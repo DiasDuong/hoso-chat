@@ -1,0 +1,194 @@
+{
+  "timestamp": "2026-10-27T07:03:03.312Z",
+  "passedCount": 12,
+  "totalCount": 12,
+  "passRate": "100.0%",
+  "results": [
+    {
+      "id": "OD_PICKER_01",
+      "name": "Liệt kê danh mục tệp và thư mục từ Microsoft OneDrive qua GET /api/onedrive/files",
+      "passed": true,
+      "expected": {
+        "status": 200,
+        "success": true,
+        "hasFolder": true,
+        "hasFile": true
+      },
+      "actual": {
+        "status": 200,
+        "success": true,
+        "totalItems": 4,
+        "hasFolder": true,
+        "hasFile": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_PICKER_02",
+      "name": "Tìm kiếm tệp trong OneDrive qua tham số search (có cơ chế fallback root)",
+      "passed": true,
+      "expected": {
+        "status": 200,
+        "hasPricing": true
+      },
+      "actual": {
+        "status": 200,
+        "hasPricing": true,
+        "matchedCount": 1
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_PICKER_03",
+      "name": "Điều hướng thư mục con và trích xuất cấu trúc Breadcrumbs metadata",
+      "passed": true,
+      "expected": {
+        "status": 200,
+        "isParentCorrect": true
+      },
+      "actual": {
+        "status": 200,
+        "parentFolderId": "D629852830F61364!s2a691a6eb6574b3b84100185cb9af659",
+        "folderName": "Ảnh"
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_PICKER_04",
+      "name": "Kiểm soát định dạng hỗ trợ (.xlsx, .docx, .pdf) và giới hạn cứng dung lượng 20MB",
+      "passed": true,
+      "expected": {
+        "isExcelSupported": true,
+        "xlsxSupported": true,
+        "exeBlocked": true,
+        "max20MB": true
+      },
+      "actual": {
+        "isExcelSupported": true,
+        "mockCheck1": true,
+        "mockCheck2": true,
+        "mockCheck3": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_PICKER_05",
+      "name": "Xử lý an toàn khi tài khoản chưa liên kết Microsoft hoặc token hết hạn (HTTP 401 notConnected)",
+      "passed": true,
+      "expected": {
+        "status": 401,
+        "notConnected": true
+      },
+      "actual": {
+        "status": 401,
+        "notConnected": true,
+        "error": "Tài khoản của bạn chưa kết nối với Microsoft OneDrive. Vui lòng liên kết tài khoản trước."
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_PICKER_06",
+      "name": "Nhập và liên kết tệp chọn từ File Picker qua POST /api/onedrive/sources/import (Không cần sharing link)",
+      "passed": true,
+      "expected": {
+        "status": 200,
+        "success": true,
+        "hasSnapshot": true
+      },
+      "actual": {
+        "status": 200,
+        "success": true,
+        "hasSnapshot": true,
+        "sourceId": "90c8fad8-7e9e-4223-bd46-76cce394e1f6"
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_PICKER_07",
+      "name": "Kiểm soát trùng lặp tệp (Anti-Duplicate): Cập nhật phiên bản thay vì tạo rác bản ghi",
+      "passed": true,
+      "expected": {
+        "singleRow": true,
+        "isVersionBumped": true
+      },
+      "actual": {
+        "singleRow": true,
+        "rowCount": "1",
+        "version": 43
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_PICKER_08",
+      "name": "Bảo vệ phân quyền IDOR & Chặn liên kết vào Agent của người dùng khác (HTTP 403 Forbidden)",
+      "passed": true,
+      "expected": {
+        "status": 403
+      },
+      "actual": {
+        "status": 403
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_PICKER_09",
+      "name": "Kiểm soát tải giới hạn theo lô (Chặn mảng rỗng và từ chối khi vượt quá 10 tệp/lần)",
+      "passed": true,
+      "expected": {
+        "emptyStatus": 400,
+        "overflowStatus": 400
+      },
+      "actual": {
+        "emptyStatus": 400,
+        "overflowStatus": 400
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_PICKER_10",
+      "name": "Tích hợp liên tục qua cuộc trò chuyện mới (Tự động nạp nguồn đã chọn cho phiên chat mới)",
+      "passed": true,
+      "expected": {
+        "hasImportedSource": true
+      },
+      "actual": {
+        "hasImportedSource": true,
+        "totalFound": 1
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_PICKER_11",
+      "name": "Tương thích tuyệt đối với Query-Time Freshness Guard (Kiểm tra eTag trực tiếp qua item_id)",
+      "passed": true,
+      "expected": {
+        "isGraphReachable": true,
+        "isFresh": true
+      },
+      "actual": {
+        "isGraphReachable": true,
+        "isFresh": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_PICKER_12",
+      "name": "Nạp dữ liệu cấu trúc bảng tính và chỉ dẫn độ mới vào Prompt của AI Agent",
+      "passed": true,
+      "expected": {
+        "hasActiveFile": true,
+        "hasTargetFile": true,
+        "hasPromptText": true,
+        "hasSpreadsheet": true
+      },
+      "actual": {
+        "hasActiveFile": true,
+        "hasTargetFile": true,
+        "hasPromptText": true,
+        "hasSpreadsheet": true,
+        "fileName": "Pricing Vendor.xlsx"
+      },
+      "notes": ""
+    }
+  ]
+}

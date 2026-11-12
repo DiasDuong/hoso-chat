@@ -1,0 +1,640 @@
+{
+  "timestamp": "2026-10-27T07:02:35.840Z",
+  "passedCount": 6,
+  "total": 6,
+  "results": [
+    {
+      "id": "OD_STRUCT_01",
+      "name": "GET /api/onedrive/files trả về cấu trúc sheetNames, validUnits, linkedAgentName và scopeNote",
+      "passed": true,
+      "expected": {
+        "isOk": true,
+        "hasEnrichedProps": true,
+        "hasSheets": true
+      },
+      "actual": {
+        "isOk": true,
+        "hasEnrichedProps": true,
+        "fileName": "Pricing Vendor.xlsx",
+        "linkedAgentName": "Excel-Data-Pro",
+        "sheetNames": [
+          "INSTRUCT",
+          "Sheet2",
+          "DATA",
+          "Sheet1",
+          "INSTRUCTION",
+          "PIC ",
+          "Miền Nam",
+          "Miền Bắc"
+        ],
+        "validUnits": 268,
+        "scopeNote": "Toàn bộ workbook (8 sheet, ~268 dòng dữ liệu)"
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_STRUCT_02",
+      "name": "POST /api/onedrive/files/inspect trích xuất sheet, cột và dữ liệu mẫu với scopeNotice toàn bộ workbook",
+      "passed": true,
+      "expected": {
+        "isOk": true,
+        "hasSheets": true,
+        "hasCols": true,
+        "hasSamples": true,
+        "hasScopeNotice": true
+      },
+      "actual": {
+        "isOk": {
+          "fileType": "spreadsheet",
+          "totalSheets": 8,
+          "sheetNames": [
+            "INSTRUCT",
+            "Sheet2",
+            "DATA",
+            "Sheet1",
+            "INSTRUCTION",
+            "PIC ",
+            "Miền Nam",
+            "Miền Bắc"
+          ],
+          "sheets": [
+            {
+              "sheetName": "INSTRUCT",
+              "totalRawRows": 30,
+              "validDataRows": 23,
+              "blankRowsCount": 6,
+              "columnsCount": 7,
+              "columns": [
+                "CODE",
+                "QUY ĐỊNH",
+                "Cột_3",
+                "Cột_4",
+                "Cột_5",
+                "Cột_6",
+                "Cột_7"
+              ],
+              "tables": [],
+              "sampleRows": [
+                {
+                  "CODE": "SALES",
+                  "Cột_3": null,
+                  "Cột_4": null,
+                  "Cột_5": null,
+                  "Cột_6": null,
+                  "Cột_7": null,
+                  "QUY ĐỊNH": "3 chữ cái đầu"
+                },
+                {
+                  "CODE": "COU",
+                  "Cột_3": null,
+                  "Cột_4": null,
+                  "Cột_5": null,
+                  "Cột_6": null,
+                  "Cột_7": null,
+                  "QUY ĐỊNH": "Code quốc tế 2 chữ"
+                },
+                {
+                  "CODE": "PORT",
+                  "Cột_3": null,
+                  "Cột_4": null,
+                  "Cột_5": null,
+                  "Cột_6": null,
+                  "Cột_7": null,
+                  "QUY ĐỊNH": "Code quốc tế 3 chữ"
+                }
+              ],
+              "warnings": []
+            },
+            {
+              "sheetName": "Sheet2",
+              "totalRawRows": 2,
+              "validDataRows": 0,
+              "blankRowsCount": 1,
+              "columnsCount": 7,
+              "columns": [
+                "Ref",
+                "Mode",
+                "Term",
+                "POL",
+                "POD",
+                "Carrier",
+                "Rate"
+              ],
+              "tables": [],
+              "sampleRows": [],
+              "warnings": []
+            },
+            {
+              "sheetName": "DATA",
+              "totalRawRows": 135,
+              "validDataRows": 134,
+              "blankRowsCount": 0,
+              "columnsCount": 10,
+              "columns": [
+                "Click chọn Sale",
+                "Click chọn Mode",
+                "Click chọn Term",
+                "Click chọn POL",
+                "Click chọn POD",
+                "Click chọn STATUS",
+                "Click chọn DEPT",
+                "Click chọn UNIT",
+                "Cột_9",
+                "Cột_10"
+              ],
+              "tables": [],
+              "sampleRows": [
+                {
+                  "Cột_9": null,
+                  "Cột_10": "GP",
+                  "Click chọn POD": "GER",
+                  "Click chọn POL": "BKK",
+                  "Click chọn DEPT": "KC",
+                  "Click chọn Mode": "FCL",
+                  "Click chọn Sale": "ALM",
+                  "Click chọn Term": "DAP",
+                  "Click chọn UNIT": "20'",
+                  "Click chọn STATUS": "CHECKING"
+                },
+                {
+                  "Cột_9": null,
+                  "Cột_10": "OT IG",
+                  "Click chọn POD": "HAN",
+                  "Click chọn POL": "CN",
+                  "Click chọn DEPT": "VT",
+                  "Click chọn Mode": "LCL",
+                  "Click chọn Sale": "ALV",
+                  "Click chọn Term": "EXW",
+                  "Click chọn UNIT": "40'",
+                  "Click chọn STATUS": "QUOTE"
+                },
+                {
+                  "Cột_9": null,
+                  "Cột_10": "FR IG",
+                  "Click chọn POD": "HCM",
+                  "Click chọn POL": "CHINA",
+                  "Click chọn DEPT": "GN",
+                  "Click chọn Mode": "SND",
+                  "Click chọn Sale": "BRI",
+                  "Click chọn Term": "FCA",
+                  "Click chọn UNIT": "KG",
+                  "Click chọn STATUS": "WIN"
+                }
+              ],
+              "warnings": []
+            },
+            {
+              "sheetName": "Sheet1",
+              "totalRawRows": 14,
+              "validDataRows": 10,
+              "blankRowsCount": 3,
+              "columnsCount": 5,
+              "columns": [
+                "Cột_1",
+                "Cột_2",
+                "From",
+                "To",
+                "CC"
+              ],
+              "tables": [],
+              "sampleRows": [
+                {
+                  "CC": "Leader",
+                  "To": "Pricing",
+                  "From": "BD/Sales",
+                  "Cột_1": 1,
+                  "Cột_2": "BD/Sales send request to PRC"
+                },
+                {
+                  "CC": "Leader",
+                  "To": "BD/Sales",
+                  "From": "Pricing",
+                  "Cột_1": 2,
+                  "Cột_2": "PRC check with Carrier and offer"
+                },
+                {
+                  "CC": "PRC (ATT email offer of PRC)",
+                  "To": "CS",
+                  "From": "BD/Sales",
+                  "Cột_1": 3,
+                  "Cột_2": "BD choose carrier svc and instruct to CS"
+                }
+              ],
+              "warnings": []
+            },
+            {
+              "sheetName": "INSTRUCTION",
+              "totalRawRows": 24,
+              "validDataRows": 11,
+              "blankRowsCount": 12,
+              "columnsCount": 15,
+              "columns": [
+                "Diễn giải cách nhập báo cáo",
+                "Cột_2",
+                "Cột_3",
+                "Cột_4",
+                "Cột_5",
+                "Cột_6",
+                "Cột_7",
+                "Cột_8",
+                "Cột_9",
+                "Cột_10",
+                "Cột_11",
+                "Cột_12",
+                "Cột_13",
+                "Cột_14",
+                "Cột_15"
+              ],
+              "tables": [],
+              "sampleRows": [
+                {
+                  "Cột_2": "DATE",
+                  "Cột_3": "W",
+                  "Cột_4": "PIC",
+                  "Cột_5": "REF NO",
+                  "Cột_6": "SALES",
+                  "Cột_7": "MODE",
+                  "Cột_8": "TERM",
+                  "Cột_9": "POL",
+                  "Cột_10": "POD",
+                  "Cột_11": "VOLUM",
+                  "Cột_12": "UNIT",
+                  "Cột_13": "AIR LINE",
+                  "Cột_14": "STATUS",
+                  "Cột_15": "REMARK/BOOKING NUMBER",
+                  "Diễn giải cách nhập báo cáo": "STT"
+                },
+                {
+                  "Cột_2": "30-Dec",
+                  "Cột_3": 53,
+                  "Cột_4": "S",
+                  "Cột_5": "JUDNRT531",
+                  "Cột_6": "JUD",
+                  "Cột_7": "AIR",
+                  "Cột_8": "CNF",
+                  "Cột_9": "SGN",
+                  "Cột_10": "NRT",
+                  "Cột_11": 200,
+                  "Cột_12": "KG",
+                  "Cột_13": "JL",
+                  "Cột_14": "WIN",
+                  "Cột_15": "3TAC -WO-AE24120027",
+                  "Diễn giải cách nhập báo cáo": 1
+                },
+                {
+                  "Cột_2": "Nhập date của ngày nhận được inquiry",
+                  "Cột_3": "Số w được auto theo date, không cần nhập",
+                  "Cột_4": "Tên viết tắt  chữ cái đầu tiên của PIC chào giá",
+                  "Cột_5": "Số ref auto theo các thông số không cần nhập. trong trường hợp số ref tạo từ trước đó mà tuần báo cáo mới đạt win thì giữ nguyên số ref ko theo công thức ngày,",
+                  "Cột_6": "Được quy định là 3 chữ cái trong tên tiếng anh của Sales, dữ liệu đc data ẩn, nếu thiếu báo leader để insert",
+                  "Cột_7": "Tích mũi tên để chọn mode",
+                  "Cột_8": "Đối với các term door bắt buộc nhập để cả team nhận diện",
+                  "Cột_9": "theo code quy ước quốc tế 3 chữ cái",
+                  "Cột_10": "theo code quy ước quốc tế 3 chữ cái",
+                  "Cột_11": "nhập số lượng",
+                  "Cột_12": "tích mũi tên để chọn đơn vị",
+                  "Cột_13": "Nhập các hãng/agent đã check, trong trường hợp win với hãng nào thì bôi đậm lên hoặc nhập ở remark",
+                  "Cột_14": "tích chọn status và luôn cập nhật daily.\r\nChecking: đang kiểm tra giá với các bên liên quan, chưa có giá\r\nQuote: đã báo giá cho sales,  \r\nWin: giá đã đạt, lấy BKG\r\nFail: đơn hàng fail \r\nClose: Đơn hàng đóng ko work tiếp kèm lý do ở remark,.",
+                  "Cột_15": "Checking: không quá 3 ngày, cần được kiểm tra và update thường xuyên\r\nQuote: đã báo giá cho sales, Quote ko quá 2 tuần, Trace lại sau 1 tuần \r\nWin: remark số BKB, Job file ... \r\nFail: trace lại phía sales lý do fail cụ thể và note ở remark\r\nClose: Đơn hàng đóng ko work tiếp kèm lý do ở remark,.",
+                  "Diễn giải cách nhập báo cáo": "Cần nhập stt bắt đầu số 1 cho thứ 2 đầu tuần. Hết tuần lại renew lại số 1"
+                }
+              ],
+              "warnings": []
+            },
+            {
+              "sheetName": "PIC ",
+              "totalRawRows": 9,
+              "validDataRows": 8,
+              "blankRowsCount": 0,
+              "columnsCount": 6,
+              "columns": [
+                "STT",
+                "HỌ VÀ TÊN",
+                "CHỨC DANH",
+                "Cột_4",
+                "TÊN TIẾNG ANH (nếu có)",
+                "Tên Viết tắt"
+              ],
+              "tables": [],
+              "sampleRows": [
+                {
+                  "STT": 1,
+                  "Cột_4": null,
+                  "CHỨC DANH": "Teamleader",
+                  "HỌ VÀ TÊN": "Trần Việt Hưng",
+                  "Tên Viết tắt": "Z",
+                  "TÊN TIẾNG ANH (nếu có)": "Zohan"
+                },
+                {
+                  "STT": 2,
+                  "Cột_4": null,
+                  "CHỨC DANH": "C/S chứng từ cước và OPS điều xe",
+                  "HỌ VÀ TÊN": "Trương Linh Thủy",
+                  "Tên Viết tắt": "J",
+                  "TÊN TIẾNG ANH (nếu có)": "Julie"
+                },
+                {
+                  "STT": 3,
+                  "Cột_4": null,
+                  "CHỨC DANH": "OPS điều xe",
+                  "HỌ VÀ TÊN": "Nguyễn Trần Đức Minh",
+                  "Tên Viết tắt": "W",
+                  "TÊN TIẾNG ANH (nếu có)": "Wilson"
+                }
+              ],
+              "warnings": []
+            },
+            {
+              "sheetName": "Miền Nam",
+              "totalRawRows": 73,
+              "validDataRows": 72,
+              "blankRowsCount": 0,
+              "columnsCount": 17,
+              "columns": [
+                "STT",
+                "NGÀY BÁO GIÁ",
+                "TUẦN",
+                "PIC BÁO GIÁ",
+                "SALE CHECK GIÁ",
+                "STATUS",
+                "MÃ REF",
+                "LOẠI HÌNH",
+                "ĐIỂM ĐI",
+                "ĐIỂM ĐẾN",
+                "SẢN LƯỢNG",
+                "LOẠI CONT/XE",
+                "VENDOR CHECK GIÁ",
+                "GIÁ COST",
+                "GIÁ DẦU ÁP DỤNG",
+                "GHI CHÚ",
+                "LINK FILE"
+              ],
+              "tables": [],
+              "sampleRows": [
+                {
+                  "STT": 1,
+                  "STATUS": "Quote",
+                  "TUẦN": 41,
+                  "MÃ REF": "41_WIN_FCL",
+                  "GHI CHÚ": "—",
+                  "GIÁ COST": "6.900.000/cont",
+                  "LINK FILE": "https://sotransvn-my.sharepoint.com/personal/sotrans-ai_sotransgroup_vn/Documents/EXTRACTOR/PRICING%20NOI%20DIA/ARCHIEVE/input3%20-%20c%C3%B3%202%20tr%C6%B0%E1%BB%9Dng%20h%E1%BB%A3p%20FCL%20v%C3%A0%20LCL_20261007_072343994.jpg",
+                  "ĐIỂM ĐI": "Meyer VN",
+                  "LOẠI HÌNH": "FCL",
+                  "PIC BÁO GIÁ": "Sophia Tâm",
+                  "LOẠI CONT/XE": "Cont 40'",
+                  "SẢN LƯỢNG": "—",
+                  "ĐIỂM ĐẾN": "Kho Sotrans TĐ - Đồng Nai",
+                  "NGÀY BÁO GIÁ": "7/10/26",
+                  "SALE CHECK GIÁ": "Winnie Quỳnh",
+                  "VENDOR CHECK GIÁ": "VENDOR",
+                  "GIÁ DẦU ÁP DỤNG": 30.49
+                },
+                {
+                  "STT": 2,
+                  "STATUS": "Quote",
+                  "TUẦN": 41,
+                  "MÃ REF": "41_WIN_LCL",
+                  "GHI CHÚ": "—",
+                  "GIÁ COST": "2.690.000/xe",
+                  "LINK FILE": "https://sotransvn-my.sharepoint.com/personal/sotrans-ai_sotransgroup_vn/Documents/EXTRACTOR/PRICING%20NOI%20DIA/ARCHIEVE/input3%20-%20c%C3%B3%202%20tr%C6%B0%E1%BB%9Dng%20h%E1%BB%A3p%20FCL%20v%C3%A0%20LCL_20261007_072343994.jpg",
+                  "ĐIỂM ĐI": "Meyer VN",
+                  "LOẠI HÌNH": "LCL",
+                  "PIC BÁO GIÁ": "Sophia Tâm",
+                  "LOẠI CONT/XE": "Xe 5T",
+                  "SẢN LƯỢNG": "—",
+                  "ĐIỂM ĐẾN": "Kho Sotrans TĐ - Đồng Nai",
+                  "NGÀY BÁO GIÁ": "7/10/26",
+                  "SALE CHECK GIÁ": "Winnie Quỳnh",
+                  "VENDOR CHECK GIÁ": "VENDOR",
+                  "GIÁ DẦU ÁP DỤNG": 30.49
+                },
+                {
+                  "STT": 3,
+                  "STATUS": "Quote",
+                  "TUẦN": 41,
+                  "MÃ REF": "41_VEN_FCL",
+                  "GHI CHÚ": "—",
+                  "GIÁ COST": "2.700.000/cont",
+                  "LINK FILE": "https://sotransvn-my.sharepoint.com/personal/sotrans-ai_sotransgroup_vn/Documents/EXTRACTOR/PRICING%20NOI%20DIA/ARCHIEVE/1789372902548_8906752926612365501_8906752926612365501_37eb897223a74c396f010f824e775b48_KU6D5_20261007_072654806.jpg",
+                  "ĐIỂM ĐI": "Casumina",
+                  "LOẠI HÌNH": "FCL",
+                  "PIC BÁO GIÁ": "VENDOR",
+                  "LOẠI CONT/XE": "Cont",
+                  "SẢN LƯỢNG": "1 cont/way/day",
+                  "ĐIỂM ĐẾN": "Tire plant/Mixing",
+                  "NGÀY BÁO GIÁ": "7/10/26",
+                  "SALE CHECK GIÁ": "VENDOR",
+                  "VENDOR CHECK GIÁ": "VENDOR",
+                  "GIÁ DẦU ÁP DỤNG": 28.48
+                }
+              ],
+              "warnings": []
+            },
+            {
+              "sheetName": "Miền Bắc",
+              "totalRawRows": 11,
+              "validDataRows": 10,
+              "blankRowsCount": 0,
+              "columnsCount": 20,
+              "columns": [
+                "STT",
+                "NGÀY BÁO GIÁ",
+                "TUẦN",
+                "PIC BÁO GIÁ",
+                "SALE CHECK GIÁ",
+                "STATUS",
+                "MÃ REF",
+                "LOẠI HÌNH",
+                "ĐIỂM ĐI",
+                "ĐIỂM ĐẾN",
+                "SẢN LƯỢNG",
+                "LOẠI CONT/XE",
+                "VENDOR CHECK GIÁ",
+                "GIÁ COST",
+                "GIÁ DẦU ÁP DỤNG",
+                "GHI CHÚ",
+                "LINK FILE",
+                "Cột_18",
+                "Cột_19",
+                "Cột_20"
+              ],
+              "tables": [],
+              "sampleRows": [
+                {
+                  "STT": 1,
+                  "STATUS": "Quote",
+                  "TUẦN": 43,
+                  "MÃ REF": "43_LYN_FCL",
+                  "Cột_18": null,
+                  "Cột_19": null,
+                  "Cột_20": null,
+                  "GHI CHÚ": "đường cấm, vào đêm ra đêm, báo luật 1tr/xe - Lạch Huyện: 450.000",
+                  "GIÁ COST": "6.200.000/cont",
+                  "LINK FILE": null,
+                  "ĐIỂM ĐI": "cảng Hải Phòng",
+                  "LOẠI HÌNH": "FCL",
+                  "PIC BÁO GIÁ": "Felix Mạnh",
+                  "LOẠI CONT/XE": "Cont 40",
+                  "SẢN LƯỢNG": "6 cont 40HC",
+                  "ĐIỂM ĐẾN": "40 Hàng Bài, Phường Cửa Nam, TP. Hà Nội, Nhà hát Kiến Hoa",
+                  "NGÀY BÁO GIÁ": "19/10/2026",
+                  "SALE CHECK GIÁ": "Lynn Suong",
+                  "VENDOR CHECK GIÁ": "VENDOR",
+                  "GIÁ DẦU ÁP DỤNG": 29.12
+                },
+                {
+                  "STT": 2,
+                  "STATUS": "Quote",
+                  "TUẦN": 43,
+                  "MÃ REF": "43_CHI_FCL",
+                  "Cột_18": null,
+                  "Cột_19": null,
+                  "Cột_20": null,
+                  "GHI CHÚ": "Mặt hàng: Fabricated steel parts - Nếu phát sinh lấy khu vực Lạch Huyện + 450.000/cont",
+                  "GIÁ COST": 4600000,
+                  "LINK FILE": null,
+                  "ĐIỂM ĐI": "Dinh Tram Industrial Park, Viet Yen, Bac Giang, Vietnam",
+                  "LOẠI HÌNH": "FCL",
+                  "PIC BÁO GIÁ": "Felix Mạnh",
+                  "LOẠI CONT/XE": "Cont 20 (đi ghép)",
+                  "SẢN LƯỢNG": "—",
+                  "ĐIỂM ĐẾN": "cảng Hải Phòng",
+                  "NGÀY BÁO GIÁ": "19/10/2026",
+                  "SALE CHECK GIÁ": "Chi Nauven",
+                  "VENDOR CHECK GIÁ": "VENDOR",
+                  "GIÁ DẦU ÁP DỤNG": 29.12
+                },
+                {
+                  "STT": 3,
+                  "STATUS": "Quote",
+                  "TUẦN": 43,
+                  "MÃ REF": "43_CHI_FCL",
+                  "Cột_18": null,
+                  "Cột_19": null,
+                  "Cột_20": null,
+                  "GHI CHÚ": "Mặt hàng: Fabricated steel parts - Nếu phát sinh lấy khu vực Lạch Huyện + 450.000/cont",
+                  "GIÁ COST": 5500000,
+                  "LINK FILE": null,
+                  "ĐIỂM ĐI": "Dinh Tram Industrial Park, Viet Yen, Bac Giang, Vietnam",
+                  "LOẠI HÌNH": "FCL",
+                  "PIC BÁO GIÁ": "Felix Mạnh",
+                  "LOẠI CONT/XE": "Cont 20 đi đơn",
+                  "SẢN LƯỢNG": "—",
+                  "ĐIỂM ĐẾN": "cảng Hải Phòng",
+                  "NGÀY BÁO GIÁ": "19/10/2026",
+                  "SALE CHECK GIÁ": "Chi Nauven",
+                  "VENDOR CHECK GIÁ": "VENDOR",
+                  "GIÁ DẦU ÁP DỤNG": 29.12
+                }
+              ],
+              "warnings": []
+            }
+          ],
+          "totalDataRows": 268,
+          "validUnits": 268,
+          "totalUnits": 298,
+          "documentSummary": null,
+          "parseStatus": "READY",
+          "warnings": [],
+          "errors": [],
+          "scopeNote": "AI sẽ sử dụng toàn bộ workbook đã phân tích (8 sheet, ~268 dòng dữ liệu) để đối soát và trả lời câu hỏi. Không giới hạn riêng một sheet."
+        },
+        "sheetCount": 8,
+        "firstSheet": "INSTRUCT",
+        "colCount": 7,
+        "sampleRowCount": 3,
+        "hasScopeNotice": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_STRUCT_03",
+      "name": "GET /api/onedrive/sources/:id/structure trả về cấu trúc chi tiết và Agent name của nguồn kết nối",
+      "passed": true,
+      "expected": {
+        "isOk": true,
+        "hasValidUnits": true,
+        "hasAgentName": true
+      },
+      "actual": {
+        "isOk": true,
+        "agentName": "Excel-Data-Pro",
+        "validUnits": 268,
+        "totalUnits": 298,
+        "sheetNames": [
+          "INSTRUCT",
+          "Sheet2",
+          "DATA",
+          "Sheet1",
+          "INSTRUCTION",
+          "PIC ",
+          "Miền Nam",
+          "Miền Bắc"
+        ]
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_STRUCT_04",
+      "name": "Bảo vệ IDOR trên GET /api/onedrive/sources/:id/structure chặn người dùng khác công ty (HTTP 404/403)",
+      "passed": true,
+      "expected": {
+        "status": 404,
+        "success": false
+      },
+      "actual": {
+        "status": 404,
+        "error": "Không tìm thấy nguồn dữ liệu hoặc bạn không có quyền truy cập."
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_STRUCT_05",
+      "name": "GET /api/onedrive/sources bổ sung agent_name, sheet_names, valid_units và scope_note",
+      "passed": true,
+      "expected": {
+        "isOk": true,
+        "hasAgent": true,
+        "hasSheets": true,
+        "hasValidUnits": true
+      },
+      "actual": {
+        "isOk": true,
+        "agentName": "Excel-Data-Pro",
+        "sheetNames": [
+          "INSTRUCT",
+          "Sheet2",
+          "DATA",
+          "Sheet1",
+          "INSTRUCTION",
+          "PIC ",
+          "Miền Nam",
+          "Miền Bắc"
+        ],
+        "validUnits": 268,
+        "scopeNote": "AI sử dụng toàn bộ workbook (8 sheet, ~268 dòng dữ liệu)"
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_STRUCT_06",
+      "name": "Giao diện index.html tích hợp Master-Detail 2 cột, bảng xem trước cột/dòng, xác nhận liên kết và cảnh báo phạm vi AI",
+      "passed": true,
+      "expected": {
+        "hasMasterDetail": true,
+        "hasConfirmView": true,
+        "hasStructDlg": true,
+        "hasScopeNotice": true
+      },
+      "actual": {
+        "hasMasterDetail": true,
+        "hasConfirmView": true,
+        "hasStructDlg": true,
+        "hasScopeNotice": true,
+        "hasAgentBadges": true
+      },
+      "notes": ""
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "HR_Daily_Scheduler_01",
+  "name": "HR_Daily_Scheduler",
+  "active": 1,
+  "nodes": "[{\"parameters\":{\"rule\":{\"interval\":[{\"field\":\"cronExpression\",\"expression\":\"5 0 * * *\"}]}},\"id\":\"e1f2a3b4-0000-4000-8000-000000000001\",\"name\":\"Daily 00:05\",\"type\":\"n8n-nodes-base.scheduleTrigger\",\"typeVersion\":1.2,\"position\":[208,240]},{\"parameters\":{\"operation\":\"executeQuery\",\"query\":\"SELECT activate_due_versions() AS activated_count, (SELECT count(*) FROM purge_expired_trash()) AS purged_count;\",\"options\":{}},\"id\":\"e1f2a3b4-0000-4000-8000-000000000002\",\"name\":\"Activate Due Versions\",\"type\":\"n8n-nodes-base.postgres\",\"typeVersion\":2.7,\"position\":[432,240],\"credentials\":{\"postgres\":{\"id\":\"oQ0QptxKd9XXLeQK\",\"name\":\"PG hrbot\"}}},{\"parameters\":{\"conditions\":{\"options\":{\"caseSensitive\":true,\"leftValue\":\"\",\"typeValidation\":\"loose\",\"version\":1},\"conditions\":[{\"id\":\"e1f2a3b4-0000-4000-8000-000000000003\",\"leftValue\":\"={{ $json.activated_count }}\",\"rightValue\":0,\"operator\":{\"type\":\"number\",\"operation\":\"gt\"}}],\"combinator\":\"and\"},\"options\":{}},\"id\":\"e1f2a3b4-0000-4000-8000-000000000004\",\"name\":\"Any Activated?\",\"type\":\"n8n-nodes-base.if\",\"typeVersion\":2.2,\"position\":[656,240]},{\"parameters\":{\"operation\":\"executeQuery\",\"query\":\"SELECT doc_version_id::text AS doc_version_id,\\n       title,\\n       doc_number,\\n       doc_type,\\n       status::text AS status,\\n       branch_scope,\\n       role_access,\\n       COALESCE(to_char(effective_date, 'YYYYMMDD')::int, 20200101) AS effective_int,\\n       COALESCE(to_char(expiry_date, 'YYYYMMDD')::int, 99991231) AS expiry_int\\nFROM documents;\",\"options\":{}},\"id\":\"e1f2a3b4-0000-4000-8000-000000000005\",\"name\":\"Sync Documents\",\"type\":\"n8n-nodes-base.postgres\",\"typeVersion\":2.7,\"position\":[880,240],\"credentials\":{\"postgres\":{\"id\":\"oQ0QptxKd9XXLeQK\",\"name\":\"PG hrbot\"}}},{\"parameters\":{\"method\":\"POST\",\"url\":\"http://qdrant:6333/collections/hr_docs/points/payload?wait=true\",\"sendBody\":true,\"specifyBody\":\"json\",\"jsonBody\":\"={{ JSON.stringify({ payload: { title: $json.title, doc_number: $json.doc_number, status: $json.status, effective_int: $json.effective_int, expiry_int: $json.expiry_int, branch_scope: Array.isArray($json.branch_scope) ? $json.branch_scope : ['all'], role_access: Array.isArray($json.role_access) ? $json.role_access : ['all'], doc_type: $json.doc_type || 'Quy chế' }, filter: { must: [ { key: 'doc_version_id', match: { value: $json.doc_version_id } } ] } }) }}\",\"options\":{}},\"id\":\"e1f2a3b4-0000-4000-8000-000000000006\",\"name\":\"Sync Qdrant\",\"type\":\"n8n-nodes-base.httpRequest\",\"typeVersion\":4.5,\"position\":[1104,240]}]",
+  "connections": "{\"Daily 00:05\":{\"main\":[[{\"node\":\"Activate Due Versions\",\"type\":\"main\",\"index\":0}]]},\"Activate Due Versions\":{\"main\":[[{\"node\":\"Any Activated?\",\"type\":\"main\",\"index\":0}]]},\"Any Activated?\":{\"main\":[[{\"node\":\"Sync Documents\",\"type\":\"main\",\"index\":0}]]},\"Sync Documents\":{\"main\":[[{\"node\":\"Sync Qdrant\",\"type\":\"main\",\"index\":0}]]}}",
+  "settings": "{\"executionOrder\":\"v1\",\"timezone\":\"Asia/Ho_Chi_Minh\",\"binaryMode\":\"separate\"}",
+  "staticData": "{\"node:Daily 00:05\":{\"recurrenceRules\":[null],\"recurrenceRuleSignatures\":[null]}}",
+  "pinData": "{}",
+  "versionId": "3ebd2c1d-a18f-4ef0-9752-e7f937401f44",
+  "triggerCount": 1,
+  "meta": "{}",
+  "parentFolderId": null,
+  "createdAt": "2026-10-07 07:05:02.000",
+  "updatedAt": "2026-10-16 02:47:34",
+  "isArchived": 0,
+  "versionCounter": 1,
+  "description": null,
+  "activeVersionId": "3ebd2c1d-a18f-4ef0-9752-e7f937401f44",
+  "nodeGroups": "[]",
+  "sourceWorkflowId": null
+}

@@ -1,0 +1,4 @@
+﻿employee_code,employee_name,company_id,department,position,email,status
+STL-001,Nguyễn Văn A,STL,Phòng Khai thác ICD Sotrans,Chuyên viên Khai thác,nguyenvana@sotrans.com.vn,ACTIVE
+VTX-001,Trần Thị B,VTX,Phòng Vận tải Đa phương thức,Điều độ Vận tải,tranthib@vietranstimex.com.vn,ACTIVE
+SWC-001,Lê Văn C,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Thuyền phó,levanc@sowatco.com.vn,ACTIVE

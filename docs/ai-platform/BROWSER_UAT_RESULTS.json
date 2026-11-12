@@ -1,0 +1,154 @@
+{
+  "total": 21,
+  "passed": 21,
+  "passRate": "100%",
+  "results": [
+    {
+      "id": "UAT-01",
+      "name": "Tải trang chủ thành công & kiểm tra Title",
+      "status": "PASS",
+      "details": "SOTRANS AI Workspace • Không gian Làm việc & Quản trị Tập trung",
+      "timestamp": "2026-10-30T02:35:51.932Z"
+    },
+    {
+      "id": "UAT-02",
+      "name": "Hiển thị nút Đăng nhập khi chưa xác thực",
+      "status": "PASS",
+      "details": "Đăng nhập",
+      "timestamp": "2026-10-30T02:35:51.955Z"
+    },
+    {
+      "id": "UAT-03",
+      "name": "Đăng nhập thành công với tài khoản admin_stl",
+      "status": "PASS",
+      "details": "admin_stl",
+      "timestamp": "2026-10-30T02:35:53.371Z"
+    },
+    {
+      "id": "UAT-04",
+      "name": "Hiển thị Trung tâm Quản trị (Admin Hub) cho vai trò ADMIN",
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2026-10-30T02:35:53.376Z"
+    },
+    {
+      "id": "UAT-05",
+      "name": "General AI phản hồi lượt 1 (Lập danh sách 3 hồ sơ)",
+      "status": "PASS",
+      "details": "Độ dài: 1084",
+      "timestamp": "2026-10-30T02:35:58.638Z"
+    },
+    {
+      "id": "UAT-06",
+      "name": "Phân giải tham chiếu tự nhiên: Thao tác có chọn lọc trên mục [2]",
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2026-10-30T02:36:00.630Z"
+    },
+    {
+      "id": "UAT-07",
+      "name": "Phân giải tham chiếu: Khôi phục phương án ban đầu",
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2026-10-30T02:36:04.630Z"
+    },
+    {
+      "id": "UAT-08",
+      "name": "Tạo mới Personal AI Agent thành công trong My Agents",
+      "status": "PASS",
+      "details": "Logistics Calculator Pro",
+      "timestamp": "2026-10-30T02:36:06.080Z"
+    },
+    {
+      "id": "UAT-09",
+      "name": "Personal Agent thực thi tính toán chính xác (15M + 22.5M + 2.5M = 40M)",
+      "status": "PASS",
+      "details": "Tổng chi phí cho các hạng mục bạn đã cung cấp là 40.000.000 VNĐ.\n\nChi tiết tính ",
+      "timestamp": "2026-10-30T02:36:09.853Z"
+    },
+    {
+      "id": "UAT-10",
+      "name": "Bóc tách bảng tính Excel đa sheet không cắt ngắn âm thầm",
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2026-10-30T02:36:16.454Z"
+    },
+    {
+      "id": "UAT-11",
+      "name": "Bóc tách văn bản Word DOCX trích xuất phân đoạn hoàn chỉnh",
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2026-10-30T02:36:20.791Z"
+    },
+    {
+      "id": "UAT-12",
+      "name": "HR Policy RAG trả lời có căn cứ quy định nội bộ",
+      "status": "PASS",
+      "details": "Độ dài: 1937",
+      "timestamp": "2026-10-30T02:36:27.170Z"
+    },
+    {
+      "id": "UAT-13",
+      "name": "Hồ sơ Nhân sự: Admin tra cứu hồ sơ nhân viên thành công",
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2026-10-30T02:36:29.171Z"
+    },
+    {
+      "id": "UAT-14",
+      "name": "Lịch sử hội thoại: Danh sách phiên trò chuyện được hiển thị",
+      "status": "PASS",
+      "details": "Số phiên: 3",
+      "timestamp": "2026-10-30T02:36:30.436Z"
+    },
+    {
+      "id": "UAT-15",
+      "name": "Khôi phục phiên trò chuyện thành công từ lịch sử",
+      "status": "PASS",
+      "details": "Số tin nhắn khôi phục: 2",
+      "timestamp": "2026-10-30T02:36:31.493Z"
+    },
+    {
+      "id": "UAT-16",
+      "name": "Đăng nhập nhân viên thông thường (emp_stl)",
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2026-10-30T02:36:33.948Z"
+    },
+    {
+      "id": "UAT-17",
+      "name": "Phân quyền RBAC: Trung tâm Quản trị (Admin Hub) bị ẩn với Employee",
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2026-10-30T02:36:33.952Z"
+    },
+    {
+      "id": "UAT-18",
+      "name": "Bảo vệ quyền riêng tư: Chatbot Hồ sơ nhân sự bị ẩn hoàn toàn với Employee",
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2026-10-30T02:36:33.955Z"
+    },
+    {
+      "id": "UAT-19",
+      "name": "Frontend RBAC Guard: canAccessAgent(\"hoso\") chặn Employee truy cập",
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2026-10-30T02:36:33.956Z"
+    },
+    {
+      "id": "UAT-20",
+      "name": "Backend API Guard: Chặn Employee truy cập API hồ sơ nhân sự (HTTP 403 Forbidden)",
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2026-10-30T02:36:33.963Z"
+    },
+    {
+      "id": "UAT-21",
+      "name": "Bảo mật AI: Chặn rò rỉ CCCD & mức lương nhạy cảm của nhân viên khác",
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2026-10-30T02:36:37.746Z"
+    }
+  ]
+}

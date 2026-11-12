@@ -1,0 +1,4 @@
+username,role,employee_code,company_id,default_password,status
+nv_sotrans_01,EMPLOYEE,STL-001,STL,Employee@123,ACTIVE
+hr_vietranstimex,HR,VTX-001,VTX,HrVTX@123,ACTIVE
+admin_sotrans,ADMIN,,,Admin@123,ACTIVE

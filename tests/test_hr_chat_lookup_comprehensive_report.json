@@ -1,0 +1,271 @@
+{
+  "timestamp": "2026-10-28T02:45:30.266Z",
+  "total": 35,
+  "passed": 18,
+  "failed": 17,
+  "pass_rate": "51%",
+  "results": [
+    {
+      "category": "Nhóm 1",
+      "id": "TC1.1",
+      "name": "Tra cứu theo mã nhân viên SWC00017",
+      "passed": true,
+      "duration": 55
+    },
+    {
+      "category": "Nhóm 1",
+      "id": "TC1.2",
+      "name": "Tra cứu theo họ và tên đầy đủ (PHAN DƯƠNG THANH BÌNH)",
+      "passed": false,
+      "duration": 38,
+      "detail": "Status 200, reply: 🔍 **Không tìm thấy nhân sự phù hợp**:\n\nKhông có hồ sơ nhân sự nào thuộc **Toàn bộ Tập đoàn (STL, SW"
+    },
+    {
+      "category": "Nhóm 1",
+      "id": "TC1.3",
+      "name": "Tra cứu họ tên không dấu (nguyen truong nam)",
+      "passed": true,
+      "duration": 21
+    },
+    {
+      "category": "Nhóm 1",
+      "id": "TC1.4",
+      "name": "Tra cứu theo số CCCD (079204001284)",
+      "passed": false,
+      "duration": 17,
+      "detail": "Status 200, reply: 🔍 **Không tìm thấy nhân sự phù hợp**:\n\nKhông có hồ sơ nhân sự nào thuộc **Toàn bộ Tập đoàn (STL, SW"
+    },
+    {
+      "category": "Nhóm 1",
+      "id": "TC1.5",
+      "name": "Tra cứu theo số điện thoại (0987654321)",
+      "passed": true,
+      "duration": 14
+    },
+    {
+      "category": "Nhóm 1",
+      "id": "TC1.6",
+      "name": "Tra cứu theo email (thienhan662005@gmail.com)",
+      "passed": false,
+      "duration": 12,
+      "detail": "Status 200, reply: 🔍 **Không tìm thấy nhân sự phù hợp**:\n\nKhông có hồ sơ nhân sự nào thuộc **Toàn bộ Tập đoàn (STL, SW"
+    },
+    {
+      "category": "Nhóm 1",
+      "id": "TC1.7",
+      "name": "Xử lý disambiguation khi tìm tên trùng lặp (Nhân)",
+      "passed": false,
+      "duration": 15,
+      "detail": "Status 200, reply: ### 🟢 THÔNG TIN NHÂN SỰ — ĐANG LÀM VIỆC (ACTIVE)\n\n- **Họ và tên**: **Lê Thu Hà**\n- **Mã nhân viên**"
+    },
+    {
+      "category": "Nhóm 2",
+      "id": "TC2.1",
+      "name": "Nhân viên nào sinh năm 2005?",
+      "passed": false,
+      "duration": 12,
+      "detail": "Status 200, reply: 🔍 **Không tìm thấy nhân sự phù hợp**:\n\nKhông có hồ sơ nhân sự nào thuộc **Toàn bộ Tập đoàn (STL, SW"
+    },
+    {
+      "category": "Nhóm 2",
+      "id": "TC2.2",
+      "name": "Những nhân viên nào dưới 30 tuổi?",
+      "passed": false,
+      "duration": 14,
+      "detail": "Status 200, total: 2"
+    },
+    {
+      "category": "Nhóm 2",
+      "id": "TC2.3",
+      "name": "Những nhân viên nào trên 30 tuổi?",
+      "passed": false,
+      "duration": 12,
+      "detail": "Status 200, reply: 🔍 **Không tìm thấy nhân sự phù hợp**:\n\nKhông có hồ sơ nhân sự nào thuộc **Toàn bộ Tập đoàn (STL, SW"
+    },
+    {
+      "category": "Nhóm 2",
+      "id": "TC2.4",
+      "name": "Kiểm tra độ chính xác mốc giáp ranh ngày sinh",
+      "passed": false,
+      "duration": 15,
+      "detail": "Status 200, reply: 🔍 **Không tìm thấy nhân sự phù hợp**:\n\nKhông có hồ sơ nhân sự nào thuộc **Toàn bộ Tập đoàn (STL, SW"
+    },
+    {
+      "category": "Nhóm 3",
+      "id": "TC3.1",
+      "name": "Liệt kê nhân viên thuộc công ty SWC",
+      "passed": false,
+      "duration": 13,
+      "detail": "Status 200, total_found: 3"
+    },
+    {
+      "category": "Nhóm 3",
+      "id": "TC3.2",
+      "name": "Liệt kê nhân viên thuộc Phòng Vận tải",
+      "passed": false,
+      "duration": 14,
+      "detail": "Status 200, reply: 🔍 Tìm thấy **2** hồ sơ nhân sự phù hợp với yêu cầu tra cứu (Toàn bộ Tập đoàn (STL, SWC, VTX)):\n\n1. "
+    },
+    {
+      "category": "Nhóm 3",
+      "id": "TC3.3",
+      "name": "Tra cứu theo chức danh \"Thợ máy\"",
+      "passed": false,
+      "duration": 12,
+      "detail": "Status 200, reply: 🔍 **Không tìm thấy nhân sự phù hợp**:\n\nKhông có hồ sơ nhân sự nào thuộc **Toàn bộ Tập đoàn (STL, SW"
+    },
+    {
+      "category": "Nhóm 3",
+      "id": "TC3.4",
+      "name": "Tra cứu theo chức danh \"Thuyền phó\"",
+      "passed": false,
+      "duration": 13,
+      "detail": "Status 200, reply: 🔍 **Không tìm thấy nhân sự phù hợp**:\n\nKhông có hồ sơ nhân sự nào thuộc **Toàn bộ Tập đoàn (STL, SW"
+    },
+    {
+      "category": "Nhóm 4",
+      "id": "TC4.1",
+      "name": "Nhân viên SWC dưới 30 tuổi",
+      "passed": false,
+      "duration": 13,
+      "detail": "Status 200, total_found: 1"
+    },
+    {
+      "category": "Nhóm 4",
+      "id": "TC4.2",
+      "name": "Nhân viên STL dưới 30 tuổi",
+      "passed": true,
+      "duration": 13
+    },
+    {
+      "category": "Nhóm 5",
+      "id": "TC5.1",
+      "name": "Có bao nhiêu nhân viên toàn hệ thống?",
+      "passed": false,
+      "duration": 15,
+      "detail": "Status 200, reply: 📊 **Kết quả thống kê nhân sự (Toàn bộ Tập đoàn (STL, SWC, VTX))**:\n\nHiện có **11** nhân sự thỏa mãn"
+    },
+    {
+      "category": "Nhóm 5",
+      "id": "TC5.2",
+      "name": "Có bao nhiêu nhân viên thuộc công ty SWC?",
+      "passed": true,
+      "duration": 13
+    },
+    {
+      "category": "Nhóm 5",
+      "id": "TC5.3",
+      "name": "Có bao nhiêu nhân viên thuộc công ty STL?",
+      "passed": true,
+      "duration": 16
+    },
+    {
+      "category": "Nhóm 6",
+      "id": "TC6.1",
+      "name": "Minh bạch ghi chú số lượng nhân sự chưa có ngày sinh",
+      "passed": true,
+      "duration": 12
+    },
+    {
+      "category": "Nhóm 6",
+      "id": "TC6.2",
+      "name": "Tra cứu thuộc tính chưa có dữ liệu (không tự bịa thông tin)",
+      "passed": true,
+      "duration": 11
+    },
+    {
+      "category": "Nhóm 7",
+      "id": "TC7.1",
+      "name": "Mặc định danh sách chung loại trừ nhân viên DELETED",
+      "passed": true,
+      "duration": 13
+    },
+    {
+      "category": "Nhóm 7",
+      "id": "TC7.2",
+      "name": "Tra cứu đích danh nhân viên đã xóa mềm thông báo rõ trạng thái",
+      "passed": true,
+      "duration": 16
+    },
+    {
+      "category": "Nhóm 8",
+      "id": "TC8.1",
+      "name": "HR SWC tra cứu nhân viên nội bộ SWC thành công",
+      "passed": true,
+      "duration": 12
+    },
+    {
+      "category": "Nhóm 8",
+      "id": "TC8.2",
+      "name": "HR SWC cố tình tra cứu nhân viên công ty STL bị chặn",
+      "passed": true,
+      "duration": 12
+    },
+    {
+      "category": "Nhóm 8",
+      "id": "TC8.3",
+      "name": "HR STL cố tình tra cứu nhân viên công ty SWC bị chặn",
+      "passed": true,
+      "duration": 14
+    },
+    {
+      "category": "Nhóm 8",
+      "id": "TC8.4",
+      "name": "EMPLOYEE Self-service chỉ xem được của mình, chặn tra cứu người khác",
+      "passed": true,
+      "duration": 11
+    },
+    {
+      "category": "Nhóm 9",
+      "id": "TC9.1",
+      "name": "Request rỗng trả về mã lỗi 400 rõ ràng",
+      "passed": true,
+      "duration": 5
+    },
+    {
+      "category": "Nhóm 9",
+      "id": "TC9.2",
+      "name": "Thử SQL injection hoặc ký tự đặc biệt không gây lỗi 500",
+      "passed": true,
+      "duration": 14
+    },
+    {
+      "category": "Nhóm 10",
+      "id": "TC10.1",
+      "name": "Viết tắt \"nv nao duoi 30 tuoi\"",
+      "passed": false,
+      "duration": 13,
+      "detail": "Status 200, total_found: 2"
+    },
+    {
+      "category": "Nhóm 10",
+      "id": "TC10.2",
+      "name": "Không dấu \"nhan vien nao sinh nam 2005\"",
+      "passed": false,
+      "duration": 12,
+      "detail": "Status 200, reply: 🔍 **Không tìm thấy nhân sự phù hợp**:\n\nKhông có hồ sơ nhân sự nào thuộc **Toàn bộ Tập đoàn (STL, SW"
+    },
+    {
+      "category": "Nhóm 10",
+      "id": "TC10.3",
+      "name": "Cách diễn đạt tự nhiên \"cho tôi xem danh sách nhân sự bên swc\"",
+      "passed": false,
+      "duration": 13,
+      "detail": "Status 200, total_found: 3"
+    },
+    {
+      "category": "Nhóm 11",
+      "id": "TC11.1",
+      "name": "Câu hỏi quy chế/chính sách (không bị chặn nhầm bởi tra cứu hồ sơ)",
+      "passed": true,
+      "duration": 6870
+    },
+    {
+      "category": "Nhóm 11",
+      "id": "TC11.2",
+      "name": "Lời chào xã giao \"Xin chào chatbot\" không bị nhầm là tra cứu nhân sự",
+      "passed": true,
+      "duration": 2737
+    }
+  ]
+}

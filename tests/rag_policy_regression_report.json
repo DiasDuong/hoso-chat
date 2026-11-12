@@ -1,0 +1,184 @@
+{
+  "executed_at": "2026-10-26T07:45:44.475Z",
+  "total": 12,
+  "passed": 12,
+  "failed": 0,
+  "pass_rate": "100.0%",
+  "results": [
+    {
+      "id": "SCENARIO_01_GENERAL_LUNCH",
+      "title": "General lunch-break duration query distinguishes corporate standard vs special shift",
+      "status": "PASS",
+      "passed": true,
+      "details": {
+        "query": "Thời gian nghỉ trưa như thế nào?",
+        "reply": "Quy định về thời gian nghỉ trưa tại Tập đoàn SOTRANS và các đơn vị thành viên được phân định cụ thể theo các nhóm đối tượng và văn bản sau:\n\n1. Khung thời giờ chuẩn toàn tập đoàn:\n- Áp dụng cho toàn bộ cán bộ công nhân viên thuộc Tập đoàn SOTRANS và các công ty thành viên (trừ các bộ phận ca kíp đặc thù):\n- Thời gian nghỉ trưa là từ 12:00 đến 13:00 (60 phút).\n\n2. Khung thời giờ làm việc đặc thù theo ca:\n- Áp dụng cho nhân viên khối văn phòng làm việc theo ca đặc thù 09:30 tại Công ty mẫu ABC (theo văn bản HR-TG-002):\n- Thời gian nghỉ trưa là từ 12:30 đến 13:30, tổng cộng 60 phút.\n\nLưu ý: Nếu bạn không thuộc ca làm việc đặc thù trên, thời gian nghỉ trưa áp dụng chung cho bạn là từ 12:00 đến 13:00. Bạn nên xác nhận lại với Trưởng bộ phận hoặc phòng Nhân sự để biết chính xác ca làm việc áp dụng tại đơn vị của mình.\n\n**Nguồn:**\n• **Bo Quy che Lao dong & Thoi gio lam viec Toan tap doan SOTRANS** (01/QC-SOTRANS, v1, hiệu lực từ 01/01/2026) – Căn cứ: Điều 1. Khung thời giờ làm việc chuẩn toàn tập đoàn\n• **Quy định Thời gian Làm việc - Khối Văn phòng (Ca 09h30)** (v3, hiệu lực từ 07/10/2026) – Căn cứ: Điều 2. Nghỉ trưa; Quy dinh Thoi gian Lam viec   Khong Van phong (Ca 09h30)",
+        "sources": [
+          "Bo Quy che Lao dong & Thoi gio lam viec Toan tap doan SOTRANS",
+          "Quy định Thời gian Làm việc - Khối Văn phòng (Ca 09h30)",
+          "Quy định Thời gian Làm việc - Khối Văn phòng (Ca 09h30)"
+        ]
+      },
+      "notes": ""
+    },
+    {
+      "id": "SCENARIO_02_OFFICE_LUNCH",
+      "title": "Office-specific lunch-break query directly addresses office staff and explains standard vs special shift applicability",
+      "status": "PASS",
+      "passed": true,
+      "details": {
+        "query": "Thời gian nghỉ trưa của khối văn phòng như thế nào?",
+        "reply": "Thời gian nghỉ trưa của khối văn phòng được quy định tùy thuộc vào chế độ làm việc và đơn vị áp dụng:\n\n1. **Khung thời giờ làm việc chuẩn toàn tập đoàn (áp dụng chung cho cán bộ nhân viên SOTRANS và các công ty thành viên):**\n   - Thời gian nghỉ trưa: Từ 12:00 đến 13:00 (60 phút).\n\n2. **Khối văn phòng làm việc theo ca đặc thù (Ví dụ: Ca 09:30 tại Công ty mẫu ABC theo văn bản HR-TG-002):**\n   - Thời gian nghỉ trưa: Từ 12:30 đến 13:30, tổng cộng 60 phút.\n\n*Lưu ý:* Bạn nên xác nhận với Trưởng bộ phận hoặc phòng Nhân sự để biết chính xác bản thân đang áp dụng theo khung giờ chuẩn toàn tập đoàn hay ca làm việc đặc thù tại đơn vị của mình.\n\n**Nguồn:**\n• **Bo Quy che Lao dong & Thoi gio lam viec Toan tap doan SOTRANS** (01/QC-SOTRANS, v1, hiệu lực từ 01/01/2026) – Căn cứ: Điều 1. Khung thời giờ làm việc chuẩn toàn tập đoàn\n• **Quy định Thời gian Làm việc - Khối Văn phòng (Ca 09h30)** (v3, hiệu lực từ 07/10/2026) – Căn cứ: Điều 2. Nghỉ trưa",
+        "sources": [
+          "Bo Quy che Lao dong & Thoi gio lam viec Toan tap doan SOTRANS",
+          "Quy định Thời gian Làm việc - Khối Văn phòng (Ca 09h30)"
+        ]
+      },
+      "notes": ""
+    },
+    {
+      "id": "SCENARIO_03_FOLLOWUP_NARROWING",
+      "title": "Follow-up query narrowing employee group (\"Thế còn khối văn phòng thì sao?\") resolves context from previous turn",
+      "status": "PASS",
+      "passed": true,
+      "details": {
+        "history": [
+          {
+            "role": "user",
+            "content": "Thời gian nghỉ trưa như thế nào?"
+          },
+          {
+            "role": "assistant",
+            "content": "Khung giờ chuẩn toàn tập đoàn là từ 12:00 đến 13:00..."
+          }
+        ],
+        "query": "Thế còn khối văn phòng thì sao?",
+        "reply": "Đối với khối văn phòng trong toàn tập đoàn, thời gian nghỉ trưa chuẩn được quy định từ 12:00 đến 13:00 (60 phút).\n\nTuy nhiên, đối với nhân viên khối văn phòng thuộc ca làm việc đặc thù (ca 09:30 tại Công ty mẫu ABC theo văn bản HR-TG-002), thời gian nghỉ trưa bắt đầu từ 12:30 đến 13:30 (tổng cộng 60 phút). Khung giờ đặc thù này chỉ áp dụng riêng cho nhân viên được xếp vào ca làm việc này tại đơn vị tương ứng.\n\n**Nguồn:**\n• **Bo Quy che Lao dong & Thoi gio lam viec Toan tap doan SOTRANS** (01/QC-SOTRANS, v1, hiệu lực từ 01/01/2026) – Căn cứ: Điều 1. Khung thời giờ làm việc chuẩn toàn tập đoàn\n• **Quy định Thời gian Làm việc - Khối Văn phòng (Ca 09h30)** (v3, hiệu lực từ 07/10/2026) – Căn cứ: Điều 4. Làm thêm giờ; Điều 2. Nghỉ trưa"
+      },
+      "notes": ""
+    },
+    {
+      "id": "SCENARIO_04_FOLLOWUP_CHANGING",
+      "title": "Follow-up query changing employee group (\"Thế còn nhân viên khối hiện trường hoặc lái xe?\") shifts focus correctly",
+      "status": "PASS",
+      "passed": true,
+      "details": {
+        "history": [
+          {
+            "role": "user",
+            "content": "Thời gian nghỉ trưa của khối văn phòng như thế nào?"
+          },
+          {
+            "role": "assistant",
+            "content": "Khối văn phòng có khung chuẩn 12:00 - 13:00 và ca đặc thù 12:30 - 13:30..."
+          }
+        ],
+        "query": "Thế còn nhân viên khối hiện trường hoặc lái xe thì sao?",
+        "reply": "Hiện tại tài liệu nội bộ mình được cung cấp chưa có thông tin về nội dung bạn hỏi. Bạn vui lòng liên hệ trực tiếp phòng Nhân sự: 028 1234 5678 hoặc hr@sotrans.vn."
+      },
+      "notes": ""
+    },
+    {
+      "id": "SCENARIO_05_POLICY_DIFFERING",
+      "title": "General vs specialized shift differing breaks explains distinct scopes without claiming invalidity",
+      "status": "PASS",
+      "passed": true,
+      "details": {
+        "query": "Quy chế tập đoàn quy định nghỉ trưa 12:00-13:00 nhưng quy định văn phòng ghi 12:30-13:30, tôi phải theo quy định nào?",
+        "reply": "Theo các tài liệu quy định nội bộ:\n\n1. Khung thời giờ làm việc chuẩn toàn tập đoàn (áp dụng chung cho toàn bộ cán bộ công nhân viên thuộc Tập đoàn SOTRANS và các công ty thành viên) quy định thời gian nghỉ giữa ca và nghỉ trưa là từ 12:00 đến 13:00.\n\n2. Trong khi đó, quy định nghỉ trưa từ 12:30 đến 13:30 (tổng cộng 60 phút) áp dụng riêng cho nhân viên khối văn phòng thuộc Công ty mẫu ABC làm việc theo ca đặc thù bắt đầu từ 09:30 đến 18:30 (theo mã văn bản HR-TG-002).\n\nDo đó, việc bạn áp dụng quy định nào sẽ phụ thuộc vào việc bạn thuộc đối tượng áp dụng chung của toàn tập đoàn (nghỉ trưa 12:00 - 13:00) hay thuộc ca làm việc đặc thù của khối văn phòng nói trên (nghỉ trưa 12:30 - 13:30). Bạn vui lòng xác nhận lại với Trưởng bộ phận hoặc phòng Nhân sự để biết chính xác ca làm việc và quy định cụ thể đang áp dụng đối với vị trí của bạn.\n\n**Nguồn:**\n• **Bo Quy che Lao dong & Thoi gio lam viec Toan tap doan SOTRANS** (01/QC-SOTRANS, v1, hiệu lực từ 01/01/2026) – Căn cứ: Điều 1. Khung thời giờ làm việc chuẩn toàn tập đoàn\n• **Quy định Thời gian Làm việc - Khối Văn phòng (Ca 09h30)** (v3, hiệu lực từ 07/10/2026) – Căn cứ: Điều 2. Nghỉ trưa; Quy dinh Thoi gian Lam viec   Khong Van phong (Ca 09h30)"
+      },
+      "notes": ""
+    },
+    {
+      "id": "SCENARIO_06_BOTH_AGREE",
+      "title": "Both documents agree on working days (Thứ Hai đến Thứ Sáu) produces consistent answer",
+      "status": "PASS",
+      "passed": true,
+      "details": {
+        "query": "Ngày làm việc trong tuần theo quy chế là những ngày nào?",
+        "reply": "Theo khung thời giờ làm việc chuẩn toàn tập đoàn (áp dụng cho toàn bộ cán bộ công nhân viên thuộc Tập đoàn SOTRANS và các công ty thành viên, ngoại trừ các bộ phận ca kíp đặc thù), ngày làm việc trong tuần là từ Thứ Hai đến Thứ Sáu, và ngày nghỉ hàng tuần là Thứ Bảy và Chủ Nhật [C4].\n\nBên cạnh đó, đối với khối văn phòng áp dụng ca làm việc đặc thù (ca 09:30 theo văn bản HR-TG-002 tại Công ty mẫu ABC), ngày làm việc trong tuần cũng là từ Thứ Hai đến Thứ Sáu, nghỉ ngày Thứ Bảy và Chủ nhật [C1].\n\n**Nguồn:**\n• **Bo Quy che Lao dong & Thoi gio lam viec Toan tap doan SOTRANS** (01/QC-SOTRANS, v1, hiệu lực từ 01/01/2026) – Căn cứ: Điều 1. Khung thời giờ làm việc chuẩn toàn tập đoàn\n• **Quy định Thời gian Làm việc - Khối Văn phòng (Ca 09h30)** (v3, hiệu lực từ 07/10/2026) – Căn cứ: Điều 4. Làm thêm giờ"
+      },
+      "notes": ""
+    },
+    {
+      "id": "SCENARIO_07_SOURCES_CONFLICT",
+      "title": "Sources conflict with unknown precedence prompts stating divergence and advising HR confirmation",
+      "status": "PASS",
+      "passed": true,
+      "details": {
+        "query": "Nếu hai văn bản nội bộ có hiệu lực đồng thời mâu thuẫn trực tiếp về quyền lợi mà không có điều khoản quy định văn bản nào ưu tiên thì xử lý thế nào?",
+        "reply": "Hiện tại tài liệu nội bộ mình được cung cấp chưa có thông tin về nội dung bạn hỏi. Bạn vui lòng liên hệ trực tiếp phòng Nhân sự: 028 1234 5678 hoặc hr@sotrans.vn."
+      },
+      "notes": ""
+    },
+    {
+      "id": "SCENARIO_08_MISSING_CLAUSE",
+      "title": "Relevant clause missing from documents returns answerable=false and directs user to HR contact",
+      "status": "PASS",
+      "passed": true,
+      "details": {
+        "query": "Chính sách trợ cấp học phí cho con em nhân viên theo học đại học là bao nhiêu tiền mỗi tháng?",
+        "reply": "Hiện tại tài liệu nội bộ mình được cung cấp chưa có thông tin về nội dung bạn hỏi. Bạn vui lòng liên hệ trực tiếp phòng Nhân sự: 028 1234 5678 hoặc hr@sotrans.vn.",
+        "answerable": false,
+        "sourcesCount": 0
+      },
+      "notes": ""
+    },
+    {
+      "id": "SCENARIO_09_REVOKED_VS_CURRENT",
+      "title": "Old revoked version (v2) is strictly ignored; only current active version (v3) is cited",
+      "status": "PASS",
+      "passed": true,
+      "details": {
+        "query": "Thời gian làm việc ca 09h30 quy định như thế nào?",
+        "citesV3": true,
+        "citesV2": false,
+        "doc_versions": [
+          "298d5728-7a73-4faf-ade8-b819991bdb64"
+        ]
+      },
+      "notes": ""
+    },
+    {
+      "id": "SCENARIO_10_CACHE_INVALIDATION",
+      "title": "Policy cache hits on repeat query, then automatically invalidates when document versions change",
+      "status": "PASS",
+      "passed": true,
+      "details": {
+        "call1_cached": false,
+        "call2_cached": true,
+        "call3_cached": false,
+        "key1_equals_key2": true,
+        "key1_diff_key3": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "SCENARIO_11_TENANT_ISOLATION",
+      "title": "Company permission isolation prevents STL user from accessing SWC-scoped branch policy while SWC user succeeds",
+      "status": "PASS",
+      "passed": true,
+      "details": {
+        "swcSeesCa930": true,
+        "swcSources": [
+          "Quy định Thời gian Làm việc - Khối Văn phòng (Ca 09h30)",
+          "Quy định Thời gian Làm việc - Khối Văn phòng (Ca 09h30)"
+        ],
+        "stlDoesNotSeeSowatcoDoc": true,
+        "stlSources": []
+      },
+      "notes": ""
+    },
+    {
+      "id": "SCENARIO_12_SEMANTIC_DISTINCTION",
+      "title": "Semantically similar question (overtime vs lunch break) correctly targets overtime provisions without confusion",
+      "status": "PASS",
+      "passed": true,
+      "details": {
+        "query": "Quy định về thời gian làm thêm giờ (tăng ca / overtime) như thế nào?",
+        "reply": "Quy định về thời gian làm thêm giờ (overtime) tại các đơn vị thuộc Tập đoàn SOTRANS như sau:\n\n1. **Quy định chung tại SOTRANS Logistics (theo văn bản 10/QD-STL):**\n   - **Đối tượng áp dụng:** Nhân viên khối văn phòng và hiện trường giao nhận logistics.\n   - **Mức phụ cấp làm thêm giờ:** \n     + Làm thêm giờ ngoài 17:00 được tính phụ cấp hệ số 1.5 tiền lương ngày thường.\n     + Làm thêm giờ vào ngày nghỉ cuối tuần được tính hệ số 2.0.\n     + Làm việc vào ngày Lễ, Tết được tính hệ số 3.0.\n\n2. **Quy định tại Khối văn phòng áp dụng ca đặc thù 09:30:**\n   - Làm thêm giờ không tự động phát sinh. Nhân viên chỉ thực hiện làm thêm giờ ngoài khung 18:30 khi có yêu cầu hoặc phê duyệt bằng văn bản theo quy trình nội bộ giả lập.\n\n**Nguồn:**\n• **Quy dinh Van hanh Giao nhan & Ky luat Di tre - SOTRANS Logistics** (10/QD-STL, v1, hiệu lực từ 01/01/2026) – Căn cứ: Điều 2. Chế độ làm thêm giờ và phụ cấp công tác SOTRANS Logistics\n• **Quy định Thời gian Làm việc - Khối Văn phòng (Ca 09h30)** (v3, hiệu lực từ 07/10/2026) – Căn cứ: Điều 4. Làm thêm giờ"
+      },
+      "notes": ""
+    }
+  ]
+}

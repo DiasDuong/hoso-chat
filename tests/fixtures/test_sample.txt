@@ -1,0 +1,8 @@
+[BÁO CÁO DỰ ÁN NÂNG CẤP HỆ THỐNG SOTRANS HUB]
+Mã dự án: SOTRANS-AI-2026
+Tên dự án: Hệ thống Trợ lý Cá nhân AI Đa năng
+Mục tiêu cốt lõi: Hỗ trợ người dùng phân tích dữ liệu bảng tính, xử lý tài liệu văn bản và tự động xuất file Excel.
+Ngân sách phê duyệt: 850.000.000 VNĐ (Tám trăm năm mươi triệu đồng).
+Thời hạn bàn giao: 31/12/2026.
+Phụ trách dự án: Ban Công Nghệ Thông Tin SOTRANS.
+Đơn vị phối hợp: Phòng Nhân Sự và Phòng Tài Chính.

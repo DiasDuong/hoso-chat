@@ -1,0 +1,96 @@
+{
+  "timestamp": "2026-10-20T01:55:56.983Z",
+  "summary": {
+    "total": 10,
+    "passed": 9,
+    "not_verified": 1,
+    "failed": 0
+  },
+  "production_integrity": {
+    "records_match": true,
+    "files_match": true
+  },
+  "tests": [
+    {
+      "id": "TC-01",
+      "name": "Expired file in allowed dir purged successfully",
+      "status": "PASS",
+      "file_id": "64f34eac-06fa-41f9-ace5-b81a63814944",
+      "fs_deleted": true,
+      "db_status": "PURGED",
+      "unlinked_count": 1
+    },
+    {
+      "id": "TC-02",
+      "name": "Active unexpired file not selected or deleted",
+      "status": "PASS",
+      "file_id": "f9f617f6-83d6-41b4-886f-376281e38dee",
+      "file_intact": true,
+      "db_status": "READY"
+    },
+    {
+      "id": "TC-03",
+      "name": "Ghost record safely marked PURGED in DB",
+      "status": "PASS",
+      "file_id": "0bad1ddf-650e-4177-b2f8-e840be80dd6d",
+      "db_status": "PURGED",
+      "purged_count": 1
+    },
+    {
+      "id": "TC-04",
+      "name": "Path traversal outside artifact root rejected",
+      "status": "PASS",
+      "file_id": "c72c80cf-2ccf-468f-be01-6ef449f2501f",
+      "canary_intact": true,
+      "db_status": "EXPIRED",
+      "action": "REJECTED_PATH_TRAVERSAL"
+    },
+    {
+      "id": "TC-05",
+      "name": "Symlink pointing outside artifact root rejected",
+      "status": "NOT VERIFIED",
+      "note": "Windows unprivileged environment requires SeCreateSymbolicLinkPrivilege. Symlink validation logic (fs.lstatSync + fs.realpathSync) inspected and verified via unit mock."
+    },
+    {
+      "id": "TC-06",
+      "name": "File locked/permission error (EPERM/EACCES) handled safely (DB not marked PURGED)",
+      "status": "PASS",
+      "file_id": "50bd39f9-2256-4aa8-9af0-dcaeeda77f4a",
+      "file_preserved": true,
+      "db_status": "EXPIRED",
+      "reason": "EPERM: operation not permitted, unlink 'd:\\hoso-chat\\tests\\fixtures\\staging_agent_outputs\\tc06_locked_file.xlsx'"
+    },
+    {
+      "id": "TC-07",
+      "name": "DB error after unlink handled gracefully (state noted as unlinked ghost)",
+      "status": "PASS",
+      "file_id": "1caa1a3e-1e12-48dd-bbbc-626c48afcdae",
+      "fs_deleted": true,
+      "db_retained_status": "EXPIRED",
+      "error_captured": "Simulated DB Network Interruption during UPDATE"
+    },
+    {
+      "id": "TC-08",
+      "name": "Concurrent cleaners blocked safely via concurrency lock",
+      "status": "PASS",
+      "p1_skipped": false,
+      "p2_skipped": true,
+      "reason": "Tiến trình dọn dẹp artifact đang chạy, bỏ qua lần kích hoạt này."
+    },
+    {
+      "id": "TC-09",
+      "name": "Batch limit strictly enforced (processed exactly 2 of 4)",
+      "status": "PASS",
+      "requested_batch": 2,
+      "purged_count": 2,
+      "total_scanned": 2
+    },
+    {
+      "id": "TC-10",
+      "name": "Interrupted run self-heals on subsequent cycle (ghost transitioned to PURGED)",
+      "status": "PASS",
+      "file_id": "1caa1a3e-1e12-48dd-bbbc-626c48afcdae",
+      "healed_status": "PURGED"
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "generatedAt": "2026-10-19T08:17:27.665Z",
+  "singleSheet": {
+    "file": "fixture_single_sheet_math.xlsx",
+    "rowCount": 1000,
+    "columnCount": 7,
+    "metrics": {
+      "sumLuong": 15005000500,
+      "sumThuong": 1125250000,
+      "sumKhauTru": 110050000,
+      "sumThucLinh": 16020200500,
+      "avgThucLinh": 16020200.5,
+      "minThucLinh": 9549500.5,
+      "maxThucLinh": 22479000.5
+    }
+  },
+  "multiSheet": {
+    "file": "fixture_multi_sheet_4q.xlsx",
+    "sheetCount": 4,
+    "totalRows": 12,
+    "sheets": {
+      "Q1_2026": {
+        "rowCount": 3,
+        "revenue": 330000000,
+        "cost": 231000000,
+        "profit": 99000000
+      },
+      "Q2_2026": {
+        "rowCount": 3,
+        "revenue": 390000000,
+        "cost": 273000000,
+        "profit": 117000000
+      },
+      "Q3_2026": {
+        "rowCount": 3,
+        "revenue": 360000000,
+        "cost": 252000000,
+        "profit": 108000000
+      },
+      "Q4_2026": {
+        "rowCount": 3,
+        "revenue": 480000000,
+        "cost": 336000000,
+        "profit": 144000000
+      }
+    },
+    "yearTotals": {
+      "revenue": 1560000000,
+      "cost": 1092000000,
+      "profit": 468000000
+    }
+  },
+  "sparseErrors": {
+    "file": "fixture_sparse_with_errors.xlsx",
+    "totalRows": 500,
+    "errorCount": 10,
+    "blankCount": 10,
+    "duplicateCount": 5
+  }
+}

@@ -1,0 +1,219 @@
+{
+  "timestamp": "2026-10-26T01:52:10.044Z",
+  "total": 19,
+  "passed": 19,
+  "failed": 0,
+  "blocked": 0,
+  "passRate": "100%",
+  "tests": [
+    {
+      "id": "ENV-01",
+      "section": "Environment",
+      "name": "Kiểm tra schema bảng agent_output_files trong PostgreSQL",
+      "input": "Table agent_output_files",
+      "action": "Truy vấn information_schema.columns",
+      "expected": "Đầy đủ các cột bắt buộc: id, user_id, agent_id, conversation_id, file_name, storage_path, mime_type, file_size, checksum_sha256, status, expires_at",
+      "actual": "Tìm thấy 14 cột: id, user_id, agent_id, conversation_id, file_name, storage_path, mime_type, file_size, checksum_sha256, status, download_count, metadata, created_at, expires_at",
+      "evidence": "Columns: id, user_id, agent_id, conversation_id, file_name, storage_path, mime_type, file_size, checksum_sha256, status, download_count, metadata, created_at, expires_at",
+      "status": "PASS"
+    },
+    {
+      "id": "ENV-02",
+      "section": "Environment",
+      "name": "Kiểm tra endpoint API Health Check (/api/health)",
+      "input": "GET /api/health",
+      "action": "Gửi request HTTP GET",
+      "expected": "HTTP 200, status: ok, service: hr-auth-service",
+      "actual": "HTTP 200, status: ok, elapsed: 22ms",
+      "evidence": "{\"status\":\"ok\",\"service\":\"hr-auth-service\",\"timestamp\":\"2026-10-26T01:51:12.676Z\"}",
+      "status": "PASS"
+    },
+    {
+      "id": "TEST-A",
+      "section": "End-to-End",
+      "name": "Câu hỏi thông thường không cần gọi công cụ",
+      "input": "Thủ đô của nước Pháp là thành phố nào?",
+      "action": "POST /api/agents/cbb7053e-c388-4072-a87f-1e49b6facf07/chat",
+      "expected": "Trả lời đúng Paris, không gọi công cụ tính toán/xuất file, HTTP 200",
+      "actual": "HTTP 200, Reply: \"Paris.\", Artifacts: 0",
+      "evidence": "HTTP 200 | Steps: 1 | Time: 3815ms",
+      "status": "PASS"
+    },
+    {
+      "id": "TEST-B",
+      "section": "End-to-End",
+      "name": "Phân tích dữ liệu bảng tính đa sheet (Multi-sheet 4 Quarters)",
+      "input": "File fixture_multi_sheet_4q.xlsx (4 sheets: Q1-Q4)",
+      "action": "POST /api/agents/cbb7053e-c388-4072-a87f-1e49b6facf07/chat (Multipart)",
+      "expected": "Tổng doanh thu cả năm = 1.560.000.000 đ, quý cao nhất là Q4",
+      "actual": "HTTP 200, Nhận diện doanh thu: true, Nhận diện Q4: true",
+      "evidence": "Reply preview: \"Tổng doanh thu toàn năm 2026 là **1.560.000.000** (Một tỷ năm trăm sáu mươi triệu đồng). Quý có doanh thu cao nhất là **Quý 4** với 480.000.000.  Dưới đây là bảng tổng hợp doanh thu theo từng quý:  | \" | Time: 21482ms",
+      "status": "PASS"
+    },
+    {
+      "id": "TEST-C",
+      "section": "End-to-End",
+      "name": "Nhiệm vụ nhiều bước (Tính toán xác định & Xuất tệp Excel)",
+      "input": "File fixture_single_sheet_math.xlsx (1.000 dòng)",
+      "action": "Agent gọi calculate_spreadsheet_metrics -> gọi export_excel_report",
+      "expected": "Artifact được tạo, file vật lý tồn tại, nội dung Excel hợp lệ, metadata ghi nhận",
+      "actual": "Artifacts: 1, FileID: 302fe4b5-fc91-4922-8335-7093cd9719a4, OnDisk: true, ValidXlsx: true",
+      "evidence": "File ID: 302fe4b5-fc91-4922-8335-7093cd9719a4 | Path: /app/data/agent_outputs/f2b6606e-3125-409c-b5f9-d3ed82282c26/2026/10/302fe4b5-fc91-4922-8335-7093cd9719a4_Bao_Cao_Thuc_Linh_P1.xlsx | Elapsed: 7164ms",
+      "status": "PASS"
+    },
+    {
+      "id": "TEST-D",
+      "section": "End-to-End",
+      "name": "Xử lý lỗi công cụ khi tham số không hợp lệ (Sheet/Cột không tồn tại)",
+      "input": "Yêu cầu tính toán trên sheet/cột không tồn tại",
+      "action": "Tool trả về error -> Agent nhận errorResponse và phản hồi minh bạch",
+      "expected": "Agent không crash, thông báo rõ ràng không tìm thấy sheet/cột, không bịa đặt số liệu",
+      "actual": "HTTP 200, Graceful error feedback: true",
+      "evidence": "Reply: \"Rất tiếc, tôi không thể thực hiện yêu cầu này vì sheet **\"Sheet_Khong_Co_Thuc\"** và cột **\"Cot_Khong_Ton_Tai_999\"** không tồn tại trong các tệp dữ liệ\"",
+      "status": "PASS"
+    },
+    {
+      "id": "TEST-E",
+      "section": "End-to-End",
+      "name": "Xử lý tài liệu văn bản không phải Excel (.txt)",
+      "input": "Tệp test_sample.txt chứa thông tin ngân sách dự án",
+      "action": "Trích xuất văn bản qua fileProcessor -> đưa vào prompt",
+      "expected": "Trích xuất đúng ngân sách 850 triệu đồng và Ban CNTT phụ trách",
+      "actual": "HTTP 200, Nhận diện ngân sách: true, Nhận diện phụ trách: true",
+      "evidence": "Reply snippet: \"Dựa trên tệp \"test_sample.txt\", thông tin về dự án như sau:  *   **Ngân sách phê duyệt:** 850.000.000 VNĐ (Tám trăm năm mươi triệu đồng). *   **Đơn vị phụ trách\"",
+      "status": "PASS"
+    },
+    {
+      "id": "TEST-F",
+      "section": "End-to-End",
+      "name": "Duy trì ngữ cảnh đa lượt (Multi-turn) & Cách ly tuyệt đối giữa người dùng",
+      "input": "Turn 1 cung cấp mã bí mật -> Turn 2 hỏi lại -> User B cố truy cập",
+      "action": "Kiểm tra nhớ ngữ cảnh hội thoại và chặn truy cập trái phép từ User B",
+      "expected": "Turn 2 nhớ mã bí mật; User B bị từ chối truy cập Agent/Conversation của User A (HTTP 404/403)",
+      "actual": "Turn 2 nhớ mã: true, User B status: HTTP 404",
+      "evidence": "Turn 2 Reply: \"Mã số dự án bí mật bạn đã cung cấp là **SOTRANS-TOP-SECRET-777**. Tôi đã ghi nhận thông tin này.\n\nTô\" | User B Status: 404",
+      "status": "PASS"
+    },
+    {
+      "id": "SEC-01",
+      "section": "Security",
+      "name": "Chống IDOR: Người dùng B truy cập tệp do Người dùng A tạo",
+      "input": "FileID=302fe4b5-fc91-4922-8335-7093cd9719a4, User B Token",
+      "action": "GET /api/agents/files/:id/download",
+      "expected": "HTTP 404 (Không tìm thấy tệp hoặc bạn không có quyền truy cập)",
+      "actual": "HTTP 404, Error: \"Không tìm thấy tệp hoặc bạn không có quyền truy cập tệp này.\"",
+      "evidence": "HTTP 404 | Response: {\"success\":false,\"error\":\"Không tìm thấy tệp hoặc bạn không có quyền truy cập tệp này.\"}",
+      "status": "PASS"
+    },
+    {
+      "id": "SEC-02",
+      "section": "Security",
+      "name": "Chặn truy cập tệp khi cung cấp JWT giả mạo",
+      "input": "Bearer token_gia_mao_invalid_jwt_12345",
+      "action": "GET /api/agents/files/:id/download",
+      "expected": "HTTP 401 Unauthorized",
+      "actual": "HTTP 401",
+      "evidence": "HTTP 401",
+      "status": "PASS"
+    },
+    {
+      "id": "SEC-03",
+      "section": "Security",
+      "name": "Truy cập tệp không tồn tại trong hệ thống",
+      "input": "FileID=00000000-0000-0000-0000-000000000999",
+      "action": "GET /api/agents/files/:id/download",
+      "expected": "HTTP 404 Not Found",
+      "actual": "HTTP 404",
+      "evidence": "HTTP 404",
+      "status": "PASS"
+    },
+    {
+      "id": "SEC-04",
+      "section": "Security",
+      "name": "Từ chối tải tệp đã quá hạn lưu trữ 7 ngày (Retention Expiration)",
+      "input": "File record có expires_at trong quá khứ",
+      "action": "GET /api/agents/files/:id/download",
+      "expected": "HTTP 410 Gone (Thông báo tệp đã hết hạn lưu trữ)",
+      "actual": "HTTP 410, Error: \"Tệp này đã hết hạn lưu trữ (chính sách lưu tối đa 7 ngày) và đã bị gỡ bỏ.\"",
+      "evidence": "HTTP 410 | Response: {\"success\":false,\"error\":\"Tệp này đã hết hạn lưu trữ (chính sách lưu tối đa 7 ngày) và đã bị gỡ bỏ.\"}",
+      "status": "PASS"
+    },
+    {
+      "id": "SEC-05",
+      "section": "Security",
+      "name": "Cấp Signed Download Ticket 5 phút và kiểm tra ràng buộc tệp",
+      "input": "FileID=302fe4b5-fc91-4922-8335-7093cd9719a4, POST /:id/ticket",
+      "action": "Tải với ticket hợp lệ & Thử dùng ticket để tải file khác",
+      "expected": "Tải thành công HTTP 200; Ticket sai file bị từ chối HTTP 403",
+      "actual": "Download ticket: HTTP 200, Mismatch ticket: HTTP 403",
+      "evidence": "Ticket prefix: eyJhbGciOiJIUzI1NiIsInR5c... | CanDownload: true | MismatchBlocked: true",
+      "status": "PASS"
+    },
+    {
+      "id": "SEC-06",
+      "section": "Security",
+      "name": "Chống tấn công Path Traversal qua tham số ID tệp",
+      "input": "FileID=..%2F..%2F..%2Fetc%2Fpasswd",
+      "action": "GET /api/agents/files/:id/download",
+      "expected": "HTTP 400 Bad Request (Định dạng ID tệp không hợp lệ)",
+      "actual": "HTTP 400",
+      "evidence": "HTTP 400",
+      "status": "PASS"
+    },
+    {
+      "id": "SEC-07",
+      "section": "Security",
+      "name": "Tiến trình tự động dọn dẹp tệp quá hạn (purgeExpiredAgentOutputs)",
+      "input": "File test có expires_at trong quá khứ",
+      "action": "Gọi hàm purgeExpiredAgentOutputs()",
+      "expected": "File vật lý bị xóa khỏi đĩa, status trong DB cập nhật thành EXPIRED",
+      "actual": "Purged total: 1, Unlinked: true, DB Status: PURGED",
+      "evidence": "Unlinked: true | DB Status: PURGED",
+      "status": "PASS"
+    },
+    {
+      "id": "REG-01",
+      "section": "Regression",
+      "name": "Smoke test API General AI (POST /api/general/chat)",
+      "input": "Tin nhắn chào hỏi gửi tới General AI",
+      "action": "POST /api/general/chat with real token",
+      "expected": "HTTP 200, phản hồi hợp lệ từ General AI",
+      "actual": "HTTP 200, Phản hồi hợp lệ: true",
+      "evidence": "HTTP 200 | Snippet: \"Chào bạn! Tôi là General AI. Tôi có thể hỗ trợ bạn thực hiện các tác vụ đa dạng sau đây:  *   **Hỗ t\"",
+      "status": "PASS"
+    },
+    {
+      "id": "REG-02",
+      "section": "Regression",
+      "name": "Smoke test API HR Policy RAG (POST /api/policy/chat)",
+      "input": "Câu hỏi quy chế thời gian làm việc",
+      "action": "POST /api/policy/chat with real token",
+      "expected": "HTTP 200, phản hồi đối chiếu chính sách nhân sự",
+      "actual": "HTTP 200, Phản hồi hợp lệ: true",
+      "evidence": "HTTP 200 | Snippet: \"Khung thời giờ làm việc chuẩn toàn tập đoàn SOTRANS áp dụng cho toàn bộ cán bộ công nhân viên là từ \"",
+      "status": "PASS"
+    },
+    {
+      "id": "REG-03",
+      "section": "Regression",
+      "name": "Smoke test API HR Intake (/api/hoso/intake/confirm-company)",
+      "input": "Request tới intake endpoint với tài khoản HR",
+      "action": "POST /api/hoso/intake/confirm-company",
+      "expected": "Route hoạt động, phản hồi kiểm tra tham số chuẩn xác (HTTP 400)",
+      "actual": "HTTP 400, Response: \"Vui lòng cung cấp danh sách ID hồ sơ cần xác nhận.\"",
+      "evidence": "HTTP 400 | Body: {\"success\":false,\"error\":\"Vui lòng cung cấp danh sách ID hồ sơ cần xác nhận.\"}",
+      "status": "PASS"
+    },
+    {
+      "id": "REG-04",
+      "section": "Regression",
+      "name": "Bảo toàn dữ liệu sản xuất (Zero Corruption on Core Tables)",
+      "input": "Bảng users, employees, documents",
+      "action": "Đếm số lượng bản ghi thực tế",
+      "expected": "14 users, 17 documents được giữ nguyên vẹn 100%",
+      "actual": "Users: 14, Employees: 18, Documents: 17",
+      "evidence": "users=14, employees=18, documents=17",
+      "status": "PASS"
+    }
+  ]
+}

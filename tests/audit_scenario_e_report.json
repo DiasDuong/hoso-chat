@@ -1,0 +1,78 @@
+{
+  "timestamp": "2026-10-21T11:14:46.935Z",
+  "results": {
+    "n8nWorkflow": {
+      "id": "odSyncReconcile01",
+      "name": "OneDrive_Reconciliation_and_Sync",
+      "isActive": true,
+      "successRuns": 3,
+      "errorRuns": 0,
+      "lastSuccessfulRun": {
+        "id": 2145,
+        "startedAt": "2026-10-21 10:30:00.021"
+      }
+    },
+    "triggers": {
+      "schedule": "*/15 * * * *",
+      "webhookStatus": "DISABLED_PENDING_PUBLIC_HTTPS"
+    },
+    "idempotency": {
+      "sourcesPreserved": true,
+      "snapshotsPreserved": true,
+      "zeroChurn": true,
+      "run1Report": {
+        "totalScanned": 3,
+        "limit": 20,
+        "offset": 0,
+        "syncedCount": 0,
+        "freshCount": 2,
+        "errorCount": 1,
+        "items": [
+          {
+            "id": "e9862c85-c4ce-43dc-a37f-d9c67c361372",
+            "fileName": "Pricing Vendor.xlsx",
+            "action": "UNREACHABLE",
+            "reason": "Graph API trả về mã lỗi 500: {\"error\":{\"code\":\"generalException\",\"message\":\"General Exception While Processing\",\"innerError\":{\"date\":\"2026-10-21T11:14:38\",\"request-id\":\"cf702375-c"
+          },
+          {
+            "id": "d722f15a-d3cd-48e6-82f1-5707043d31d6",
+            "fileName": "Sổ làm việc.xlsx",
+            "action": "FRESH"
+          },
+          {
+            "id": "90c8fad8-7e9e-4223-bd46-76cce394e1f6",
+            "fileName": "Pricing Vendor.xlsx",
+            "action": "FRESH"
+          }
+        ]
+      },
+      "run2Report": {
+        "totalScanned": 3,
+        "limit": 20,
+        "offset": 0,
+        "syncedCount": 0,
+        "freshCount": 2,
+        "errorCount": 1,
+        "items": [
+          {
+            "id": "e9862c85-c4ce-43dc-a37f-d9c67c361372",
+            "fileName": "Pricing Vendor.xlsx",
+            "action": "UNREACHABLE",
+            "reason": "Graph API trả về mã lỗi 500: {\"error\":{\"code\":\"generalException\",\"message\":\"General Exception While Processing\",\"innerError\":{\"date\":\"2026-10-21T11:14:42\",\"request-id\":\"22ed807e-7"
+          },
+          {
+            "id": "d722f15a-d3cd-48e6-82f1-5707043d31d6",
+            "fileName": "Sổ làm việc.xlsx",
+            "action": "FRESH"
+          },
+          {
+            "id": "90c8fad8-7e9e-4223-bd46-76cce394e1f6",
+            "fileName": "Pricing Vendor.xlsx",
+            "action": "FRESH"
+          }
+        ]
+      }
+    }
+  },
+  "allPassed": true
+}

@@ -1,0 +1,22 @@
+{
+  "id": "p3vzMirfR1FjbPFp",
+  "name": "HR_Doc_Activate",
+  "active": 1,
+  "nodes": "[{\"parameters\":{\"jsCode\":\"const f = $input.first().json;\\nconst id = String(f.doc_version_id || '').trim();\\nif (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error('doc_version_id không hợp lệ');\\nconst ok = [].concat(f.confirmed || []).length > 0;\\nif (!ok) throw new Error('Chưa xác nhận đã chạy preview và golden set đạt');\\nconst approver = String(f.approver || '').trim().slice(0, 100);\\nif (!approver) throw new Error('Thiếu người duyệt');\\nreturn [{ json: { doc_version_id: id, approver } }];\"},\"id\":\"536ca5ef-d284-4885-b407-549cf78cdf58\",\"name\":\"Validate\",\"type\":\"n8n-nodes-base.code\",\"typeVersion\":2,\"position\":[64,48]},{\"parameters\":{\"operation\":\"executeQuery\",\"query\":\"SELECT activate_version($1::uuid, $2) AS result;\",\"options\":{\"queryReplacement\":\"={{ [ $json.doc_version_id, $json.approver ] }}\"}},\"id\":\"ed5312c7-fb91-4727-a8c7-f130f0125f32\",\"name\":\"Activate\",\"type\":\"n8n-nodes-base.postgres\",\"typeVersion\":2.5,\"position\":[288,48],\"credentials\":{\"postgres\":{\"id\":\"oQ0QptxKd9XXLeQK\",\"name\":\"PG hrbot\"}}},{\"parameters\":{\"operation\":\"executeQuery\",\"query\":\"SELECT doc_version_id::text AS doc_version_id, status::text AS status,\\n       COALESCE(to_char(expiry_date, 'YYYYMMDD')::int, 99991231) AS expiry_int\\nFROM documents;\",\"options\":{}},\"id\":\"afa7972a-1e4b-4da8-af4c-b1a75c04c125\",\"name\":\"Read statuses\",\"type\":\"n8n-nodes-base.postgres\",\"typeVersion\":2.5,\"position\":[512,48],\"executeOnce\":true,\"credentials\":{\"postgres\":{\"id\":\"oQ0QptxKd9XXLeQK\",\"name\":\"PG hrbot\"}}},{\"parameters\":{\"method\":\"POST\",\"url\":\"http://qdrant:6333/collections/hr_docs/points/payload?wait=true\",\"sendBody\":true,\"specifyBody\":\"json\",\"jsonBody\":\"={{ JSON.stringify({ payload: { status: $json.status, expiry_int: $json.expiry_int }, filter: { must: [ { key: 'doc_version_id', match: { value: $json.doc_version_id } } ] } }) }}\",\"options\":{}},\"id\":\"6fe8715c-b6c1-41f3-b7d1-1967bad23eb3\",\"name\":\"Qdrant sync\",\"type\":\"n8n-nodes-base.httpRequest\",\"typeVersion\":4.2,\"position\":[736,48]},{\"parameters\":{\"operation\":\"completion\",\"completionTitle\":\"Đã xử lý\",\"completionMessage\":\"=Kết quả: {{ $('Activate').first().json.result }}\",\"options\":{}},\"id\":\"0ce41af8-6d3c-4278-8e85-6660af106b9e\",\"name\":\"Done\",\"type\":\"n8n-nodes-base.form\",\"typeVersion\":1,\"position\":[960,48],\"executeOnce\":true,\"webhookId\":\"b2c3d4e5-0000-4000-8000-0000000000a6\"},{\"parameters\":{\"authentication\":\"basicAuth\",\"formTitle\":\"Kích hoạt văn bản HR\",\"formDescription\":\"Nhập doc_version_id của văn bản đang ở trạng thái testing hoặc scheduled.\",\"formFields\":{\"values\":[{\"fieldLabel\":\"doc_version_id\",\"requiredField\":true},{\"fieldLabel\":\"approver\",\"requiredField\":true},{\"fieldLabel\":\"confirmed\",\"fieldType\":\"checkbox\",\"fieldOptions\":{\"values\":[{\"option\":\"Đã chạy preview và golden set đạt\"}]},\"requiredField\":true}]},\"options\":{}},\"id\":\"5adabbb0-8903-4975-aa97-7913b861c169\",\"name\":\"Activate Form\",\"type\":\"n8n-nodes-base.formTrigger\",\"typeVersion\":2.2,\"position\":[-160,48],\"webhookId\":\"68a0713c-c32a-46c8-96cd-85d150bd97b1\",\"credentials\":{\"httpBasicAuth\":{\"id\":\"QTpb8GcBCkdfP4TB\",\"name\":\"TK_Admin\"}}}]",
+  "connections": "{\"Validate\":{\"main\":[[{\"node\":\"Activate\",\"type\":\"main\",\"index\":0}]]},\"Activate\":{\"main\":[[{\"node\":\"Read statuses\",\"type\":\"main\",\"index\":0}]]},\"Read statuses\":{\"main\":[[{\"node\":\"Qdrant sync\",\"type\":\"main\",\"index\":0}]]},\"Qdrant sync\":{\"main\":[[{\"node\":\"Done\",\"type\":\"main\",\"index\":0}]]},\"Activate Form\":{\"main\":[[{\"node\":\"Validate\",\"type\":\"main\",\"index\":0}]]}}",
+  "settings": "{}",
+  "staticData": "{}",
+  "pinData": "{}",
+  "versionId": "300e8f5f-105c-4660-9c41-d3dbff00ae58",
+  "triggerCount": 1,
+  "meta": "{}",
+  "parentFolderId": null,
+  "createdAt": "2026-10-07 06:41:34.000",
+  "updatedAt": "2026-10-16 02:47:22",
+  "isArchived": 0,
+  "versionCounter": 1,
+  "description": null,
+  "activeVersionId": "300e8f5f-105c-4660-9c41-d3dbff00ae58",
+  "nodeGroups": "[]",
+  "sourceWorkflowId": null
+}

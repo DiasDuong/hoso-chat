@@ -1,0 +1,132 @@
+{
+  "timestamp": "2026-10-26T02:41:38.828Z",
+  "testedAgents": [
+    {
+      "id": "f09ffaab-c202-4042-8a2b-b2c337599d66",
+      "name": "Trợ lý Pháp chế Hợp đồng",
+      "role": "DOC_WRITER"
+    },
+    {
+      "id": "b48a9dad-1e2f-410f-a8d5-14b2707f0749",
+      "name": "Trợ lý Mua hàng & Định giá",
+      "role": "DATA_ANALYST"
+    },
+    {
+      "id": "264767e6-9138-4fc6-96ad-11a86ec9d170",
+      "name": "Trợ lý Vận hành & Điều phối",
+      "role": "GENERAL_ASSISTANT"
+    }
+  ],
+  "testedFormats": [
+    "XLSX (Multi-sheet)",
+    "DOCX (Headings/Clauses)",
+    "Empty XLSX",
+    "Corrupted PDF",
+    "Unsupported Format"
+  ],
+  "totalGates": 9,
+  "passedCount": 9,
+  "failedCount": 0,
+  "successRate": "100%",
+  "gateResults": [
+    {
+      "id": "GATE_01",
+      "name": "Tự động kế thừa Universal Intelligence Tools trên 3 Agent mới",
+      "category": "INHERITANCE",
+      "agent": "Legal, Procurement, Ops",
+      "passed": true,
+      "groundTruthCheck": "Tất cả 3 Agent mới tạo (DOC_WRITER, DATA_ANALYST, GENERAL_ASSISTANT) đều tự động nhận đủ 5 công cụ phổ quát",
+      "actualEvidence": "Legal: [web_research, calculate_spreadsheet_metrics, export_excel_report, search_spreadsheet_data, search_document_sections, get_file_manifest] | Proc: [web_research, calculate_spreadsheet_metrics, export_excel_report, search_spreadsheet_data, search_document_sections, get_file_manifest] | Ops: [web_research, calculate_spreadsheet_metrics, export_excel_report, search_spreadsheet_data, search_document_sections, get_file_manifest]",
+      "latencyMs": 779,
+      "notes": "Tự động kế thừa thành công 100%"
+    },
+    {
+      "id": "GATE_02",
+      "name": "Kiểm thử tính đầy đủ bảng tính XLSX: Bảo toàn 100% bản ghi trùng mã REF",
+      "category": "XLSX_GROUND_TRUTH",
+      "agent": "Trợ lý Mua hàng & Định giá",
+      "passed": true,
+      "groundTruthCheck": "Tìm thấy đủ cả 4 bản ghi (13/10: 900.000/chuyến và 900.000/xe, 15/10, 16/10, REF 42_LAU_LCL, Vendor 3S)",
+      "actualEvidence": "Dưới đây là danh sách các báo giá cho tuyến đường từ **KCN Tân Bình, HCM** đến **Dĩ An, Bình Dương** được trích xuất từ dữ liệu hệ thống:\n\n| Ngày báo giá | Mã REF | Nhà cung cấp | Giá Cost | Ghi chú |\n| :--- | :--- | :--- | :--- | :--- |\n| 16/10/2026...",
+      "latencyMs": 18802,
+      "notes": "Đối chiếu khớp 100% ground truth từ sheet Miền Nam"
+    },
+    {
+      "id": "GATE_03",
+      "name": "Tra cứu đa sheet ở cuối file (Sheet Miền Bắc)",
+      "category": "MULTI_SHEET_RETRIEVAL",
+      "agent": "Trợ lý Mua hàng & Định giá",
+      "passed": true,
+      "groundTruthCheck": "Tìm thấy báo giá Hải Phòng - Hà Nội (6.200.000/cont hoặc 1.610.000/xe) và tuyến Đình Trám từ sheet Miền Bắc",
+      "actualEvidence": "Dưới đây là chi tiết các báo giá từ sheet **Miền Bắc** cho tuyến đi Hà Nội và tuyến đi/đến Đình Trám (Bắc Giang):\n\n### 1. Tuyến đi Hà Nội\n* **Ngày báo giá:** 19/10/2026 (Tuần 43)\n* **Mã REF:** `43_LYN_FCL`\n* **Loại hình:** FCL (Cont 40)\n* **Điểm đi:*...",
+      "latencyMs": 9506,
+      "notes": "Truy xuất chính xác dữ liệu từ sheet cuối workbook"
+    },
+    {
+      "id": "GATE_04",
+      "name": "Đọc tài liệu Word (DOCX) & Trích xuất điều khoản có trích dẫn nguồn",
+      "category": "DOCX_GROUND_TRUTH",
+      "agent": "Trợ lý Pháp chế Hợp đồng",
+      "passed": true,
+      "groundTruthCheck": "Khớp chính xác Điều 1 (thời hạn 48 giờ) và Điều 2 (bồi thường tối đa 5.000.000 VNĐ)",
+      "actualEvidence": "Theo quy định tại tài liệu \"fixture_sotrans_sop.docx\", thời hạn và mức bồi thường khiếu nại được quy định như sau:\n\n*   **Thời hạn khiếu nại:** Khách hàng phải thông báo bằng văn bản hoặc email trong vòng **48 giờ** kể từ thời điểm giao hàng (theo **...",
+      "latencyMs": 6663,
+      "notes": "Trích xuất chính xác và dẫn nguồn cụ thể số điều"
+    },
+    {
+      "id": "GATE_05",
+      "name": "Duy trì ngữ cảnh tệp Word qua nhiều lượt chat không tải lại file",
+      "category": "MULTI_TURN_PERSISTENCE",
+      "agent": "Trợ lý Pháp chế Hợp đồng",
+      "passed": true,
+      "groundTruthCheck": "Tự động phục hồi tệp từ ai_attachments và trích dẫn Điều 3 (miễn trừ trách nhiệm)",
+      "actualEvidence": "SOTRANS được miễn trừ trách nhiệm bồi thường trong các trường hợp bất khả kháng được quy định tại **Điều 3**, cụ thể bao gồm:\n\n*   Thiên tai, bão lũ.\n*   Đường cấm đột xuất của cơ quan chức năng.\n*   Quy cách đóng gói bên trong của người gửi không bả...",
+      "latencyMs": 1461,
+      "notes": "Ngữ cảnh tệp được duy trì hoàn hảo xuyên suốt"
+    },
+    {
+      "id": "GATE_06",
+      "name": "Truy vấn kết hợp đa tệp (Bảng tính Excel + Quy trình Word)",
+      "category": "MULTI_FILE_HYBRID",
+      "agent": "Trợ lý Vận hành & Điều phối",
+      "passed": true,
+      "groundTruthCheck": "Kết hợp giá 900.000 VNĐ từ Pricing Vendor.xlsx và thời hạn 48 giờ từ fixture_sotrans_sop.docx",
+      "actualEvidence": "Dựa trên dữ liệu đối soát và quy trình vận tải của SOTRANS, thông tin chi tiết cho yêu cầu của bạn như sau:\n\n### 1. Giá cước vận chuyển (Tuyến: KCN Tân Bình -> Dĩ An, Bình Dương)\nTheo dữ liệu tại sheet **\"Miền Nam\"**, hiện có 3 bản ghi báo giá cho tu...",
+      "latencyMs": 22762,
+      "notes": "Xử lý mượt mà câu hỏi giao thoa giữa 2 loại dữ liệu"
+    },
+    {
+      "id": "GATE_07",
+      "name": "Xử lý minh bạch tệp rỗng và tệp hỏng (No Silent Failures)",
+      "category": "EDGE_CASE_HANDLING",
+      "agent": "Trợ lý Vận hành & Điều phối",
+      "passed": true,
+      "groundTruthCheck": "Hệ thống nhận diện đúng trạng thái rỗng/lỗi, thông báo minh bạch, không crash",
+      "actualEvidence": "Empty: \"Tệp `fixture_empty.xlsx` hiện tại không có dòng dữ liệu nào (0 dòng hợp lệ).\" | Corrupt: \"Rất tiếc, tôi không thể đọc được nội dung của tệp \"fixture_corrupted.pdf\" vì tệp này hiện đang bị hỏ\"",
+      "latencyMs": 5523,
+      "notes": "Xử lý lỗi tệp an toàn và chính xác"
+    },
+    {
+      "id": "GATE_08",
+      "name": "Xác minh không có dữ liệu (Anti-hallucination NOT_FOUND_VERIFIED)",
+      "category": "ANTI_HALLUCINATION",
+      "agent": "Trợ lý Vận hành & Điều phối",
+      "passed": true,
+      "groundTruthCheck": "Xác nhận rõ ràng cả tuyến Tân Bình - Cà Mau và Điều 99 đều không tồn tại trong dữ liệu",
+      "actualEvidence": "Dựa trên dữ liệu bảng tính và tài liệu quy trình đã được cung cấp, tôi xin phản hồi như sau:\n\n**1. Về báo giá tuyến KCN Tân Bình đi Cà Mau:**\nSau khi rà soát toàn bộ dữ liệu trong file *Pricing Vendor.xlsx* (bao gồm các sheet \"Miền Nam\" và \"Miền Bắc\"...",
+      "latencyMs": 2737,
+      "notes": "Không phát sinh ảo giác, từ chối chính xác và có căn cứ"
+    },
+    {
+      "id": "GATE_09",
+      "name": "Cô lập dữ liệu & Chống IDOR trên toàn bộ 3 Agent mới",
+      "category": "SECURITY_TENANCY",
+      "agent": "Legal, Procurement, Ops",
+      "passed": true,
+      "groundTruthCheck": "User thuộc chi nhánh VTX bị chặn tuyệt đối (HTTP 404/403) khi cố truy cập bất kỳ Agent nào của STL",
+      "actualEvidence": "Legal: HTTP 404 | Proc: HTTP 404 | Ops: HTTP 404",
+      "latencyMs": 20,
+      "notes": "Bảo vệ an ninh phân quyền và cô lập đa chi nhánh hoàn hảo"
+    }
+  ]
+}

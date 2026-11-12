@@ -1,0 +1,33 @@
+# SOTRANS HUB — MA TRẬN KHOẢNG TRỐNG KỸ THUẬT (CHECKPOINT 0)
+## POLICY & REGULATORY GOVERNANCE GAP MATRIX
+
+> **Dự án:** SOTRANS Hub — Logistics AI Platform  
+> **Workspace:** `D:\hoso-chat`  
+> **Phiên bản:** `v1.1.0-gov3-hotfix1`  
+> **Nhánh:** `feat/policy-conflict-engine-v2`  
+> **Tiêu chuẩn kiểm soát:** Không sửa mã nguồn tùy tiện; chỉ khắc phục đúng các khoảng trống đã được xác minh bằng bằng chứng.
+
+---
+
+## 1. MA TRẬN KHOẢNG TRỐNG TOÀN DIỆN (8 PHẠM VI CHỨC NĂNG)
+
+| Finding ID | Domain | Hiện trạng & Bằng chứng thực tế | File / Module liên quan | Mức nghiêm trọng | Hành động kỹ thuật bắt buộc | Phương pháp kiểm thử | Tiêu chí nghiệm thu (Acceptance Criteria) |
+|---|---|---|---|:---:|---|---|---|
+| **GAP-01** | Domain 1: Lifecycle | Các endpoint `/submit`, `/approve`, `/reject`, `/activate`, `/archive` kiểm tra trạng thái riêng lẻ, thiếu ma trận chuyển đổi trạng thái tập trung (Deterministic State Transition Matrix). | `auth-service/routes/documents.js` | **HIGH** | Xây dựng hàm `validateStateTransition(currentStatus, targetStatus, role)` tập trung; chặn mọi bước nhảy trạng thái không hợp lệ. | Unit test ma trận 10x10 trạng thái với vai trò ADMIN và HR. | Chuyển đổi trạng thái trái phép (vd: `rejected` -> `active` trực tiếp) trả về lỗi HTTP 400 `INVALID_STATE_TRANSITION`. |
+| **GAP-02** | Domain 2: Relationships | Chưa có cơ chế phát hiện chu trình vòng lặp quan hệ (Cycle / Circular Relationship Detection) khi liên kết văn bản; chưa chặn quan hệ mâu thuẫn đồng thời trên cùng một cặp văn bản. | `auth-service/routes/documents.js` | **CRITICAL** | Triển khai thuật toán kiểm tra chu trình đồ thị có hướng (DAG Cycle Check) bằng DFS/BFS trước khi lưu quan hệ; chặn cặp quan hệ mâu thuẫn (vd: `supersedes` + `applies_with`). | Test tạo chu trình: Doc A supersedes Doc B, Doc B supersedes Doc C, Doc C supersedes Doc A. | Hệ thống từ chối tạo quan hệ thứ 3 với mã lỗi `CIRCULAR_RELATIONSHIP_DETECTED`. |
+| **GAP-03** | Domain 3: Conflict V2 | `policyConflictDetector.js` chưa có các nhãn phân loại chuẩn hóa theo thiết kế: `IDENTIFIER_DUPLICATE`, `CONTENT_OVERLAP`, `SUPERSESSION`, `UNKNOWN` (Fail-closed). | `auth-service/services/policyConflictDetector.js` | **CRITICAL** | Cập nhật hàm `detectPolicyConflicts` để trả về đầy đủ 9 nhóm phân loại chuẩn hóa; bổ sung nhánh `UNKNOWN` khi thiếu bằng chứng đối tượng/nội dung. | Chạy bộ kiểm thử Golden Dataset với các ca trùng mã hiệu khác nội dung và thiếu trích xuất. | Kết quả trả về đúng nhãn phân loại; không có trường hợp `UNKNOWN` bị ép thành `SAFE`. |
+| **GAP-04** | Domain 3: Shadow Mode | Chưa có module ghi log ngầm bất đồng bộ V2 độc lập ra tệp tin JSON Lines (`shadow_conflict_audit.jsonl`). | `auth-service/routes/documents.js` | **MEDIUM** | Bổ sung hàm `dispatchShadowConflictAudit(doc, candidate)` chạy qua `setImmediate` và ghi log append-only vào `/app/storage/logs/shadow_conflict_audit.jsonl`. | Kiểm tra sự xuất hiện của dòng JSONL sau khi nộp văn bản trên môi trường Staging. | Dòng log ghi nhận đầy đủ `correlation_id`, `v1_result`, `v2_result`, `delta_score`; không làm chậm response API. |
+| **GAP-05** | Domain 4: OCR / Zero-Chunk | Zero-Chunk Gate đã có ở route `approve`, nhưng cần đồng bộ hóa chặt chẽ tại route `activate` để ngăn chặn kích hoạt văn bản rỗng do lỗi đồng bộ. | `auth-service/routes/documents.js` | **HIGH** | Thêm chốt chặn Zero-Chunk Gate vào route `POST /:id/activate` và hàm tự động kích hoạt `autoActivateDueDocuments()`. | Thử kích hoạt văn bản có 0 chunks thông qua API `activate`. | API trả về mã lỗi `ACTIVATE_BLOCKED_ZERO_CHUNK` và từ chối kích hoạt. |
+| **GAP-06** | Domain 5: Consistency (F-01) | Hàm `reconcileGenerationsAndVectors` xóa chunks chưa publish qua 2 câu lệnh DELETE rời rạc, gây sai lệch thống kê dọn dẹp. | `auth-service/services/qdrantSyncService.js` | **MEDIUM** | Hợp nhất thao tác dọn dẹp chunks chưa publish thành một câu lệnh SQL atomic duy nhất với điều kiện `is_published = FALSE` rõ ràng. | Chạy thử nghiệm hàm `reconcileGenerationsAndVectors()` trên dữ liệu Staging có chunks rác. | Số lượng báo cáo `unpublished_chunks_cleaned` khớp chính xác 100% với số dòng thực tế bị xóa trong PG. |
+| **GAP-07** | Domain 5: Retry Lock (F-02) | Cần kiểm chứng thực tế cơ chế khóa thuê `document_retry_leases` khi có 2 luồng worker/instance tranh chấp cùng 1 văn bản. | `auth-service/routes/documents.js` | **HIGH** | Viết kịch bản kiểm thử giả lập 2 tiến trình Node.js đồng thời gọi `acquireRetryLease()` cho cùng một `doc_version_id`. | Chạy 2 tiến trình async đồng thời cùng 1 mili-giây. | Tiến trình thứ nhất nhận lease thành công; tiến trình thứ hai nhận mã lỗi `LEASE_ALREADY_ACQUIRED`. |
+| **GAP-08** | Domain 6: RBAC Isolation | Cần đảm bảo quyền bảo mật nhiều đơn vị (Tenant Isolation): Tài khoản thuộc đơn vị `STL` không thể xem hoặc chỉnh sửa văn bản nội bộ riêng của `SWC` hoặc `VTX`. | `auth-service/routes/documents.js` | **HIGH** | Rà soát và bổ sung mệnh đề lọc `branch_scope` chặt chẽ trong truy vấn `GET /api/documents` và các thao tác cập nhật. | Đăng nhập tài khoản HR STL truy vấn văn bản riêng của SWC. | Không hiển thị và từ chối truy cập với mã `403 Forbidden` / `NOT_FOUND`. |
+| **GAP-09** | Domain 7: Advanced RAG | RAG Policy Chat chưa có bộ lọc loại trừ văn bản đã bãi bỏ (`superseded`) và chưa cảnh báo rõ ràng khi thông tin trong câu hỏi thiếu căn cứ pháp lý. | `auth-service/services/smartRouter.js`, `routes/policy.js` | **HIGH** | Bổ sung payload filter `status: 'active'` vào truy vấn Qdrant trong RAG; chuẩn hóa định dạng trả về kèm số Điều, Khoản và cảnh báo khi thiếu bằng chứng. | Đặt câu hỏi về nội dung của văn bản đã bị `superseded`. | Trợ lý không lấy văn bản đã bãi bỏ làm quy định hiện hành; trả về đúng văn bản thay thế mới nhất. |
+| **GAP-10** | Domain 8: Dashboard / Audit | Thống kê số lượng văn bản xung đột và tài liệu chờ phê duyệt trên Dashboard cần được đồng bộ trực tiếp từ bảng cơ sở dữ liệu thật. | `auth-service/routes/documents.js` | **MEDIUM** | Chuẩn hóa hàm trả về thống kê tại `GET /api/documents` bao gồm: `total_active`, `pending_approval`, `superseded`, `expired`, `conflicts_detected`. | Gọi API `GET /api/documents` và đối chiếu số đếm với bảng `documents` trong PG. | Số liệu thống kê khớp 100% với dữ liệu thực tế trong database. |
+
+---
+
+## 2. KẾT LUẬN & ĐỊNH HƯỚNG TRIỂN KHAI
+
+Tất cả 10 khoảng trống trên đều có phạm vi rõ ràng, giải pháp cụ thể và tiêu chí nghiệm thu kiểm chứng được.  
+Không cần đập đi xây lại bất kỳ module nào đang hoạt động tốt.  
+Toàn bộ các giải pháp sẽ được hiện thực hóa tuần tự qua các Checkpoint trên nhánh `feat/policy-conflict-engine-v2` và kiểm thử trong môi trường Staging biệt lập.

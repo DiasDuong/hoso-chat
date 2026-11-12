@@ -1,0 +1,181 @@
+[
+  {
+    "id": "HR_Sequential_Sync_01",
+    "name": "HR_Sequential_Sync",
+    "active": true,
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "hr-sequential-sync",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "sync-webhook-01",
+        "name": "Webhook Sequential Sync",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          180,
+          300
+        ],
+        "webhookId": "hr-sequential-sync-hook"
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst body = $input.first().json.body || $input.first().json;\nconst headers = $input.first().json.headers || {};\nconst expected = \"8973d464f5f1475b83d6ab88d222d824\";\nconst incoming = body.secret || headers['x-n8n-auth-token'] || headers['x-internal-secret'] || '';\nconst isAuthorized = (incoming === expected);\n\nreturn [{\n  json: {\n    isAuthorized,\n    task_id: body.sync_task_id || body.task_id,\n    staging_id: body.staging_id,\n    employee_id: body.employee_id\n  }\n}];\n"
+        },
+        "id": "sync-auth-check",
+        "name": "Validate Sync Request",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          400,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "boolean": [
+              {
+                "value1": "={{ $json.isAuthorized }}",
+                "value2": true
+              }
+            ]
+          }
+        },
+        "id": "sync-if-auth",
+        "name": "IF Authorized",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          620,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "{\"success\": false, \"error\": \"401 Unauthorized\"}",
+          "options": {
+            "responseCode": 401
+          }
+        },
+        "id": "sync-respond-401",
+        "name": "Respond 401",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          860,
+          440
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://hr-auth:3000/api/hoso/intake/internal/execute-sync-step",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "x-n8n-auth-token",
+                "value": "8973d464f5f1475b83d6ab88d222d824"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ task_id: $json.task_id, step: \"execute\", secret: \"8973d464f5f1475b83d6ab88d222d824\" }) }}",
+          "options": {
+            "timeout": 60000
+          }
+        },
+        "id": "sync-execute-step",
+        "name": "Execute Sequential Sync Step",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          860,
+          200
+        ]
+      },
+      {
+        "parameters": {
+          "respondWith": "firstIncomingItem",
+          "options": {
+            "responseCode": 200
+          }
+        },
+        "id": "sync-respond-success",
+        "name": "Respond Sync Result",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          1100,
+          200
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook Sequential Sync": {
+        "main": [
+          [
+            {
+              "node": "Validate Sync Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Sync Request": {
+        "main": [
+          [
+            {
+              "node": "IF Authorized",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF Authorized": {
+        "main": [
+          [
+            {
+              "node": "Execute Sequential Sync Step",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Respond 401",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Sequential Sync Step": {
+        "main": [
+          [
+            {
+              "node": "Respond Sync Result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    }
+  }
+]

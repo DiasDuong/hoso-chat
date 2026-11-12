@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  postgres-staging:
+    image: postgres:16
+    container_name: sotrans-postgres-staging
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: staging_admin
+      POSTGRES_PASSWORD: Staging_Secure_Pass_2026_!@#$
+      POSTGRES_DB: sotrans_staging
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - sotrans_staging_pg_data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+      - ./sql:/sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U staging_admin -d sotrans_staging"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - hrbot_staging_net
+    mem_limit: 512m
+
+  qdrant-staging:
+    image: qdrant/qdrant:latest
+    container_name: sotrans-qdrant-staging
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6334:6333"
+    volumes:
+      - sotrans_staging_qdrant_data:/qdrant/storage
+    networks:
+      - hrbot_staging_net
+    mem_limit: 512m
+
+  auth-staging:
+    image: node:20-alpine
+    container_name: sotrans-auth-staging
+    restart: unless-stopped
+    depends_on:
+      postgres-staging:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      PG_HOST: postgres-staging
+      PG_PORT: 5432
+      PG_DATABASE: sotrans_staging
+      PG_USER: staging_admin
+      PG_PASSWORD: Staging_Secure_Pass_2026_!@#$
+      PORT: 3000
+      NODE_ENV: staging
+      JWT_SECRET: staging_secret_jwt_key_hrbot_2026_!@#$
+      JWT_EXPIRES_IN: 24h
+      QDRANT_HOST: qdrant-staging
+      QDRANT_PORT: 6333
+      QDRANT_COLLECTION: hr_docs_staging_v2
+      STORAGE_DIR: /app/chat-files-staging
+    volumes:
+      - ./auth-service:/app
+      - ./files-staging:/app/chat-files-staging
+    working_dir: /app
+    command: node server.js
+    networks:
+      - hrbot_staging_net
+    mem_limit: 512m
+
+networks:
+  hrbot_staging_net:
+    driver: bridge
+
+volumes:
+  sotrans_staging_pg_data:
+  sotrans_staging_qdrant_data:

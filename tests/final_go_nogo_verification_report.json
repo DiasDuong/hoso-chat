@@ -1,0 +1,223 @@
+{
+  "timestamp": "2026-10-28T10:08:26.952Z",
+  "totalTests": 12,
+  "passedCount": 12,
+  "failedCount": 0,
+  "successRate": "100%",
+  "finalGoDecision": "GO",
+  "testResults": [
+    {
+      "id": "VERIFY_01",
+      "section": "GROUND_TRUTH_RECONCILIATION",
+      "name": "Đối chiếu tập bản ghi thực tế vs Ground truth 4 bản ghi Tân Bình -> Dĩ An",
+      "passed": true,
+      "expected": {
+        "totalRecords": 4,
+        "expectedGroundTruth_TB": [
+          {
+            "ref": "42_LAU_LCL",
+            "date": "16/10/2026",
+            "price": "900",
+            "vendor": "Vendor 3S"
+          },
+          {
+            "ref": "42_LAU_LCL",
+            "date": "15/10/2026",
+            "price": "900.000/chuyến",
+            "vendor": "VENDOR"
+          },
+          {
+            "ref": "42_LAU_LCL",
+            "date": "13/10/2026",
+            "price": "900.000/chuyến",
+            "vendor": "3S"
+          },
+          {
+            "ref": "42_LAU_LCL",
+            "date": "13/10/2026",
+            "price": "900.000/xe",
+            "vendor": "3S"
+          }
+        ]
+      },
+      "actual": {
+        "totalRecords": 4,
+        "actualRecords_TB": [
+          {
+            "ref": "42_LAU_LCL",
+            "date": "16/10/2026",
+            "price": "900",
+            "vehicle": "Xe tải",
+            "vendor": "Vendor 3S"
+          },
+          {
+            "ref": "42_LAU_LCL",
+            "date": "15/10/2026",
+            "price": "900.000/chuyến",
+            "vehicle": "Xe tải",
+            "vendor": "VENDOR"
+          },
+          {
+            "ref": "42_LAU_LCL",
+            "date": "13/10/2026",
+            "price": "900.000/chuyến",
+            "vehicle": "Xe tải",
+            "vendor": "3S"
+          },
+          {
+            "ref": "42_LAU_LCL",
+            "date": "13/10/2026",
+            "price": "900.000/xe",
+            "vehicle": "Xe tải",
+            "vendor": "3S"
+          }
+        ]
+      },
+      "notes": "Bảo toàn tuyệt đối 100% bản ghi trùng mã REF, phân biệt ngày và đơn vị tính"
+    },
+    {
+      "id": "VERIFY_02",
+      "section": "GROUND_TRUTH_RECONCILIATION",
+      "name": "Đối chiếu dữ liệu sheet cuối file (Miền Bắc: Hải Phòng -> Hà Nội cont 40 & xe 1.25T)",
+      "passed": true,
+      "expected": "Có ít nhất 2 bản ghi Hải Phòng - Hà Nội gồm giá 6.200.000 và 1.610.000",
+      "actual": [
+        {
+          "origin": "cảng Hải Phòng",
+          "dest": "40 Hàng Bài, Phường Cửa Nam, TP. Hà Nội, Nhà hát Kiến Hoa",
+          "price": "6.200.000/cont"
+        },
+        {
+          "origin": "cảng Hải Phòng",
+          "dest": "Số 3, ngách 69 ngõ 117 Thái Hà, Phường Đống Đa, Hà Nội",
+          "price": 1610000
+        }
+      ],
+      "notes": "Sheet cuối file được đọc trọn vẹn và chính xác"
+    },
+    {
+      "id": "VERIFY_03",
+      "section": "PARTIAL_RETRIEVAL_VERIFICATION",
+      "name": "Hệ thống tự động phát hiện và gán nhãn PARTIAL khi số bản ghi vượt limit",
+      "passed": true,
+      "expected": {
+        "status": "PARTIAL",
+        "totalMatches": 4,
+        "returnedMatches": 2,
+        "isExhaustive": false
+      },
+      "actual": {
+        "status": "PARTIAL",
+        "totalMatches": 4,
+        "returnedMatches": 2,
+        "isExhaustive": false
+      },
+      "notes": "Minh bạch trạng thái PARTIAL khi truy xuất chưa đầy đủ, không gây hiểu nhầm"
+    },
+    {
+      "id": "VERIFY_04",
+      "section": "OPERATIONAL_STATUSES",
+      "name": "Định dạng không hỗ trợ (.xyz) được gán đúng trạng thái UNSUPPORTED",
+      "passed": true,
+      "expected": {
+        "parseStatus": "UNSUPPORTED",
+        "readyForQuery": false
+      },
+      "actual": {
+        "parseStatus": "UNSUPPORTED",
+        "readyForQuery": false
+      },
+      "notes": "Phân định rõ định dạng không hỗ trợ"
+    },
+    {
+      "id": "VERIFY_05",
+      "section": "OPERATIONAL_STATUSES",
+      "name": "Tệp hỏng (Corrupted PDF) được gán đúng trạng thái PROCESSING_FAILED",
+      "passed": true,
+      "expected": {
+        "parseStatus": "PROCESSING_FAILED",
+        "readyForQuery": false
+      },
+      "actual": {
+        "parseStatus": "PROCESSING_FAILED",
+        "readyForQuery": false
+      },
+      "notes": "Phân định rõ tệp bị hỏng"
+    },
+    {
+      "id": "VERIFY_06",
+      "section": "OPERATIONAL_STATUSES",
+      "name": "Tra cứu không có dữ liệu được gán đúng trạng thái NOT_FOUND_VERIFIED",
+      "passed": true,
+      "expected": {
+        "status": "NOT_FOUND_VERIFIED",
+        "totalMatches": 0
+      },
+      "actual": {
+        "status": "NOT_FOUND_VERIFIED",
+        "totalMatches": 0
+      },
+      "notes": "Kiểm tra trọn vẹn và xác nhận phủ định có căn cứ"
+    },
+    {
+      "id": "VERIFY_07",
+      "section": "SECURITY_TAMPERED_IDS",
+      "name": "Server chặn Agent ID sai định dạng (Tampered malformed UUID)",
+      "passed": true,
+      "expected": 400,
+      "actual": 400,
+      "notes": "Input validation ở tầng controller"
+    },
+    {
+      "id": "VERIFY_08",
+      "section": "SECURITY_TAMPERED_IDS",
+      "name": "Server chặn truy cập Agent chi tiết của công ty khác (Cross-tenant Agent IDOR)",
+      "passed": true,
+      "expected": 404,
+      "actual": 404,
+      "notes": "SQL controller ràng buộc id = $1 AND user_id = $2"
+    },
+    {
+      "id": "VERIFY_09",
+      "section": "SECURITY_TAMPERED_IDS",
+      "name": "Server chặn đọc tin nhắn hội thoại của công ty khác (Cross-tenant Conversation IDOR)",
+      "passed": true,
+      "expected": 404,
+      "actual": 404,
+      "notes": "Bảo vệ lịch sử hội thoại trên máy chủ"
+    },
+    {
+      "id": "VERIFY_10",
+      "section": "SECURITY_ATTACHMENT_ISOLATION",
+      "name": "User công ty khác không thể đọc danh sách attachment của hội thoại thuộc công ty STL",
+      "passed": true,
+      "expected": "0 attachments trả về cho user VTX",
+      "actual": "0 attachments",
+      "notes": "Cô lập hoàn toàn luồng nạp tệp và attachment cache"
+    },
+    {
+      "id": "VERIFY_11",
+      "section": "REGRESSION_VERIFICATION",
+      "name": "Agent nghiệp vụ hiện hữu Excel-Data-Pro giữ nguyên cấu hình và đủ 6 công cụ",
+      "passed": true,
+      "expected": "Status active, đầy đủ tools",
+      "actual": {
+        "status": "active",
+        "toolCount": 6
+      },
+      "notes": "Không mất cấu hình hay quyền"
+    },
+    {
+      "id": "VERIFY_12",
+      "section": "REGRESSION_VERIFICATION",
+      "name": "Agent nghiệp vụ hiện hữu Email-Assistant giữ nguyên cấu hình và đủ 6 công cụ",
+      "passed": true,
+      "expected": "Status active, đầy đủ tools",
+      "actual": {
+        "status": "active",
+        "toolCount": 6
+      },
+      "notes": "Không mất cấu hình hay quyền"
+    }
+  ]
+}

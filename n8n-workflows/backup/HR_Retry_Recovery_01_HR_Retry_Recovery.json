@@ -1,0 +1,22 @@
+{
+  "id": "HR_Retry_Recovery_01",
+  "name": "HR_Retry_Recovery",
+  "active": 1,
+  "nodes": "[{\"parameters\":{\"rule\":{\"interval\":[{\"field\":\"cronExpression\",\"expression\":\"*/15 * * * *\"}]}},\"id\":\"retry-cron-trigger\",\"name\":\"Schedule (Every 15m)\",\"type\":\"n8n-nodes-base.scheduleTrigger\",\"typeVersion\":1.2,\"position\":[180,200]},{\"parameters\":{\"httpMethod\":\"POST\",\"path\":\"hr-sync-retry\",\"responseMode\":\"responseNode\",\"options\":{}},\"id\":\"retry-webhook\",\"name\":\"Webhook Manual Retry\",\"type\":\"n8n-nodes-base.webhook\",\"typeVersion\":2,\"position\":[180,400],\"webhookId\":\"hr-sync-retry-hook\"},{\"parameters\":{\"method\":\"POST\",\"url\":\"http://hr-auth:3000/api/hoso/intake/internal/scan-failed-sync\",\"sendHeaders\":true,\"headerParameters\":{\"parameters\":[{\"name\":\"Content-Type\",\"value\":\"application/json\"},{\"name\":\"x-n8n-auth-token\",\"value\":\"8973d464f5f1475b83d6ab88d222d824\"}]},\"sendBody\":true,\"specifyBody\":\"json\",\"jsonBody\":\"={{ JSON.stringify({ secret: \\\"8973d464f5f1475b83d6ab88d222d824\\\" }) }}\",\"options\":{\"timeout\":30000}},\"id\":\"retry-scan-failed\",\"name\":\"Scan Failed Sync Tasks\",\"type\":\"n8n-nodes-base.httpRequest\",\"typeVersion\":4.2,\"position\":[460,300]},{\"parameters\":{\"jsCode\":\"\\nconst res = $input.first().json;\\nconst tasks = res.tasks || [];\\nreturn [{\\n  json: {\\n    scanned_count: tasks.length,\\n    status: 'recovery_scan_completed',\\n    timestamp: new Date().toISOString(),\\n    tasks\\n  }\\n}];\\n\"},\"id\":\"retry-audit\",\"name\":\"Audit Recovery Scan\",\"type\":\"n8n-nodes-base.code\",\"typeVersion\":2,\"position\":[700,300]},{\"parameters\":{\"respondWith\":\"firstIncomingItem\",\"options\":{\"responseCode\":200}},\"id\":\"retry-respond\",\"name\":\"Respond Retry Status\",\"type\":\"n8n-nodes-base.respondToWebhook\",\"typeVersion\":1.1,\"position\":[940,400]}]",
+  "connections": "{\"Schedule (Every 15m)\":{\"main\":[[{\"node\":\"Scan Failed Sync Tasks\",\"type\":\"main\",\"index\":0}]]},\"Webhook Manual Retry\":{\"main\":[[{\"node\":\"Scan Failed Sync Tasks\",\"type\":\"main\",\"index\":0}]]},\"Scan Failed Sync Tasks\":{\"main\":[[{\"node\":\"Audit Recovery Scan\",\"type\":\"main\",\"index\":0}]]},\"Audit Recovery Scan\":{\"main\":[[{\"node\":\"Respond Retry Status\",\"type\":\"main\",\"index\":0}]]}}",
+  "settings": "{\"executionOrder\":\"v1\"}",
+  "staticData": "{\"node:Schedule (Every 15m)\":{\"recurrenceRules\":[null],\"recurrenceRuleSignatures\":[null]}}",
+  "pinData": null,
+  "versionId": "9d218e43-7970-4236-ba9a-513352302d28",
+  "triggerCount": 2,
+  "meta": null,
+  "parentFolderId": null,
+  "createdAt": "2026-10-31 14:28:10.110",
+  "updatedAt": "2026-10-31 14:28:10.110",
+  "isArchived": 0,
+  "versionCounter": 1,
+  "description": null,
+  "activeVersionId": "9d218e43-7970-4236-ba9a-513352302d28",
+  "nodeGroups": "[]",
+  "sourceWorkflowId": null
+}

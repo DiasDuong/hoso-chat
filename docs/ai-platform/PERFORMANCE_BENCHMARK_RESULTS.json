@@ -1,0 +1,55 @@
+{
+  "timestamp": "2026-10-30T02:24:30.498Z",
+  "primaryModel": "gemini-flash-lite-latest",
+  "fallbackModels": [
+    "gemini-flash-lite-latest",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite"
+  ],
+  "latencyBenchmark": {
+    "totalRequests": 12,
+    "successfulRequests": 12,
+    "minMs": 1094,
+    "maxMs": 2215,
+    "avgMs": 1618,
+    "p50Ms": 1539,
+    "p95Ms": 2215
+  },
+  "fallbackResilience": [
+    {
+      "test": "Simulated Invalid Primary Model",
+      "result": "PASS",
+      "usedModel": "gemini-flash-lite-latest"
+    },
+    {
+      "model": "gemini-flash-lite-latest",
+      "status": "READY",
+      "latencyMs": 837
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "status": "READY",
+      "latencyMs": 574
+    },
+    {
+      "model": "gemini-3.1-flash-lite",
+      "status": "READY",
+      "latencyMs": 615
+    }
+  ],
+  "concurrencyTest": {
+    "totalRequests": 5,
+    "successCount": 5,
+    "totalWallClockMs": 1818,
+    "avgTimePerReqMs": 364,
+    "throughputReqPerSec": "2.75"
+  },
+  "tokenCost": {
+    "totalPromptTokens": 193,
+    "totalCandidatesTokens": 2652,
+    "totalTokens": 2845,
+    "estimatedCostUsd": "0.000810",
+    "estimatedCostVnd": 21,
+    "costPerRequestVnd": "1.75"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "timestamp": "2026-10-21T17:46:24.874Z",
+  "passCount": 7,
+  "total": 7,
+  "results": [
+    {
+      "test": "C.1_STL_LISTING",
+      "passed": true,
+      "detail": "HTTP 200, 3 items"
+    },
+    {
+      "test": "C.2_VTX_LISTING",
+      "passed": true,
+      "detail": "HTTP 200, 3 items"
+    },
+    {
+      "test": "C.3_SWC_UNLINKED_STATUS",
+      "passed": true,
+      "detail": "HTTP 401, notConnected=true"
+    },
+    {
+      "test": "C.4_CROSS_TENANT_IMPORT_IDOR",
+      "passed": true,
+      "detail": "HTTP 403: Bạn không có quyền liên kết dữ liệu với Agent này."
+    },
+    {
+      "test": "C.5_CROSS_TENANT_DELETE_IDOR",
+      "passed": true,
+      "detail": "HTTP 404: Không tìm thấy nguồn dữ liệu hoặc bạn không có quyền truy cập."
+    },
+    {
+      "test": "C.6_CROSS_TENANT_CHAT_IDOR",
+      "passed": true,
+      "detail": "HTTP 404: Không tìm thấy Agent cá nhân hoặc bạn không có quyền truy cập."
+    },
+    {
+      "test": "C.7_ZERO_INFORMATION_LEAKAGE",
+      "passed": true,
+      "detail": "Zero path, database, or token leakage in rejection messages"
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+﻿employee_code,employee_name,company_id,department,position,email,status
+SWC-001,Nguyễn Trần Thiên Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên khai thác Cảng,thiennhan662005@gmail.com,ACTIVE
+SWC-002,Ngô Đặng Tuấn Uyên,SWC,Chưa phân bổ,Tài xế,swc-002@sotrans.com.vn,ACTIVE
+SWC-003,LÊ THÀNH NHÂN,SWC,Phòng Vận tải,Thuyền phó,swc-003@sotrans.com.vn,ACTIVE
+VTX-001,Nguyễn Văn Hiếu,VTX,Chưa phân bổ,NV lái xe Cont Việt,vtx-001@sotrans.com.vn,ACTIVE
+STL-001,Nguyễn Trường Nam,STL,Phòng Khai thác ICD Sotrans,Nhân viên Khai thác,nguyentruongnam2192002@gmail.com,ACTIVE
+VTX-002,Phan Dương Thanh Bình,VTX,Phòng Vận tải,Thợ máy,vtx-002@sotrans.com.vn,ACTIVE
+STL-002,Nguyễn Trường Nam,STL,Phòng Khai thác ICD Sotrans,Nhân viên Khai thác,nguyentruongnam2192002@gmail.com,ACTIVE
+SWC-004,Ngô Đặng Tuấn Uyên,SWC,Chưa phân bổ,Tài xế,swc-004@sotrans.com.vn,ACTIVE
+SWC-005,PHAN DƯƠNG THANH BÌNH,SWC,Chưa phân bổ,Thợ máy,swc-005@sotrans.com.vn,ACTIVE
+SWC-006,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác - Cảng Sowatco Long Bình,thienhan662005@gmail.com,ACTIVE
+SWC-007,Lê Thành Nhân,SWC,Phòng Vận tải,Thuyền phó,swc-007@sotrans.com.vn,ACTIVE
+SWC-008,NGUYỄN TRẦN THIỆN NHÂN,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-009,LÊ THÀNH NHÂN,SWC,Phòng Vận tải,Thuyền phó,swc-009@sotrans.com.vn,ACTIVE
+VTX-003,PHAN DƯƠNG THANH BÌNH,VTX,Phòng Vận tải,thợ máy,vtx-003@sotrans.com.vn,ACTIVE
+SWC-010,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-011,Ngô Đặng Tuấn Uyên,SWC,Chưa phân bổ,Tài xế,swc-011@sotrans.com.vn,ACTIVE
+SWC-012,NGUYỄN TRẦN THIỆN NHÂN,SWC,Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+VTX-004,Ngô Đặng Tuấn Uyên,VTX,Chưa phân bổ,NV lái xe cont viet,vtx-004@sotrans.com.vn,ACTIVE
+SWC-013,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+VTX-005,Ngô Đặng Tuấn Uyên,VTX,Chưa phân bổ,NV lái xe,vtx-005@sotrans.com.vn,ACTIVE
+SWC-014,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-015,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-016,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-017,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-018,Nhân viên 25,SWC,Chưa phân bổ,Nhân viên,swc-018@sotrans.com.vn,ACTIVE
+SWC-019,NGUYỄN TRẦN THIỆN NHÂN,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-020,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-021,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác - Cảng Sowatco Long Bình,thienhan662005@gmail.com,ACTIVE
+SWC-022,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-023,Nguyễn Trần Thiện Nhân,SWC,Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-024,Nhân viên 31,SWC,Chưa phân bổ,Nhân viên,thiennhan662005@gmail.com,ACTIVE
+SWC-025,Nhân viên 32,SWC,Chưa phân bổ,Nhân viên,swc-025@sotrans.com.vn,ACTIVE
+SWC-026,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-027,NGUYỄN TRẦN THIỆN NHÂN,SWC,Chưa phân bổ,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-028,Nguyễn Trần Thiện Nhân,SWC,Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-029,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-030,Nguyễn Trần Thiện Nhân,SWC,Cảng Sowatco Long Bình,Nhân viên Khai thác Cảng,thienhan662005@gmail.com,ACTIVE
+SWC-031,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác Cảng,thienhan662005@gmail.com,ACTIVE
+SWC-032,Nguyễn Trần Thiện Nhân,SWC,Chưa phân bổ,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-033,Nguyễn Trần Thiện Nhân,SWC,Chưa phân bổ,Nhân viên Khai thác Cảng,thienhan662005@gmail.com,ACTIVE
+SWC-034,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác Cảng,thienhan662005@gmail.com,ACTIVE
+SWC-035,NGUYỄN TRẦN THIỆN NHÂN,SWC,Phòng Khai thác,NV Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-036,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-037,NGUYỄN TRẦN THIỆN NHÂN,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-038,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-039,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-040,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-041,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-042,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-043,Nhân viên 50,SWC,Chưa phân bổ,Nhân viên,swc-043@sotrans.com.vn,ACTIVE
+SWC-044,Nhân viên 51,SWC,Chưa phân bổ,Nhân viên,swc-044@sotrans.com.vn,ACTIVE
+SWC-045,Nhân viên 52,SWC,Chưa phân bổ,Nhân viên,swc-045@sotrans.com.vn,ACTIVE
+SWC-046,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-047,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-048,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-049,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-050,Lê Thành Nhân,SWC,Phòng Vận tải,Thuyền phó,swc-050@sotrans.com.vn,ACTIVE
+VTX-006,Phan Dương Thanh Bình,VTX,Phòng Vận tải,Thợ máy,vtx-006@sotrans.com.vn,ACTIVE
+SWC-051,Nhân viên 59,SWC,Chưa phân bổ,Nhân viên,swc-051@sotrans.com.vn,ACTIVE
+SWC-052,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+STL-003,Nguyễn Trường Nam,STL,Phòng Khai thác ICD Sotrans,Nhân viên Khai thác,nguyentruongnam2192002@gmail.com,ACTIVE
+SWC-053,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+STL-004,Nguyễn Trường Nam,STL,Phòng Khai thác ICD Sotrans,Nhân viên Khai thác,nguyentruongnam2192002@gmail.com,ACTIVE
+SWC-054,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+STL-005,Nguyễn Trường Nam,STL,Phòng Khai thác ICD Sotrans,Nhân viên Khai thác,nguyentruongnam2192002@gmail.com,ACTIVE
+SWC-055,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-056,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-057,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-058,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-059,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-060,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-061,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+SWC-062,Nhân viên 73,SWC,Chưa phân bổ,Nhân viên,swc-062@sotrans.com.vn,ACTIVE
+SWC-063,Nhân viên 74,SWC,Chưa phân bổ,Nhân viên,swc-063@sotrans.com.vn,ACTIVE
+SWC-064,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+VTX-007,Ngô Đặng Tuấn Uyên,VTX,Chưa phân bổ,Lái xe,vtx-007@sotrans.com.vn,ACTIVE
+SWC-065,Lê Thành Nhân,SWC,Phòng Vận tải,Thuyền phó,swc-065@sotrans.com.vn,ACTIVE
+STL-006,Nguyễn Trường Nam,STL,Phòng Khai thác ICD Sotrans,Nhân viên Khai thác,nguyentruongnam2192002@gmail.com,ACTIVE
+VTX-008,Phan Dương Thanh Bình,VTX,Phòng Vận tải,thợ máy,vtx-008@sotrans.com.vn,ACTIVE
+VTX-009,Nguyễn Văn Hiếu,VTX,Chưa phân bổ,Lái xe,vtx-009@sotrans.com.vn,ACTIVE
+SWC-066,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+VTX-010,Ngô Đặng Tuấn Uyên,VTX,Chưa phân bổ,Lái xe,vtx-010@sotrans.com.vn,ACTIVE
+VTX-011,Nguyễn Văn Hiếu,VTX,Chưa phân bổ,Lái xe,vtx-011@sotrans.com.vn,ACTIVE
+SWC-067,NGUYỄN TRẦN THIỆN NHÂN,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+VTX-012,Ngô Đặng Tuấn Uyên,VTX,Chưa phân bổ,NV lái xe,vtx-012@sotrans.com.vn,ACTIVE
+VTX-013,Nguyễn Văn Hiếu,VTX,Chưa phân bổ,Lái xe,vtx-013@sotrans.com.vn,ACTIVE
+VTX-014,Ngô Đặng Tuấn Uyên,VTX,Chưa phân bổ,Lái xe,vtx-014@sotrans.com.vn,ACTIVE
+VTX-015,Phan Dương Thanh Bình,VTX,Phòng Vận tải,Thợ máy,vtx-015@sotrans.com.vn,ACTIVE
+VTX-016,Nguyễn Văn Hiếu,VTX,Chưa phân bổ,Lái xe,vtx-016@sotrans.com.vn,ACTIVE
+SWC-068,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác,Nhân viên Khai thác,thienhan662005@gmail.com,ACTIVE
+VTX-017,Ngô Đặng Tuấn Uyên,VTX,Chưa phân bổ,NV lái xe,vtx-017@sotrans.com.vn,ACTIVE
+VTX-018,Phan Dương Thanh Bình,VTX,Phòng Vận tải Tổng Công ty Cổ phần Đường sông miền Nam,Thợ máy,vtx-018@sotrans.com.vn,ACTIVE
+SWC-069,Nguyễn Trần Thiện Nhân,SWC,Phòng Khai thác Cảng Sowatco Long Bình,Nhân viên khai thác,thienhan662005@gmail.com,ACTIVE
+VTX-019,Ngô Đặng Tuấn Uyên,VTX,Chưa phân bổ,Lái xe,vtx-019@sotrans.com.vn,ACTIVE
+SWC-070,Lê Thành Nhân,SWC,Phòng Vận tải,Thuyền phó,swc-070@sotrans.com.vn,ACTIVE
+STL-007,Nguyễn Trường Nam,STL,Phòng Khai thác ICD Sotrans,Nhân viên Khai thác,nguyentruongnam2192002@gmail.com,ACTIVE
+VTX-020,Phan Dương Thanh Bình,VTX,Phòng Vận tải,thợ máy,vtx-020@sotrans.com.vn,ACTIVE
+VTX-021,Nguyễn Văn Hiếu,VTX,Chưa phân bổ,Lái xe,vtx-021@sotrans.com.vn,ACTIVE
+VTX-022,Phan Dương Thanh Bình,VTX,Phòng Vận tải Tổng Công ty Cổ phần Đường sông miền Nam,thợ máy,vtx-022@sotrans.com.vn,ACTIVE
+VTX-023,Nguyễn Văn Hiếu,VTX,Chưa phân bổ,Nhân viên lái xe container,vtx-023@sotrans.com.vn,ACTIVE

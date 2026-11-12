@@ -1,0 +1,168 @@
+{
+  "auditVersion": "v2.1",
+  "timestamp": "2026-10-28T10:10:15.820Z",
+  "environment": {
+    "baseUrl": "http://127.0.0.1:3000",
+    "nodeVersion": "v20.20.0",
+    "platform": "win32",
+    "engine": "Universal Data Understanding Engine v2.0"
+  },
+  "totalGates": 13,
+  "passedCount": 13,
+  "failedCount": 0,
+  "blockedCount": 0,
+  "notRunCount": 0,
+  "passRate": "100%",
+  "defectsCount": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  },
+  "finalDecision": "GO",
+  "auditResults": [
+    {
+      "id": "AUDIT_01",
+      "pillar": "PILLAR_1_EVIDENCE",
+      "name": "Kiểm chứng tệp JSON kết quả Acceptance Gate trước đó",
+      "passed": true,
+      "expected": "Tồn tại báo cáo JSON hợp lệ với 9/9 Gates PASS (100%)",
+      "actual": "Tìm thấy báo cáo ngày 2026-10-26T02:41:38.828Z, tỷ lệ đạt: 100%",
+      "latencyMs": 5,
+      "severity": "High",
+      "notes": "Đã xác minh bằng chứng báo cáo trước đó"
+    },
+    {
+      "id": "AUDIT_02",
+      "pillar": "PILLAR_2_COMPLETENESS",
+      "name": "Bảo toàn 100% bản ghi trùng mã REF (khác ngày 13/15/16 và đơn vị chuyến/xe)",
+      "passed": true,
+      "expected": "Tìm thấy đủ cả 4 bản ghi tuyến Tân Bình - Dĩ An (REF 42_LAU_LCL, đơn vị chuyến & xe, ngày 13, 15, 16)",
+      "actual": "Dưới đây là các báo giá cho tuyến đường từ **KCN Tân Bình, HCM** đến **Dĩ An, Bình Dương** được trích xuất từ sheet \"Miền Nam\" của tệp *Pricing Vendor.xlsx*:\n\n| Ngày báo giá | Mã REF | Đơn vị tính (Gi...",
+      "latencyMs": 11126,
+      "severity": "Critical",
+      "notes": "Không bỏ sót bản ghi, bảo toàn đơn vị tính"
+    },
+    {
+      "id": "AUDIT_03",
+      "pillar": "PILLAR_2_COMPLETENESS",
+      "name": "Truy xuất chuẩn xác dữ liệu từ định dạng bảng tính CSV",
+      "passed": true,
+      "expected": "Tìm thấy giá Sóng Thần (1.500.000 VNĐ) và VSIP 1 (2.100.000 VNĐ) từ file CSV",
+      "actual": "Dựa trên dữ liệu từ tệp `fixture_vendor_csv.csv` mà bạn đã cung cấp, dưới đây là thông tin giá cước cho các tuyến đường bạn yêu cầu:\n\n*   **Tuyến Cảng Cát Lái đến KCN Sóng Thần:**\n    *   **Giá cước:*...",
+      "latencyMs": 13039,
+      "severity": "High",
+      "notes": "CSV parser trích xuất chuẩn xác"
+    },
+    {
+      "id": "AUDIT_04",
+      "pillar": "PILLAR_2_COMPLETENESS",
+      "name": "Phát hiện và đối chiếu mâu thuẫn số liệu giữa nhiều tệp đính kèm",
+      "passed": true,
+      "expected": "Chỉ ra cả mức giá 900.000 VNĐ (Pricing Vendor) và 1.800.000 VNĐ (fixture_conflict_pricing)",
+      "actual": "Dựa trên dữ liệu từ hai tệp bảng tính đã kết nối, có sự thay đổi về mức giá cho tuyến **KCN Tân Bình, HCM đi Dĩ An, Bình Dương** (mã REF: `42_LAU_LCL`). Cụ thể như sau:\n\n### 1. Dữ liệu từ tệp \"Pricing...",
+      "latencyMs": 21455,
+      "severity": "High",
+      "notes": "Phát hiện sự khác biệt giá giữa 2 nguồn độc lập"
+    },
+    {
+      "id": "AUDIT_05",
+      "pillar": "PILLAR_2_COMPLETENESS",
+      "name": "Khả năng hiểu câu hỏi không dấu, alias địa danh logistics (Tân Bình -> Dĩ An)",
+      "passed": true,
+      "expected": "Tìm đúng giá 900.000 VNĐ dù câu hỏi hoàn toàn không có dấu",
+      "actual": "Báo giá cước vận chuyển cho tuyến từ **KCN Tân Bình, HCM** đến **Dĩ An, Bình Dương** (Sheet **Miền Nam**, sắp xếp theo ngày mới nhất) gồm các bản ghi sau:\n\n1. **Ngày báo giá:** 16/10/2026 (Tuần 42)\n  ...",
+      "latencyMs": 10452,
+      "severity": "Medium",
+      "notes": "Xử lý chuẩn xác câu hỏi tiếng Việt không dấu"
+    },
+    {
+      "id": "AUDIT_06",
+      "pillar": "PILLAR_3_PARSER_OPS",
+      "name": "Bóc tách tài liệu PDF chuẩn text (24 hours window, 10,000,000 VND limit)",
+      "passed": true,
+      "expected": "Trích xuất chính xác 24 hours và 10,000,000 VND từ PDF",
+      "actual": "Thời gian xác nhận giao hàng (Delivery Confirmation Window) theo SOP là **trong vòng 24 giờ kể từ thời điểm giao hàng**, và mức bồi thường trách nhiệm tối đa (Maximum Claim Liability Limit) đối với hà...",
+      "latencyMs": 11507,
+      "severity": "High",
+      "notes": "Bóc tách PDF văn bản thành công"
+    },
+    {
+      "id": "AUDIT_07",
+      "pillar": "PILLAR_3_PARSER_OPS",
+      "name": "Xử lý định dạng không hỗ trợ (UNSUPPORTED) minh bạch, không bịa đặt",
+      "passed": true,
+      "expected": "Server từ chối an toàn (HTTP 400 hoặc thông báo rõ định dạng không hỗ trợ, không crash/không bịa đặt)",
+      "actual": "HTTP 400: Định dạng tệp \"fixture_unsupported.xyz\" không được hỗ trợ.",
+      "latencyMs": 8,
+      "severity": "Medium",
+      "notes": "Hệ thống chặn và thông báo định dạng UNSUPPORTED an toàn"
+    },
+    {
+      "id": "AUDIT_08",
+      "pillar": "PILLAR_3_PARSER_OPS",
+      "name": "Kiểm chứng trạng thái NOT_FOUND_VERIFIED (Cát Lái -> Móng Cái)",
+      "passed": true,
+      "expected": "Khẳng định rõ ràng không có dữ liệu tuyến này trong bảng giá, từ chối chính xác",
+      "actual": "Trong dữ liệu bảng tính hiện tại (file *Pricing Vendor.xlsx*), tôi đã thực hiện tra cứu toàn bộ các sheet nhưng **không tìm thấy báo giá cho tuyến đường từ Cát Lái đi Móng Cái, Quảng Ninh**.\n\nDữ liệu ...",
+      "latencyMs": 5804,
+      "severity": "Critical",
+      "notes": "Chống bịa đặt tuyệt đối"
+    },
+    {
+      "id": "AUDIT_09",
+      "pillar": "PILLAR_4_SECURITY_IDOR",
+      "name": "Chặn IDOR trên Agent Chat API giữa 2 công ty (VTX gọi Agent của STL)",
+      "passed": true,
+      "expected": "HTTP 404 Not Found hoặc HTTP 403 Forbidden",
+      "actual": "HTTP 404: {\"success\":false,\"error\":\"Không tìm thấy Agent cá nhân hoặc bạn không có quyền truy cập.\"}",
+      "latencyMs": 10,
+      "severity": "Critical",
+      "notes": "Cô lập hoàn hảo ở tầng controller SQL"
+    },
+    {
+      "id": "AUDIT_10",
+      "pillar": "PILLAR_4_SECURITY_IDOR",
+      "name": "Chặn IDOR trên Conversation Detail API (VTX đọc hội thoại của STL)",
+      "passed": true,
+      "expected": "HTTP 404 Not Found hoặc HTTP 403 Forbidden",
+      "actual": "HTTP 404",
+      "latencyMs": 15,
+      "severity": "Critical",
+      "notes": "Lịch sử hội thoại được bảo vệ tuyệt đối"
+    },
+    {
+      "id": "AUDIT_11",
+      "pillar": "PILLAR_4_SECURITY_IDOR",
+      "name": "Chặn IDOR trên File Download API (VTX tải file xuất của STL)",
+      "passed": true,
+      "expected": "HTTP 404 hoặc HTTP 403 khi cố tải file của người khác",
+      "actual": "HTTP 404",
+      "latencyMs": 25,
+      "severity": "Critical",
+      "notes": "Tệp kết quả cá nhân được cô lập tuyệt đối"
+    },
+    {
+      "id": "AUDIT_12",
+      "pillar": "PILLAR_5_REGRESSION",
+      "name": "Bảo toàn cấu hình & prompt của các Agent nghiệp vụ hiện hữu (Excel-Data-Pro & Email-Assistant)",
+      "passed": true,
+      "expected": "Cả 2 Agent hiện hữu đều tồn tại, trạng thái active và giữ nguyên cấu hình",
+      "actual": "Excel-Data-Pro: Active | Email-Assistant: Active",
+      "latencyMs": 12,
+      "severity": "Critical",
+      "notes": "Không bị hồi quy cấu hình hay mất dữ liệu"
+    },
+    {
+      "id": "AUDIT_13",
+      "pillar": "PILLAR_5_REGRESSION",
+      "name": "Kiểm thử hồi quy nghiệp vụ thực tế trên Excel-Data-Pro",
+      "passed": true,
+      "expected": "Excel-Data-Pro tự động kích hoạt Universal Data Engine và trả về giá 900.000 VNĐ",
+      "actual": "Dữ liệu báo giá cước vận chuyển tuyến từ **KCN Tân Bình, HCM** đi **Dĩ An, Bình Dương** (Sheet **Miền Nam**) gồm **4 bản ghi** được cập nhật như sau:\n\n| STT | Ngày báo giá | Mã REF | Điểm đi | Điểm đế...",
+      "latencyMs": 12000,
+      "severity": "High",
+      "notes": "Agent gốc vận hành hoàn hảo với Universal Engine v2.0"
+    }
+  ]
+}

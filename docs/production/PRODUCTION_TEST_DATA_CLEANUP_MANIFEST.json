@@ -1,0 +1,73 @@
+{
+  "work_code": "PROD-TEST-DATA-CLEANUP-01",
+  "execution_time": "2026-10-30T04:58:57.000Z",
+  "environment": "Production",
+  "database": "hrbot",
+  "database_user": "hrbot",
+  "pre_cleanup_backup": {
+    "file": "backups/prod_test_data_cleanup_01/hrbot_pre_cleanup_backup.sql",
+    "size_bytes": 77643526,
+    "sha256": "3f7df692df0baa466f36e49cbfe1386c1dce2ffdab24301d90c0c3c7371cd12f"
+  },
+  "cleaned_records": {
+    "employee_hard_delete_audit": 2,
+    "employee_hard_delete_manifests": 1,
+    "employee_hard_delete_requests": 1,
+    "hr_sync_tasks": 78,
+    "user_agent_versions": 3,
+    "user_agents": 3,
+    "ai_attachments": 9,
+    "chat_conversation_files": 14,
+    "ai_messages": 25,
+    "ai_conversations": 20
+  },
+  "post_commit_cleaned_files": [
+    "auth-service/storage/conversations/conversation_7954faec-23aa-4f64-a002-5bea34462367.md",
+    "auth-service/storage/conversations/conversation_07fbd584-fab0-434a-8045-39ae79d3dd5c.md",
+    "auth-service/storage/conversations/conversation_767eb53b-75da-4d0a-9356-616fa1f74fb2.md",
+    "auth-service/storage/conversations/conversation_34cb2bf9-6b34-4794-89f2-4610ade8274d.md",
+    "auth-service/storage/conversations/conversation_e4c42044-582c-46d0-8711-e79b7aeb5cec.md",
+    "auth-service/storage/conversations/conversation_599a1648-e1a8-444b-b638-a140cc0bdded.md",
+    "auth-service/storage/conversations/conversation_4b4aed5a-cf3c-42e3-85ee-18730861f0f7.md",
+    "auth-service/storage/conversations/conversation_e8b3bf68-cecd-4345-bad4-0fc952f6f752.md",
+    "auth-service/storage/conversations/conversation_bcddaab5-2d43-4cfe-9617-d8f1f4d7d31a.md",
+    "auth-service/storage/conversations/conversation_244939fa-0f1e-4644-80eb-6578962055ef.md",
+    "auth-service/storage/conversations/conversation_8cb83c8e-ec39-4b82-910c-4eeadbc0574e.md"
+  ],
+  "baseline_verification": {
+    "status": "VERIFIED_ZERO_MUTATIONS",
+    "count": 5,
+    "employees": [
+      {
+        "employee_code": "STL00014",
+        "employee_name": "NGUYỄN TRƯỜNG NAM",
+        "company_id": "STL",
+        "status": "ACTIVE"
+      },
+      {
+        "employee_code": "SWC00022",
+        "employee_name": "PHAN DƯƠNG THANH BÌNH",
+        "company_id": "SWC",
+        "status": "ACTIVE"
+      },
+      {
+        "employee_code": "SWC00023",
+        "employee_name": "NGUYỄN TRẦN THIỆN NHÂN",
+        "company_id": "SWC",
+        "status": "ACTIVE"
+      },
+      {
+        "employee_code": "SWC00024",
+        "employee_name": "NGÔ ĐẶNG TUẤN UYÊN",
+        "company_id": "SWC",
+        "status": "ACTIVE"
+      },
+      {
+        "employee_code": "SWC00025",
+        "employee_name": "LÊ THÀNH NHÂN",
+        "company_id": "SWC",
+        "status": "ACTIVE"
+      }
+    ]
+  }
+}

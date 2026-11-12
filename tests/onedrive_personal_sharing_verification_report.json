@@ -1,0 +1,141 @@
+{
+  "timestamp": "2026-10-27T07:03:12.599Z",
+  "total": 12,
+  "passed": 12,
+  "results": [
+    {
+      "id": "OD_TEST_01",
+      "name": "Chặn đứng 100% các URL độc hại, SSRF, IP nội bộ, giao thức không an toàn",
+      "passed": true,
+      "expected": 6,
+      "actual": 6,
+      "notes": "Đã kiểm tra 6 mẫu tấn công SSRF/Protocol injection."
+    },
+    {
+      "id": "OD_TEST_02",
+      "name": "Chấp nhận chính xác các tên miền chuẩn OneDrive và SharePoint",
+      "passed": true,
+      "expected": 4,
+      "actual": 4,
+      "notes": ""
+    },
+    {
+      "id": "OD_TEST_03",
+      "name": "Mã hóa Sharing Link tuân thủ chuẩn Base64URL của Microsoft Graph API",
+      "passed": true,
+      "expected": "Starts with u! and uses URL-safe base64 characters",
+      "actual": "u!aHR0cHM6Ly8xZHJ2Lm...",
+      "notes": ""
+    },
+    {
+      "id": "OD_TEST_04",
+      "name": "Áp dụng giới hạn dung lượng tải tối đa 20 MB cho tệp OneDrive",
+      "passed": true,
+      "expected": 20971520,
+      "actual": 20971520,
+      "notes": ""
+    },
+    {
+      "id": "OD_TEST_05",
+      "name": "Kiểm soát chặt chẽ danh sách định dạng hỗ trợ (XLSX, DOCX, PDF, CSV; chặn EXE/ZIP)",
+      "passed": true,
+      "expected": true,
+      "actual": {
+        "isXlsxSupported": true,
+        "isDocxSupported": true,
+        "isPdfSupported": true,
+        "isExeBlocked": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_TEST_06",
+      "name": "Xác thực chữ ký nhị phân (Magic Bytes) chặn tệp giả mạo phần mở rộng",
+      "passed": true,
+      "expected": true,
+      "actual": {
+        "sigXlsxOk": true,
+        "fakeXlsxBlocked": true,
+        "sigPdfOk": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_TEST_07",
+      "name": "Mã hóa AES-256-GCM token tại cơ sở dữ liệu và giải mã chính xác trong bộ nhớ",
+      "passed": true,
+      "expected": true,
+      "actual": {
+        "isCiphertextInDb": true,
+        "accessMatches": true,
+        "refreshMatches": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_TEST_08",
+      "name": "Cô lập dữ liệu OAuth giữa các người dùng (User VTX không thấy token của User STL)",
+      "passed": true,
+      "expected": {
+        "stlConnected": true,
+        "unlinkedConnected": false,
+        "crossUserLeak": false,
+        "randomIsolatedConnected": false
+      },
+      "actual": {
+        "stlConnected": true,
+        "unlinkedConnected": false,
+        "crossUserLeak": false,
+        "randomIsolatedConnected": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_TEST_09",
+      "name": "Cơ chế Anti-CSRF bằng mã State một lần (Chặn đứng state giả mạo / can thiệp)",
+      "passed": true,
+      "expected": true,
+      "actual": {
+        "hasValidState": true,
+        "fakeBlocked": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_TEST_10",
+      "name": "Xử lý mượt mà kịch bản người dùng hủy ủy quyền (access_denied) không gây lỗi server",
+      "passed": true,
+      "expected": true,
+      "actual": {
+        "status": 400,
+        "cancelHandled": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_TEST_11",
+      "name": "Endpoint ngắt kết nối Microsoft OneDrive xóa sạch token an toàn",
+      "passed": true,
+      "expected": {
+        "disconnected": true,
+        "connectedAfter": false
+      },
+      "actual": {
+        "disconnected": true,
+        "connectedAfter": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_TEST_12",
+      "name": "Nạp tệp nhị phân từ OneDrive vào Universal Data Engine (Kế thừa đầy đủ cấu trúc và chỉ mục)",
+      "passed": true,
+      "expected": "Sheet Miền Nam parsed with status READY",
+      "actual": {
+        "status": "READY",
+        "totalUnits": 298
+      },
+      "notes": ""
+    }
+  ]
+}

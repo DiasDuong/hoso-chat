@@ -1,0 +1,52 @@
+{
+  "timestamp": "2026-10-29T03:50:22.318Z",
+  "passCount": 5,
+  "total": 5,
+  "results": [
+    {
+      "id": "Q1_EXACT_LOOKUP",
+      "type": "Exact lookup",
+      "prompt": "Giá cước vận chuyển từ cảng Hải Phòng đến Thái Hà Hà Nội cho xe 1.25T là bao nhiêu tiền?",
+      "expected": "1.610.000",
+      "evidence": "Sheet Miền Bắc, STT 5, Cảng Hải Phòng -> Số 3 ngách 69 ngõ 117 Thái Hà Đống Đa Hà Nội, xe 1.25T, Giá: 1.610.000 VNĐ",
+      "actual": "Giá cước vận chuyển từ cảng Hải Phòng đến Thái Hà, Hà Nội cho xe 1.25T là **1.610.000 VNĐ** (chưa bao gồm VAT, áp dụng theo mức GIÁ COST).\n\n* **Chi tiết bản ghi:**\n  - **Tuyến đường:** Cảng Hải Phòng → Số 3, ngách 69 ngõ 117 Thái Hà, Phường Đống Đa, Hà Nội (Điểm đến: Thái Hà)\n  - **Loại xe / Cont:** 1.25T (Loại hình: LCL)\n  - **Mã REF:** `43_VIC_LCL`\n  - **Ngày báo giá:** 19/10/2026\n  - **Ghi chú:** Mặt hàng ống bảo vệ sensor (GW: 222.00 kgs, 0.64 CBM) — đường cấm, xe vào đêm ra đêm.\n  - **Nguồn:** Sheet `Miền Bắc`, Dòng số 6.",
+      "passed": true
+    },
+    {
+      "id": "Q2_PARAPHRASED_LOOKUP",
+      "type": "Lookup using different wording",
+      "prompt": "Cho tôi biết chi phí thuê xe tải chuyển hàng từ khu công nghiệp Tân Bình về Dĩ An Bình Dương?",
+      "expected": "900.000",
+      "evidence": "Sheet Miền Nam, STT 53, 54, 63, 64, KCN Tân Bình HCM -> Dĩ An Bình Dương, Xe tải, Giá: 900.000 VNĐ",
+      "actual": "Chi phí thuê xe tải chuyển hàng từ KCN Tân Bình, TP.HCM đi Dĩ An, Bình Dương (Mã REF: `42_LAU_LCL`, Sheet: `Miền Nam`) ghi nhận mức giá **900.000 VNĐ** (áp dụng cho xe tải LCL). \n\nDưới đây là chi tiết các bản ghi báo giá gần nhất cho tuyến đường này trong hệ thống:\n\n| Ngày báo giá | Điểm đi | Điểm đến | Loại xe / Hình thức | Giá Cost | Vendor | Ghi chú |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| **16/10/2026** | KCN Tân Bình, HCM | Alley 64, Truong Van Vinh Street, Tan Binh Ward, Di An City, Binh Duong Province | Xe tải (LCL) | 900.000 VNĐ *(giá trần)* | Vendor 3S | Mặt hàng: máy khuấy - GW: 50kg, 20kg, 50kg - hàng bốc tay được |\n| **15/10/2026** | KCN Tân Bình, HCM | Alley 64, Truong Van Vinh Street, Tan Binh Ward, Di An City, Binh Duong Province | Xe tải (LCL) | **900.000/chuyến** | VENDOR | Mặt hàng: máy khuấy - Trọng lượng: 140kg - hàng bốc tay được |\n| **13/10/2026** | KCN Tân Bình, HCM | Alley 64, Truong Van Vinh Street, Tan Binh Ward, Di An City, Binh Duong Province | Xe tải (LCL) | **900.000/chuyến** | 3S | Mặt hàng: máy khuấy - Trọng lượng: 120kg - 15% phụ phí dầu |\n| **13/10/2026** | KCN Tân Bình, HCM | Dĩ An, Bình Dương | Xe tải (LCL) | **900.000/xe** | 3S | 15% phụ phí dầu - Phí làm hàng nếu có |\n\n*Lưu ý: Chi phí trên chưa bao gồm phí làm hàng (nếu có) và phụ phí dầu theo từng thời điểm.*",
+      "passed": true
+    },
+    {
+      "id": "Q3_MISSING_ITEM",
+      "type": "Missing item",
+      "prompt": "Giá cước vận chuyển hàng hóa từ Đà Nẵng đi Cần Thơ trong bảng giá là bao nhiêu?",
+      "expected": "không có",
+      "evidence": "Toàn bộ file Pricing Vendor.xlsx chỉ có Sheet Miền Nam và Miền Bắc, không có tuyến Đà Nẵng đi Cần Thơ",
+      "actual": "Trong hệ thống dữ liệu bảng tính hiện tại (`Pricing Vendor.xlsx`), **không có bản ghi/báo giá nào** cho tuyến đường vận chuyển hàng hóa từ **Đà Nẵng đi Cần Thơ** (hoặc chiều ngược lại từ Cần Thơ đi Đà Nẵng). \n\nBảng tính chỉ có ghi nhận một số tuyến liên quan đến Đà Nẵng xuất phát từ TP.HCM (Sân bay Tân Sơn Nhất / kho TCS) đến Nhà máy Heineken Đà Nẵng / KCN Hòa Khánh.",
+      "passed": true
+    },
+    {
+      "id": "Q4_AMBIGUOUS_ITEM",
+      "type": "Ambiguous item",
+      "prompt": "Báo giá cho tuyến Casumina đến Tire plant/Mixing như thế nào?",
+      "expected": "2.700.000",
+      "evidence": "Sheet Miền Nam, STT 3, 4, 5, Casumina -> Tire plant/Mixing FCL, có 3 mức sản lượng: 1 cont, 2 cont, 3 cont/ngày đều là 2.700.000/cont",
+      "actual": "Dưới đây là chi tiết báo giá cước vận chuyển cho tuyến từ **Casumina** đến **Tire plant/Mixing** ghi nhận trong hệ thống dữ liệu hiện tại (sheet **Miền Nam**):\n\n| Điểm đi | Điểm đến | Loại hình / Cont | Sản lượng | Giá Cost | Ngày báo giá | Mã REF |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| **Casumina** | **Tire plant/Mixing** | FCL / Cont | 1 cont/way/day | **2.700.000 VNĐ/cont** | 07/10/26 | 41_VEN_FCL |\n| **Casumina** | **Tire plant/Mixing** | FCL / Cont | 2 cont/way/day | **2.700.000 VNĐ/cont** | 07/10/26 | 41_VEN_FCL |\n| **Casumina** | **Tire plant/Mixing** | FCL / Cont | 3 cont/way/day | **2.700.000 VNĐ/cont** | 07/10/26 | 41_VEN_FCL |\n\n* **Thông tin bổ sung:** Giá dầu áp dụng chuẩn tại thời điểm báo giá là **28.48**.",
+      "passed": true
+    },
+    {
+      "id": "Q5_CALCULATION_COMPARISON",
+      "type": "Calculation or comparison",
+      "prompt": "So sánh giá cước Cont 20 đi ghép và Cont 20 đi đơn từ KCN Đình Trám đi cảng Hải Phòng, phương án nào rẻ hơn và chênh lệch bao nhiêu?",
+      "expected": "4.600.000",
+      "evidence": "Sheet Miền Bắc, STT 2 (Cont 20 đi ghép: 4.600.000) và STT 3 (Cont 20 đi đơn: 5.500.000), chênh lệch 900.000",
+      "actual": "Dựa trên dữ liệu mới nhất từ tệp **Pricing Vendor.xlsx** (sheet *Miền Bắc*), chi phí cước vận chuyển Cont 20' cho tuyến **KCN Đình Trám đi cảng Hải Phòng** cụ thể như sau:\n\n* **Cont 20 đi ghép:** `4.600.000 VNĐ` (Mã REF: `43_CHI_FCL`, dòng 3)\n* **Cont 20 đi đơn:** `5.500.000 VNĐ` (Mã REF: `43_CHI_FCL`, dòng 4)\n\n### Kết luận so sánh:\n* **Phương án rẻ hơn:** **Cont 20 đi ghép** có mức chi phí thấp hơn.\n* **Mức chênh lệch:** Phương án đi ghép rẻ hơn **900.000 VNĐ** so với phương án đi đơn ($5.500.000 - 4.600.000$).\n\n*(Lưu ý: Đơn giá trên áp dụng cho mặt hàng Fabricated steel parts, giá dầu 29.12; nếu phát sinh lấy khu vực Lạch Huyện sẽ cộng thêm 450.000 VNĐ/cont).*",
+      "passed": true
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "timestamp": "2026-10-26T01:47:27.724Z",
+  "summary": {
+    "total": 10,
+    "passed": 9,
+    "not_verified": 1,
+    "failed": 0
+  },
+  "production_integrity": {
+    "records_match": true,
+    "files_match": true
+  },
+  "tests": [
+    {
+      "id": "ST-01",
+      "name": "Audit log on Dry-Run correctly logged DRY_RUN_CANDIDATE",
+      "status": "PASS",
+      "audit_id": "8",
+      "run_id": "f03b8810-3fde-47c9-9191-273badb708c7",
+      "mode": "DRY_RUN",
+      "event": "DRY_RUN_CANDIDATE"
+    },
+    {
+      "id": "ST-02",
+      "name": "Successful deletion and DB update logged DB_UPDATE_SUCCEEDED",
+      "status": "PASS",
+      "audit_id": "9",
+      "fs_deleted": true,
+      "event": "DB_UPDATE_SUCCEEDED",
+      "db_update_succeeded_count": 1
+    },
+    {
+      "id": "ST-03",
+      "name": "File deletion permission error (EPERM) logged DELETE_FAILED",
+      "status": "PASS",
+      "audit_id": "10",
+      "file_preserved": true,
+      "event": "DELETE_FAILED",
+      "error_code": "EPERM"
+    },
+    {
+      "id": "ST-04",
+      "name": "Path traversal outside root logged REJECTED_UNSAFE_PATH",
+      "status": "PASS",
+      "audit_id": "11",
+      "canary_intact": true,
+      "event": "REJECTED_UNSAFE_PATH",
+      "error_code": "PATH_TRAVERSAL_DETECTED"
+    },
+    {
+      "id": "ST-05",
+      "name": "Symlink pointing outside root logged REJECTED_UNSAFE_PATH",
+      "status": "NOT VERIFIED",
+      "note": "Windows unprivileged environment requires SeCreateSymbolicLinkPrivilege. Logic verified via audit structure and unit validation."
+    },
+    {
+      "id": "ST-06",
+      "name": "DB update failure after unlink traps DELETE_SUCCEEDED_DB_UPDATE_PENDING",
+      "status": "PASS",
+      "audit_id": "12",
+      "fs_deleted": true,
+      "event": "DELETE_SUCCEEDED_DB_UPDATE_PENDING",
+      "inconsistency_detected": true,
+      "inconsistent_ids": [
+        "29dd9e31-89f8-4347-903a-80410ab724ac"
+      ]
+    },
+    {
+      "id": "ST-08",
+      "name": "Subsequent retry self-heals unlinked ghost record into RECOVERED_ON_RETRY",
+      "status": "PASS",
+      "audit_id": "13",
+      "db_status": "PURGED",
+      "event": "RECOVERED_ON_RETRY",
+      "recovered_count": 1
+    },
+    {
+      "id": "ST-07",
+      "name": "Audit failure explicitly flags audit_logged: false without crash",
+      "status": "PASS",
+      "audit_logged": false,
+      "audit_error": "Simulated Audit Storage Disk Full Error"
+    },
+    {
+      "id": "ST-09",
+      "name": "Concurrency mutex blocks second cleaner without spamming audit logs",
+      "status": "PASS",
+      "p1_skipped": false,
+      "p2_skipped": true,
+      "reason": "Tiến trình dọn dẹp artifact đang chạy, bỏ qua lần kích hoạt này."
+    },
+    {
+      "id": "ST-10",
+      "name": "Summary metrics strictly reconcile with event logs & zero sensitive data leaked",
+      "status": "PASS",
+      "audits_audited": 7,
+      "reconciled": true,
+      "zero_sensitive_leaks": true
+    }
+  ]
+}

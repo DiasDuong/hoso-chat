@@ -1,0 +1,159 @@
+{
+  "timestamp": "2026-10-29T03:30:46.891Z",
+  "totalTests": 10,
+  "passedCount": 10,
+  "failedCount": 0,
+  "successRate": "100%",
+  "testResults": [
+    {
+      "id": "TEST_A",
+      "suite": "SUITE_A",
+      "name": "Giá hiện tại tuyến KCN Tân Bình -> Dĩ An",
+      "query": "Giá đi từ KCN Tân Bình tới Dĩ An hiện tại như thế nào?",
+      "passed": true,
+      "assertions": {
+        "hasRoute": true,
+        "hasPrice": true,
+        "hasVendor": true
+      },
+      "actualReply": "Báo giá vận chuyển cho tuyến từ **KCN Tân Bình, HCM** đi **Dĩ An, Bình Dương** hiện được ghi nhận qua các bản ghi trong sheet **\"Miền Nam\"** (được sắp xếp theo ngày mới nhất):\n\n| Ngày báo giá | Mã REF | Điểm đi | Điểm đến | Loại hình & Xe | Nhà cung cấp | Giá Cost | Ghi chú & Điều kiện |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| **16/10/2026** | `42_LAU_LCL` | KCN Tân Bình, HCM | Alley 64, Trường Văn Vĩnh, Dĩ An | LCL / Xe tải | Vendor 3S | 900 *(nghìn)* | Mặt hàng: máy khuấy (GW: 50kg, 20kg, 50kg), bốc tay được, phí làm hàng nếu có. |\n| **15/10/2026** | `42_LAU_LCL` | KCN Tân Bình, HCM | Alley 64, Trường Văn Vĩnh, Dĩ An | LCL / Xe tải | VENDOR | 900.000/chuyến | Mặt hàng: máy khuấy (Trọng lượng: 140kg), bốc tay được, phí làm hàng nếu có. |\n| **13/10/2026** | `42_LAU_LCL` | KCN Tân Bình, HCM | Alley 64, Trường Văn Vĩnh, Dĩ An | LCL / Xe tải | 3S | 900.000/chuyến | Mặt hàng: máy khuấy (Trọng lượng: 120kg), 15% phụ phí dầu, phí làm hàng nếu có. |\n| **13/10/2026** | `42_LAU_LCL` | KCN Tân Bình, HCM | Dĩ An, Bình Dương | LCL / Xe tải | 3S | 900.000/xe | 15% phụ phí dầu, phí làm hàng nếu có. |\n\n**Tóm tắt:** Mức giá cước phổ biến cho tuyến đường này là **900.000 VNĐ** (áp dụng cho xe tải LCL chở hàng máy khuấy), kèm theo phụ phí dầu (khoảng 15%) và phí làm hàng phát sinh (nếu có).",
+      "latencyMs": 3829,
+      "notes": "Tìm thấy tuyến đường, mức giá 900k và nhà cung cấp"
+    },
+    {
+      "id": "TEST_B",
+      "suite": "SUITE_B",
+      "name": "Tìm tất cả báo giá đầy đủ bản ghi",
+      "query": "Tìm tất cả báo giá từ KCN Tân Bình đến Dĩ An, Bình Dương.",
+      "passed": true,
+      "assertions": {
+        "has13": true,
+        "has15": true,
+        "has16": true,
+        "hasRef": true,
+        "has3S": true,
+        "hasUnits": true
+      },
+      "actualReply": "Dữ liệu bảng tính hiện ghi nhận tổng cộng **4 bản ghi báo giá** cho tuyến đường từ **KCN Tân Bình, HCM** đi **Dĩ An, Bình Dương** (thuộc sheet **Miền Nam**, sắp xếp từ mới nhất đến cũ nhất):\n\n| Ngày báo giá | Mã REF | Điểm đi | Điểm đến | Loại hình / Xe | Nhà cung cấp | Giá Cost | Ghi chú & Điều kiện |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| **16/10/2026** | `42_LAU_LCL` | KCN Tân Bình, HCM | Alley 64, Trường Văn Vĩnh, Dĩ An | LCL / Xe tải | Vendor 3S | 900 *(nghìn/chuyến)* | Máy khuấy (GW: 50kg, 20kg, 50kg), bốc tay được, phí làm hàng nếu có. |\n| **15/10/2026** | `42_LAU_LCL` | KCN Tân Bình, HCM | Alley 64, Trường Văn Vĩnh, Dĩ An | LCL / Xe tải | VENDOR | 900.000/chuyến | Máy khuấy (Trọng lượng: 140kg), bốc tay được, phí làm hàng nếu có. |\n| **13/10/2026** | `42_LAU_LCL` | KCN Tân Bình, HCM | Alley 64, Trường Văn Vĩnh, Dĩ An | LCL / Xe tải | 3S | 900.000/chuyến | Máy khuấy (Trọng lượng: 120kg), 15% phụ phí dầu, phí làm hàng nếu có. |\n| **13/10/2026** | `42_LAU_LCL` | KCN Tân Bình, HCM | Dĩ An, Bình Dương | LCL / Xe tải | 3S | 900.000/xe | 15% phụ phí dầu, phí làm hàng nếu có. |",
+      "latencyMs": 4269,
+      "notes": "Bảo toàn đầy đủ tất cả các bản ghi (13/10, 15/10, 16/10, REF 42_LAU_LCL, đơn vị tính)"
+    },
+    {
+      "id": "TEST_C",
+      "suite": "SUITE_C",
+      "name": "Giá mới nhất nhà cung cấp 3S, ngày và đơn vị tính",
+      "query": "Giá mới nhất của nhà cung cấp 3S là bao nhiêu? Nêu ngày báo giá và đơn vị tính.",
+      "passed": true,
+      "assertions": {
+        "hasLatestDate": true,
+        "hasPrice": true,
+        "hasUnit": true
+      },
+      "actualReply": "Mức giá mới nhất từ nhà cung cấp **3S / Vendor 3S** (ghi nhận ngày **16/10/2026**) là **900.000 VNĐ** (trong bảng ghi là `900`, đơn vị ngàn đồng) cho tuyến KCN Tân Bình đi Dĩ An, áp dụng loại hình **LCL / Xe tải**.\n\nChi tiết các bản ghi cước của nhà cung cấp 3S:\n\n| Ngày báo giá | Tuyến đường | Nhà cung cấp | Giá Cost | Đơn vị tính | Ghi chú |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n| **16/10/2026** | KCN Tân Bình, HCM → Dĩ An, Bình Dương | Vendor 3S | **900** *(900.000 VNĐ)* | chuyến / xe tải | Máy khuấy (GW: 50kg, 20kg, 50kg), bốc tay được, phí làm hàng nếu có. |\n| **13/10/2026** | KCN Tân Bình, HCM → Dĩ An, Bình Dương | 3S | **900.000** | chuyến | Máy khuấy (Trọng lượng: 120kg), 15% phụ phí dầu, phí làm hàng nếu có. |\n| **13/10/2026** | KCN Tân Bình, HCM → Dĩ An, Bình Dương | 3S | **900.000** | xe | 15% phụ phí dầu, phí làm hàng nếu có. |",
+      "latencyMs": 4165,
+      "notes": "Xác định chính xác ngày báo giá, mức giá và đơn vị tính"
+    },
+    {
+      "id": "TEST_D",
+      "suite": "SUITE_D",
+      "name": "Truy vấn tiếng Việt không dấu",
+      "query": "Gia tu Tan Binh den Di An.",
+      "passed": true,
+      "assertions": {
+        "hasRouteOrPrice": true
+      },
+      "actualReply": "Dữ liệu thực tế mới nhất từ bảng tính `Pricing Vendor.xlsx` (sheet **Miền Nam**) ghi nhận **4 bản ghi** báo giá cho tuyến đường từ **KCN Tân Bình, HCM** đi **Dĩ An, Bình Dương**, chi tiết cụ thể như sau:\n\n| Ngày báo giá | Mã REF | Điểm đi | Điểm đến | Loại xe / Hình thức | Nhà cung cấp | Giá Cost | Ghi chú & Điều kiện |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| **16/10/2026** | `42_LAU_LCL` | KCN Tân Bình, HCM | Alley 64, Truong Van Vinh St, Dĩ An | Xe tải / LCL | Vendor 3S | **900** *(900.000 VNĐ)* | Máy khuấy (GW: 50kg, 20kg, 50kg), bốc tay được, phí làm hàng nếu có. |\n| **15/10/2026** | `42_LAU_LCL` | KCN Tân Bình, HCM | Alley 64, Truong Van Vinh St, Dĩ An | Xe tải / LCL | VENDOR | **900.000/chuyến** | Máy khuấy (Trọng lượng: 140kg), bốc tay được, phí làm hàng nếu có. |\n| **13/10/2026** | `42_LAU_LCL` | KCN Tân Bình, HCM | Alley 64, Truong Van Vinh St, Dĩ An | Xe tải / LCL | 3S | **900.000/chuyến** | Máy khuấy (Trọng lượng: 120kg), 15% phụ phí dầu, phí làm hàng nếu có. |\n| **13/10/2026** | `42_LAU_LCL` | KCN Tân Bình, HCM | Dĩ An, Bình Dương | Xe tải / LCL | 3S | **900.000/xe** | 15% phụ phí dầu, phí làm hàng nếu có. |\n\n**Tóm tắt cước phí:** Mức giá cước phổ biến cho tuyến đường này là **900.000 VNĐ** (áp dụng cho xe tải chở hàng LCL), kèm theo các điều kiện phụ phí dầu (khoảng 15%) và phí làm hàng phát sinh (nếu có).",
+      "latencyMs": 5756,
+      "notes": "Xử lý chính xác câu hỏi không dấu, trả về đúng tuyến đường và giá"
+    },
+    {
+      "id": "TEST_E",
+      "suite": "SUITE_E",
+      "name": "So sánh báo giá theo ngày, giá và ghi chú",
+      "query": "So sánh tất cả báo giá của tuyến này theo ngày, giá và ghi chú.",
+      "passed": true,
+      "assertions": {
+        "hasDates": true,
+        "hasNotes": true
+      },
+      "actualReply": "Dữ liệu thực tế mới nhất từ bảng tính `Pricing Vendor.xlsx` (sheet **Miền Nam**, sau khi đã kiểm tra và đối soát trực tiếp trên file) ghi nhận chính xác **4 bản ghi** báo giá cho tuyến đường từ **KCN Tân Bình, HCM** đi **Dĩ An, Bình Dương**, chi tiết như sau:\n\n| Ngày báo giá | Mã REF | Nhà cung cấp | Giá Cost | Đơn vị tính | Ghi chú & Điều kiện |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n| **16/10/2026** | `42_LAU_LCL` | Vendor 3S | **900** *(900.000)* | chuyến / xe tải | Mặt hàng: máy khuấy (GW: 50kg, 20kg, 50kg), bốc tay được nên không cần xe thùng, phí làm hàng nếu có. |\n| **15/10/2026** | `42_LAU_LCL` | VENDOR | **900.000** | chuyến | Mặt hàng: máy khuấy (Trọng lượng: 140kg), bốc tay được nên không cần xe thùng, phí làm hàng nếu có. |\n| **13/10/2026** | `42_LAU_LCL` | 3S | **900.000** | chuyến | Mặt hàng: máy khuấy (Trọng lượng: 120kg), gồm 15% phụ phí dầu, phí làm hàng nếu có. |\n| **13/10/2026** | `42_LAU_LCL` | 3S | **900.000** | xe | Gồm 15% phụ phí dầu, phí làm hàng nếu có. |\n\n**Tóm tắt:** Tất cả 4 báo giá đều đồng nhất ở mức **900.000 VNĐ** cho hình thức vận chuyển LCL bằng xe tải, áp dụng cho các lô hàng máy khuấy đi Dĩ An, Bình Dương.",
+      "latencyMs": 8391,
+      "notes": "So sánh chi tiết qua các mốc thời gian kèm ghi chú kỹ thuật"
+    },
+    {
+      "id": "TEST_F",
+      "suite": "SUITE_F",
+      "name": "Tuyến không tồn tại (Anti-hallucination)",
+      "query": "Tìm báo giá tuyến từ KCN Tân Bình đi Cà Mau trong bảng tính đính kèm.",
+      "passed": true,
+      "assertions": {
+        "statesNotFound": true,
+        "doesNotFabricatePrice": true
+      },
+      "actualReply": "Trong dữ liệu bảng tính `Pricing Vendor.xlsx` hiện tại, tôi đã thực hiện tra cứu trên tất cả các sheet nhưng **không tìm thấy bản ghi báo giá nào** cho tuyến đường từ **KCN Tân Bình** đi **Cà Mau**.",
+      "latencyMs": 6221,
+      "notes": "Xác nhận chuẩn xác không có dữ liệu cho tuyến không tồn tại, không bịa giá"
+    },
+    {
+      "id": "TEST_G1",
+      "suite": "SUITE_G",
+      "name": "Tra cứu đa sheet (Sheet Miền Bắc)",
+      "query": "Trong sheet Miền Bắc, tìm báo giá tuyến từ cảng Hải Phòng đi Hà Nội (hoặc Đình Trám đi cảng Hải Phòng). Cho biết giá và nhà cung cấp.",
+      "passed": true,
+      "assertions": {
+        "foundNorthernRoute": true,
+        "foundPriceOrVendor": true
+      },
+      "actualReply": "Dữ liệu trong sheet **\"Miền Bắc\"** ghi nhận các báo giá cho tuyến đường từ **cảng Hải Phòng** đi **Hà Nội** và chiều ngược lại từ **Đình Trám** đi **cảng Hải Phòng** như sau:\n\n### 1. Tuyến từ cảng Hải Phòng đi Hà Nội\n| Ngày báo giá | Điểm đến | Loại xe/Cont | Giá Cost | Nhà cung cấp | Ghi chú |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n| 19/10/2026 | 40 Hàng Bài, Hà Nội | Cont 40 | 6.200.000/cont | VENDOR | Đường cấm, vào đêm ra đêm, phí luật 1tr/xe, Lạch Huyện +450k |\n| 19/10/2026 | Thái Hà, Đống Đa, Hà Nội | 1.25T | 1.610.000 | VENDOR | Đường cấm, vào đêm ra đêm |\n\n### 2. Tuyến từ Đình Trám (Bắc Giang) đi cảng Hải Phòng\n| Ngày báo giá | Điểm đi | Loại xe/Cont | Giá Cost | Nhà cung cấp | Ghi chú |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n| 19/10/2026 | Đình Trám | Cont 20 (ghép) | 4.600.000 | VENDOR | Lạch Huyện +450k |\n| 19/10/2026 | Đình Trám | Cont 20 (đơn) | 5.500.000 | VENDOR | Lạch Huyện +450k |\n| 19/10/2026 | Đình Trám | Cont 40 | 5.600.000 | VENDOR | Lạch Huyện +450k |\n\n*Lưu ý: Tất cả các báo giá trên đều do nhà cung cấp **VENDOR** thực hiện.*",
+      "latencyMs": 15538,
+      "notes": "Truy xuất thành công dữ liệu từ sheet Miền Bắc"
+    },
+    {
+      "id": "TEST_G2",
+      "suite": "SUITE_G",
+      "name": "Bảo toàn dữ liệu trùng mã REF 42_LAU_LCL (Data Engine Integrity)",
+      "query": "searchSpreadsheetRecords({ refCode: \"42_LAU_LCL\" })",
+      "passed": true,
+      "assertions": {
+        "totalMatches": 4,
+        "hasRow53": true,
+        "hasRow54": true,
+        "hasRow63": true,
+        "hasRow64": true
+      },
+      "actualReply": "Tìm thấy 4/4 bản ghi chính xác",
+      "latencyMs": 5,
+      "notes": "Cả 4 bản ghi trùng mã REF đều được giữ nguyên vẹn, không bị deduplicate nhầm"
+    },
+    {
+      "id": "TEST_G3",
+      "suite": "SUITE_G",
+      "name": "Kiểm tra chống parse nhầm văn bản thành số (Type Safety)",
+      "query": "parseVNNumber on text strings",
+      "passed": true,
+      "assertions": {
+        "parsedRef": null,
+        "parsedVendor": null,
+        "parsedDate": null,
+        "parsedPriceUnit": null
+      },
+      "actualReply": "Mọi chuỗi chữ và đơn vị đều được bảo toàn nguyên dạng văn bản",
+      "latencyMs": 1,
+      "notes": "parseVNNumber không còn chuyển 42_LAU_LCL thành 42 hay 3S thành 3"
+    },
+    {
+      "id": "TEST_H",
+      "suite": "SUITE_H",
+      "name": "Định hướng tuyến đường (A -> B có, B -> A chưa có - Anti-reverse hallucination)",
+      "query": "Giá từ Dĩ An đến KCN Tân Bình là bao nhiêu trong bảng tính đính kèm?",
+      "passed": true,
+      "assertions": {
+        "statesNotFoundForReversed": true,
+        "explainsDirectionOrReverse": true
+      },
+      "actualReply": "Dựa trên việc kiểm tra trực tiếp dữ liệu mới nhất trong tệp `Pricing Vendor.xlsx`, hiện tại **không có báo giá nào cho chiều từ Dĩ An, Bình Dương về KCN Tân Bình, HCM**.\n\nBảng tính chỉ ghi nhận dữ liệu cho chiều ngược lại (từ KCN Tân Bình đi Dĩ An). Trong vận tải và logistics, giá cước chiều đi và chiều về thường khác nhau do các yếu tố như luồng xe chạy rỗng, biểu cước cầu đường và tính cân đối tải trọng. Do đó, bạn không nên sử dụng mức giá của chiều đi để áp đặt cho chiều về.\n\nĐể có báo giá chính xác cho chiều từ Dĩ An về KCN Tân Bình, bạn vui lòng liên hệ bộ phận Pricing hoặc kiểm tra lại các cập nhật mới nhất từ nhà cung cấp.",
+      "latencyMs": 19495,
+      "notes": "Xác nhận chuẩn xác: Bảng tính chỉ có Tân Bình -> Dĩ An, chưa có Dĩ An -> Tân Bình; không tự ý lấy giá chiều đi gán cho chiều về"
+    }
+  ]
+}

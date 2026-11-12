@@ -1,0 +1,82 @@
+[
+  {
+    "id": "HR_Approval_Callback_01",
+    "name": "HR_Approval_Callback",
+    "active": true,
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "hr-approval-callback",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "appr-webhook-01",
+        "name": "Webhook Approval Callback",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          180,
+          300
+        ],
+        "webhookId": "hr-approval-callback-hook"
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst body = $input.first().json.body || $input.first().json;\nconst headers = $input.first().json.headers || {};\nconst expected = \"8973d464f5f1475b83d6ab88d222d824\";\nconst incoming = body.secret || headers['x-n8n-auth-token'] || headers['x-internal-secret'] || '';\nconst isAuthorized = (incoming === expected);\n\nreturn [{\n  json: {\n    isAuthorized,\n    success: true,\n    status: 'approved',\n    sync_initiated: true,\n    staging_ids: body.staging_ids || [],\n    approver: body.approver,\n    approved_at: body.approved_at || new Date().toISOString()\n  }\n}];\n"
+        },
+        "id": "appr-process",
+        "name": "Audit & Record Approval",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          420,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "respondWith": "firstIncomingItem",
+          "options": {
+            "responseCode": 200
+          }
+        },
+        "id": "appr-respond",
+        "name": "Respond Approval ACK",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          680,
+          300
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook Approval Callback": {
+        "main": [
+          [
+            {
+              "node": "Audit & Record Approval",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Audit & Record Approval": {
+        "main": [
+          [
+            {
+              "node": "Respond Approval ACK",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    }
+  }
+]

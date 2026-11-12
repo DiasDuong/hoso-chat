@@ -1,0 +1,551 @@
+[
+  {
+    "updatedAt": "2026-10-15T03:28:17.000Z",
+    "createdAt": "2026-10-07T06:41:34.000Z",
+    "id": "qcTWkHkWOSAVxMAG",
+    "name": "HR_Admin_API",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "hr-admin-api",
+          "authentication": "headerAuth",
+          "responseMode": "responseNode",
+          "options": {
+            "allowedOrigins": "*"
+          }
+        },
+        "id": "9d662865-ba61-4ccd-bc35-4f348cfcdc11",
+        "name": "Admin API",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          1136,
+          1520
+        ],
+        "webhookId": "b2c3d4e5-0000-4000-8000-0000000000b1",
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "fvZECZnvWlGfYcF9",
+            "name": "HR Upload Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const b = $input.first().json.body || {};\nconst a = String(b.action || '');\nconst ALL = ['list', 'view', 'diff', 'activate', 'rollback', 'revoke', 'edit', 'delete', 'restore', 'chat_history', 'unanswered', 'mark_handled'];\nif (!ALL.includes(a)) throw new Error('Hành động không hợp lệ');\nconst id = String(b.doc_version_id || '').trim(), doc = String(b.document_id || '').trim();\nconst BYID = ['view', 'diff', 'activate', 'edit', 'delete', 'restore'];\nif (BYID.includes(a) && !/^[0-9a-f-]{36}$/i.test(id)) throw new Error('doc_version_id không hợp lệ');\nif ((a === 'rollback' || a === 'revoke') && !/^[A-Za-z0-9_-]{1,100}$/.test(doc)) throw new Error('document_id không hợp lệ');\n\nconst WRITE = ['activate', 'rollback', 'revoke', 'edit', 'delete', 'restore'];\nlet actor = String(b.actor || '').replace(/\\s+/g, ' ').trim();\nif (WRITE.includes(a)) {\n  if (actor.length < 2 || actor.length > 60) throw new Error('Hãy nhập tên người thực hiện (2 đến 60 ký tự).');\n} else { actor = ''; }\n\nconst actor_role = String(b.actor_role || (b.role || 'super_admin')).toLowerCase();\nconst actor_branch = String(b.actor_branch || (b.branch || 'all')).toLowerCase();\n\nlet title = '', doc_number = '', effective_date = '', expiry_date = '';\nlet branch_scope = '', doc_type = '', role_access = '', change_summary = '';\nif (a === 'edit') {\n  title = String(b.title || '').trim();\n  doc_number = String(b.doc_number || '').trim();\n  effective_date = String(b.effective_date || '').trim();\n  expiry_date = String(b.expiry_date || '').trim();\n  branch_scope = String(b.branch_scope || '').trim();\n  doc_type = String(b.doc_type || '').trim();\n  role_access = String(b.role_access || '').trim();\n  change_summary = String(b.change_summary || '').trim();\n  if (!title || title.length > 300) throw new Error('Tiêu đề không được để trống và tối đa 300 ký tự.');\n  if (doc_number.length > 100) throw new Error('Số văn bản tối đa 100 ký tự.');\n  if (effective_date && !/^\\d{4}-\\d{2}-\\d{2}$/.test(effective_date)) {\n    throw new Error('Ngày hiệu lực không đúng định dạng YYYY-MM-DD.');\n  }\n}\nconst target = BYID.includes(a) ? id : (a === 'list' || a === 'chat_history' || a === 'unanswered' || a === 'mark_handled' ? '00000000-0000-0000-0000-000000000000' : doc);\nreturn [{ json: { action: a, target, actor, actor_role, actor_branch, title, doc_number, effective_date, expiry_date, branch_scope, doc_type, role_access, change_summary, ids: String(b.ids || ''), mode: String(b.mode || 'handled') } }];"
+        },
+        "id": "3d0c6c33-cc22-4cae-b3ca-f04b443fa024",
+        "name": "Route",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1360,
+          1520
+        ],
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "c1000000-0000-4000-8000-000000000001",
+                "leftValue": "={{ $json.action === 'list' || $json.action === 'view' || $json.action === 'diff' || $json.action === 'chat_history' || $json.action === 'unanswered' || $json.action === 'mark_handled' }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "2a07dbae-e317-4ba1-95e0-ece113fd0307",
+        "name": "Is list",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          1584,
+          1440
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH upd AS (\n  UPDATE unanswered_log\n  SET handled = ($6::text = 'handled')\n  WHERE $1::text = 'mark_handled'\n    AND id = ANY(string_to_array(NULLIF($5::text, ''), ',')::bigint[])\n  RETURNING id\n)\nSELECT CASE $1::text\nWHEN 'view' THEN (\n  WITH doc AS (\n    SELECT branch_scope FROM documents WHERE doc_version_id = $2::text::uuid LIMIT 1\n  )\n  SELECT \n    CASE \n      WHEN $3 = 'employee' AND NOT ((SELECT branch_scope FROM doc) && ARRAY['all', $4]::text[]) THEN\n        jsonb_build_object('error', '403 Forbidden: Quyền nhân viên không được phép truy cập tài liệu của công ty khác.', 'http_status', 403)\n      WHEN $3 = 'admin' AND $4 <> 'all' AND NOT ((SELECT branch_scope FROM doc) && ARRAY['all', $4]::text[]) THEN\n        jsonb_build_object('error', '403 Forbidden: Admin ' || $4 || ' không có quyền quản trị tài liệu công ty khác.', 'http_status', 403)\n      ELSE\n        (SELECT COALESCE(jsonb_agg(jsonb_build_object('muc', c.section_path, 'loai', c.chunk_type, 'noidung', c.content) ORDER BY c.seq), '[]'::jsonb)\n         FROM chunks c WHERE c.doc_version_id = $2::text::uuid)\n    END\n)\nWHEN 'diff' THEN (\n  WITH base AS (\n    SELECT d.doc_version_id FROM documents d\n    WHERE d.document_id = (SELECT document_id FROM documents WHERE doc_version_id = $2::text::uuid)\n      AND d.status::text = 'active' AND d.doc_version_id <> $2::text::uuid\n    LIMIT 1),\n  n AS (\n    SELECT COALESCE(regexp_replace(c.section_path, '\\s*\\(phần \\d+\\)$', ''), '(không có tên mục)') AS muc, min(c.seq) AS sq,\n           string_agg(c.content, E'\\n' ORDER BY c.seq) AS txt\n    FROM chunks c WHERE c.doc_version_id = $2::text::uuid GROUP BY 1),\n  o AS (\n    SELECT COALESCE(regexp_replace(c.section_path, '\\s*\\(phần \\d+\\)$', ''), '(không có tên mục)') AS muc, min(c.seq) AS sq,\n           string_agg(c.content, E'\\n' ORDER BY c.seq) AS txt\n    FROM chunks c WHERE c.doc_version_id = (SELECT doc_version_id FROM base) GROUP BY 1)\n  SELECT jsonb_build_object(\n    'has_base', EXISTS (SELECT 1 FROM base),\n    'rows', CASE WHEN NOT EXISTS (SELECT 1 FROM base) THEN '[]'::jsonb ELSE\n      COALESCE(jsonb_agg(jsonb_build_object(\n          'muc', COALESCE(n.muc, o.muc),\n          'thay_doi', CASE WHEN o.muc IS NULL THEN 'THÊM MỚI' WHEN n.muc IS NULL THEN 'BỊ XÓA' ELSE 'SỬA ĐỔI' END,\n          'cu', o.txt, 'moi', n.txt)\n        ORDER BY COALESCE(n.sq, 1000000 + o.sq)), '[]'::jsonb) END)\n  FROM n FULL JOIN o ON n.muc = o.muc\n  WHERE o.muc IS NULL OR n.muc IS NULL\n     OR btrim(regexp_replace(o.txt, '\\s+', ' ', 'g')) IS DISTINCT FROM btrim(regexp_replace(n.txt, '\\s+', ' ', 'g')))\nWHEN 'chat_history' THEN (\n  SELECT COALESCE(jsonb_agg(to_jsonb(h) ORDER BY h.id DESC), '[]'::jsonb)\n  FROM (\n    SELECT id,\n           to_char(at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD HH24:MI:SS') AS at_iso,\n           to_char(at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI:SS DD/MM/YYYY') AS at_vn,\n           mode,\n           question,\n           rewritten,\n           reply,\n           answerable,\n           round(COALESCE(best_sim, 0)::numeric, 2) AS best_sim,\n           doc_versions\n    FROM chat_log\n    ORDER BY id DESC\n    LIMIT 200\n  ) h)\nWHEN 'unanswered' THEN (\n  SELECT COALESCE(jsonb_agg(to_jsonb(u) ORDER BY u.id DESC), '[]'::jsonb)\n  FROM (\n    SELECT id,\n           question,\n           round(COALESCE(best_sim, 0)::numeric, 2) AS best_sim,\n           reason,\n           handled,\n           to_char(at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD HH24:MI:SS') AS at_iso,\n           to_char(at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI:SS DD/MM/YYYY') AS at_vn\n    FROM unanswered_log\n    ORDER BY id DESC\n    LIMIT 500\n  ) u)\nWHEN 'mark_handled' THEN (\n  SELECT jsonb_build_object('ok', true, 'updated', (SELECT count(*) FROM upd))\n)\nELSE (\n  SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY x.document_id, x.version DESC), '[]'::jsonb)\n  FROM (SELECT d.doc_version_id::text AS doc_version_id, d.document_id, d.version, d.title, d.doc_number,\n               d.status::text AS status, d.effective_date::text AS effective_date,\n               d.expiry_date::text AS expiry_date,\n               d.uploaded_by, d.approved_by,\n               array_to_string(d.branch_scope, ',') AS branch_scope,\n               d.doc_type,\n               array_to_string(d.role_access, ',') AS role_access,\n               d.change_summary,\n               (SELECT count(*) FROM chunks c WHERE c.doc_version_id = d.doc_version_id)::int AS chunks\n        FROM documents d\n        WHERE ($3 = 'super_admin' OR $4 = 'all' OR d.branch_scope && ARRAY['all', $4]::text[])) x)\nEND AS data;",
+          "options": {
+            "queryReplacement": "={{ [ $json.action, $json.target, $json.actor_role, $json.actor_branch, $json.ids, $json.mode ] }}"
+          }
+        },
+        "id": "fc3aa3ff-844f-4924-9252-9c66d618b86f",
+        "name": "List",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          1808,
+          1296
+        ],
+        "alwaysOutputData": true,
+        "credentials": {
+          "postgres": {
+            "id": "oQ0QptxKd9XXLeQK",
+            "name": "PG hrbot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ ($(\"List\").first().json.data && $(\"List\").first().json.data.error) ? JSON.stringify({ ok: false, status: $(\"List\").first().json.data.http_status || 403, error: $(\"List\").first().json.data.error }) : JSON.stringify($(\"Route\").first().json.action === \"view\" ? { ok: true, chunks: $(\"List\").first().json.data } : ($(\"Route\").first().json.action === \"diff\" ? { ok: true, diff: $(\"List\").first().json.data } : ($(\"Route\").first().json.action === \"chat_history\" ? { ok: true, history: $(\"List\").first().json.data } : ($(\"Route\").first().json.action === \"unanswered\" ? { ok: true, unanswered: $(\"List\").first().json.data } : ($(\"Route\").first().json.action === \"mark_handled\" ? { ok: true, result: $(\"List\").first().json.data } : { ok: true, docs: $(\"List\").first().json.data }))))) }}",
+          "options": {
+            "responseCode": "={{ ($(\"List\").first().json.data && $(\"List\").first().json.data.http_status) ? $(\"List\").first().json.data.http_status : 200 }}",
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ]
+            }
+          }
+        },
+        "id": "1654bbf9-d9af-47bb-bb21-cb86f116c23d",
+        "name": "Reply list",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          2032,
+          1296
+        ],
+        "executeOnce": true
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT CASE $1::text\nWHEN 'activate' THEN activate_version($2::text::uuid, $3::text)\nWHEN 'rollback' THEN rollback_version($2::text, $3::text)\nWHEN 'revoke' THEN revoke_document($2::text, $3::text)::text\nWHEN 'edit' THEN edit_version_info($2::text::uuid, $3::text, $4::text, $5::text, $6::text, $7::text, $8::text, $9::text, $10::text, $11::text)\nWHEN 'delete' THEN delete_version($2::text::uuid, $3::text)\nWHEN 'restore' THEN restore_version($2::text::uuid, $3::text)\nEND AS result;",
+          "options": {
+            "queryReplacement": "={{ [ $json.action, $json.target, $json.actor, $json.title, $json.doc_number, $json.effective_date, $json.expiry_date, $json.branch_scope, $json.doc_type, $json.role_access, $json.change_summary ] }}"
+          }
+        },
+        "id": "b4c3047a-5e95-48cf-8c69-316e5bdf27d0",
+        "name": "Run action",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          1808,
+          1536
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "oQ0QptxKd9XXLeQK",
+            "name": "PG hrbot"
+          }
+        },
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "c1000000-0000-4000-8000-000000000002",
+                "leftValue": "={{ $('Run action').first().json.result === 'purged' }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "32905221-0fcc-4cd9-97b9-2c2a69ead6b2",
+        "name": "Is delete",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          2032,
+          1488
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://qdrant:6333/collections/hr_docs/points/delete?wait=true",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ filter: { must: [ { key: 'doc_version_id', match: { value: $('Route').first().json.target } } ] } }) }}",
+          "options": {}
+        },
+        "id": "8616d15a-2e34-4e62-a84a-09e3f4e41b3c",
+        "name": "Qdrant delete",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "position": [
+          2480,
+          1440
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "id": "c1000000-0000-4000-8000-000000000003",
+                "leftValue": "={{ $('Route').first().json.action === 'edit' }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "4025efaf-4dbd-4470-909c-d7de18667ec0",
+        "name": "Is edit",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          2256,
+          1620
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://qdrant:6333/collections/hr_docs/points/payload?wait=true",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ (() => { const r = $('Route').first().json; const p = { title: r.title, doc_number: r.doc_number }; if (r.branch_scope) p.branch_scope = r.branch_scope.split(',').map(x=>x.trim()).filter(Boolean); if (r.role_access) p.role_access = r.role_access.split(',').map(x=>x.trim()).filter(Boolean); if (r.doc_type) p.doc_type = r.doc_type; if (r.effective_date) p.effective_int = parseInt(r.effective_date.replace(/-/g, ''), 10); if (r.expiry_date) p.expiry_int = parseInt(r.expiry_date.replace(/-/g, ''), 10); return JSON.stringify({ payload: p, filter: { must: [ { key: 'doc_version_id', match: { value: r.target } } ] } }); })() }}",
+          "options": {}
+        },
+        "id": "f8a8dd72-74c6-46d1-8168-7dc5ff8b662e",
+        "name": "Qdrant edit",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "position": [
+          2480,
+          1600
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT doc_version_id::text AS doc_version_id,\n       title,\n       doc_number,\n       status::text AS status,\n       COALESCE(to_char(effective_date, 'YYYYMMDD')::int, 20200101) AS effective_int,\n       COALESCE(to_char(expiry_date, 'YYYYMMDD')::int, 99991231) AS expiry_int\nFROM documents;",
+          "options": {}
+        },
+        "id": "87213d76-e093-46c4-9074-7a959adc78ab",
+        "name": "Sync list",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          2480,
+          1808
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "oQ0QptxKd9XXLeQK",
+            "name": "PG hrbot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://qdrant:6333/collections/hr_docs/points/payload?wait=true",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ payload: { title: $json.title, doc_number: $json.doc_number, status: $json.status, effective_int: $json.effective_int, expiry_int: $json.expiry_int }, filter: { must: [ { key: 'doc_version_id', match: { value: $json.doc_version_id } } ] } }) }}",
+          "options": {}
+        },
+        "id": "167c683d-4f62-47fc-ac55-3dd9a88f2623",
+        "name": "Qdrant sync",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "position": [
+          2704,
+          1808
+        ]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ ok: true, result: $('Run action').first().json.result }) }}",
+          "options": {
+            "responseCode": 200,
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ]
+            }
+          }
+        },
+        "id": "6d1a8e4f-982c-4304-9951-2232a8926b3d",
+        "name": "Reply action",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          2928,
+          1680
+        ],
+        "executeOnce": true
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ ok: false, message: (typeof $json.error === 'string' ? $json.error : ($json.error?.message || JSON.stringify($json.error || 'Lỗi không xác định'))) }) }}",
+          "options": {
+            "responseCode": 200,
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ]
+            }
+          }
+        },
+        "id": "15f86d2f-33dc-4168-b4fc-bd3b18301215",
+        "name": "Reply error",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          2032,
+          1712
+        ]
+      }
+    ],
+    "connections": {
+      "Admin API": {
+        "main": [
+          [
+            {
+              "node": "Route",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Route": {
+        "main": [
+          [
+            {
+              "node": "Is list",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Reply error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is list": {
+        "main": [
+          [
+            {
+              "node": "List",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Run action",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "List": {
+        "main": [
+          [
+            {
+              "node": "Reply list",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Run action": {
+        "main": [
+          [
+            {
+              "node": "Is delete",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Reply error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is delete": {
+        "main": [
+          [
+            {
+              "node": "Qdrant delete",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Is edit",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Qdrant delete": {
+        "main": [
+          [
+            {
+              "node": "Reply action",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is edit": {
+        "main": [
+          [
+            {
+              "node": "Qdrant edit",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Sync list",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Qdrant edit": {
+        "main": [
+          [
+            {
+              "node": "Reply action",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sync list": {
+        "main": [
+          [
+            {
+              "node": "Qdrant sync",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Qdrant sync": {
+        "main": [
+          [
+            {
+              "node": "Reply action",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate"
+    },
+    "staticData": {},
+    "meta": {},
+    "nodeGroups": [],
+    "pinData": {},
+    "versionId": "b0355d2e-93eb-4812-be34-c991132f3a38",
+    "activeVersionId": "b0355d2e-93eb-4812-be34-c991132f3a38",
+    "versionCounter": 1,
+    "triggerCount": 1,
+    "sourceWorkflowId": null,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-10-06T09:48:45.669Z",
+        "createdAt": "2026-10-06T09:48:45.669Z",
+        "role": "workflow:owner",
+        "workflowId": "qcTWkHkWOSAVxMAG",
+        "projectId": "ATzva6fPFnDCLlXz",
+        "project": {
+          "updatedAt": "2026-10-04T16:24:23.713Z",
+          "createdAt": "2026-10-04T16:14:03.714Z",
+          "id": "ATzva6fPFnDCLlXz",
+          "name": "Đức Dương <duongduc196873@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "customTelemetryTags": [],
+          "creatorId": "c0c41bac-c8e9-4dfe-b175-96f18e7e8eec"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  }
+]

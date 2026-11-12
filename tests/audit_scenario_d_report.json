@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-10-21T11:13:14.307Z",
+  "passCount": 9,
+  "total": 9,
+  "results": [
+    {
+      "test": "D.1_ROOT_NAVIGATION",
+      "passed": true
+    },
+    {
+      "test": "D.2_MATCHING_SEARCH",
+      "passed": true
+    },
+    {
+      "test": "D.3_NON_MATCHING_SEARCH_EMPTY",
+      "passed": true
+    },
+    {
+      "test": "D.4_SPECIAL_CHAR_ACCENTS_HANDLING",
+      "passed": true
+    },
+    {
+      "test": "D.5_EMPTY_IMPORT_VALIDATION",
+      "passed": true
+    },
+    {
+      "test": "D.6_EXCESS_BATCH_LIMIT",
+      "passed": true
+    },
+    {
+      "test": "D.7_NON_EXISTENT_ITEM_HANDLING",
+      "passed": true
+    },
+    {
+      "test": "D.8_IMPORT_IDEMPOTENCY",
+      "passed": true
+    },
+    {
+      "test": "D.9_SNAPSHOT_ATOMICITY",
+      "passed": true
+    }
+  ]
+}

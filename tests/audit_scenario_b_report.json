@@ -1,0 +1,37 @@
+{
+  "timestamp": "2026-10-29T03:49:37.994Z",
+  "results": {
+    "baselineMetadata": {
+      "sourceId": "90c8fad8-7e9e-4223-bd46-76cce394e1f6",
+      "fileName": "Pricing Vendor.xlsx",
+      "version": 43,
+      "etag": "\"{CA0F4D8A-EC37-4469-AA91-D2E80E71581E},13\"",
+      "ctag": "\"c:{CA0F4D8A-EC37-4469-AA91-D2E80E71581E},11\"",
+      "lastModifiedAt": "2026-10-26T06:13:57.000Z",
+      "lastSyncedAt": "2026-10-27T07:03:00.062Z"
+    },
+    "graphWriteEnforcement": {
+      "status": "VERIFIED_ENFORCED",
+      "httpStatus": 403,
+      "code": "accessDenied",
+      "message": "Access denied"
+    },
+    "liveWriteConstraint": {
+      "isBlocked": true,
+      "reason": "Scope constraint: token contains \"User.Read Files.Read\" (read-only Files.Read). Files.ReadWrite is deliberately omitted per security baseline.",
+      "scope": "User.Read Files.Read"
+    },
+    "changeDetection": {
+      "detectedStale": true,
+      "preVersion": 43,
+      "postVersion": 43,
+      "autoSynced": false
+    },
+    "downtimeSimulation": {
+      "isGraphReachable": false,
+      "gracefulErrorCaptured": false,
+      "doesNotCrashAgent": true
+    }
+  },
+  "allPassed": false
+}

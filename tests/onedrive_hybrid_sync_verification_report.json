@@ -1,0 +1,188 @@
+{
+  "timestamp": "2026-10-21T17:44:34.228Z",
+  "passedCount": 12,
+  "totalCount": 12,
+  "passRate": "100.0%",
+  "results": [
+    {
+      "id": "OD_HYBRID_01",
+      "name": "Đăng ký nguồn OneDrive và tự động xuất bản Snapshot bất biến phiên bản v1",
+      "passed": true,
+      "expected": {
+        "activeVersion": 1,
+        "isSnapPublished": true
+      },
+      "actual": {
+        "activeVersion": 1,
+        "isSnapPublished": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_HYBRID_02",
+      "name": "Lưu trữ thường trực nguồn dữ liệu qua các cuộc hội thoại mới của cùng Agent",
+      "passed": true,
+      "expected": {
+        "hasSource": true,
+        "hasDataProfile": true
+      },
+      "actual": {
+        "hasSource": true,
+        "hasDataProfile": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_HYBRID_03",
+      "name": "Query-Time Freshness: Xác nhận dữ liệu FRESH khi Microsoft Graph eTag/cTag nguyên vẹn",
+      "passed": true,
+      "expected": {
+        "isGraphReachable": true,
+        "isFresh": true
+      },
+      "actual": {
+        "isGraphReachable": true,
+        "isFresh": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_HYBRID_04",
+      "name": "Tự động nâng cấp phiên bản (v1 -> v2) khi phát hiện eTag thay đổi; lưu vết lịch sử Snapshot",
+      "passed": true,
+      "expected": {
+        "newVersion": 2,
+        "hasBothSnapshots": true,
+        "v1Archived": true,
+        "v2Published": true
+      },
+      "actual": {
+        "newVersion": 2,
+        "hasBothSnapshots": true,
+        "v1Archived": true,
+        "v2Published": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_HYBRID_05",
+      "name": "Nạp dữ liệu cấu trúc bảng tính và chỉ dẫn độ mới vào Prompt của AI Agent",
+      "passed": true,
+      "expected": {
+        "hasNotes": true,
+        "hasSpreadsheets": true,
+        "hasPromptText": true
+      },
+      "actual": {
+        "hasNotes": true,
+        "hasSpreadsheets": true,
+        "hasPromptText": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_HYBRID_06",
+      "name": "Xử lý an toàn khi Graph API Timeout/Offline: Báo trạng thái cảnh báo, không làm gián đoạn AI",
+      "passed": true,
+      "expected": {
+        "isGraphReachable": false,
+        "isFresh": false
+      },
+      "actual": {
+        "isGraphReachable": false,
+        "isFresh": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_HYBRID_07",
+      "name": "Cơ chế Khóa Mutex đồng thời: Chặn đứng xung đột tải trùng lặp khi có 2 truy vấn cùng lúc",
+      "passed": true,
+      "expected": {
+        "callCount": 1,
+        "versionsMatch": true
+      },
+      "actual": {
+        "callCount": 1,
+        "versionsMatch": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_HYBRID_08",
+      "name": "Chuẩn hóa phân quyền IDOR: Chặn xem/đồng bộ/xóa nguồn chéo (Trả HTTP 404 nhất quán, 400 khi ID sai định dạng)",
+      "passed": true,
+      "expected": {
+        "hasStlSourceInVtx": false,
+        "vtxSync": 404,
+        "vtxDelete": 404,
+        "sameCompDiffUser": 404,
+        "malformed": 400,
+        "nonExistent": 404
+      },
+      "actual": {
+        "hasStlSourceInVtx": false,
+        "vtxSync": 404,
+        "vtxDelete": 404,
+        "sameCompDiffUser": 404,
+        "malformed": 400,
+        "nonExistent": 404
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_HYBRID_09",
+      "name": "Endpoint kích hoạt đồng bộ thủ công (POST /api/onedrive/sources/:id/sync) phản hồi chuẩn mực",
+      "passed": true,
+      "expected": "Response with status 200 or safe 500 handling",
+      "actual": "Status: 500",
+      "notes": ""
+    },
+    {
+      "id": "OD_HYBRID_10",
+      "name": "Endpoint ngắt kết nối tệp (DELETE /api/onedrive/sources/:id) chuyển trạng thái DISCONNECTED an toàn",
+      "passed": true,
+      "expected": {
+        "status": 200,
+        "success": true,
+        "isMarkedDisconnected": true
+      },
+      "actual": {
+        "status": 200,
+        "success": true,
+        "isMarkedDisconnected": true
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_HYBRID_11",
+      "name": "Endpoint đối soát định kỳ n8n (POST /api/onedrive/reconcile) kiểm toán toàn diện danh mục tệp",
+      "passed": true,
+      "expected": {
+        "status": 200,
+        "success": true
+      },
+      "actual": {
+        "status": 200,
+        "success": true,
+        "totalScanned": 3
+      },
+      "notes": ""
+    },
+    {
+      "id": "OD_HYBRID_12",
+      "name": "Webhook Microsoft Graph: Bắt tay validationToken chuẩn HTTP 200 & tiếp nhận notification HTTP 202 (<3s)",
+      "passed": true,
+      "expected": {
+        "isHandshakeOk": true,
+        "isNotifFast": true
+      },
+      "actual": {
+        "isHandshakeOk": true,
+        "isNotifFast": true,
+        "notifDuration": "5ms"
+      },
+      "notes": ""
+    }
+  ]
+}

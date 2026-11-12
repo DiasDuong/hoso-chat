@@ -1,0 +1,463 @@
+{
+  "work_order": "SOTRANS-TEST-DATA-CLEANUP-10",
+  "project": "D:/hoso-chat",
+  "timestamp": "2026-10-29T23:22:00+07:00",
+  "backup_reference": {
+    "db_logical_dump": "backups/cleanup_data_10/hrbot_pre_cleanup_10.dump",
+    "db_dump_size_bytes": 15289133,
+    "db_dump_toc_entries": 265,
+    "files_backup_dir": "backups/cleanup_data_10/deleted_files_backup/",
+    "files_backup_count": 10
+  },
+  "summary": {
+    "total_targets_identified": 33,
+    "action_delete_count": 11,
+    "already_clean_count": 14,
+    "preserved_production_count": 8,
+    "review_required_count": 0,
+    "blocked_external_count": 0,
+    "action_delete_completed": 11,
+    "execution_timestamp": "2026-10-29T16:22:55.256Z",
+    "overall_status": "CLEANUP_COMPLETED"
+  },
+  "items": [
+    {
+      "id": "POSTGRESQL-HRBOT-STAGING-8fff1c43",
+      "system": "PostgreSQL (Production hrbot)",
+      "resource_type": "table_row",
+      "target": "public.hr_employee_staging",
+      "object_id": "8fff1c43-4593-46ea-a00f-a2eeaade87d5",
+      "testRunId": "tr_failclosed_20261029_mvtlzccg",
+      "identification_reason": "Synthetic candidate (full_name: NGUYEN SYNTHETIC REGRESSION, citizen_id: 099205009901, file_name: synthetic_swc_candidate.pdf) generated in Section 2 of test_fail_closed_and_regression_suite.js",
+      "dependencies": {
+        "foreign_keys_inbound": [],
+        "foreign_keys_outbound": [
+          "companies (STL)"
+        ],
+        "physical_file": "D:/hoso-chat/auth-service/uploads/staging/f1caa806-7029-4e0a-ae92-bc98e3ba7a66_synthetic_swc_candidate.pdf"
+      },
+      "planned_action": "DELETE",
+      "status": "DELETED",
+      "executed_at": "2026-10-29T16:22:55.258Z"
+    },
+    {
+      "id": "STORAGE-STAGING-FILE-f1caa806",
+      "system": "File Storage",
+      "resource_type": "physical_file",
+      "target": "auth-service/uploads/staging",
+      "object_id": "f1caa806-7029-4e0a-ae92-bc98e3ba7a66_synthetic_swc_candidate.pdf",
+      "testRunId": "tr_failclosed_20261029_mvtlzccg",
+      "identification_reason": "Physical file uploaded as candidate dossier for staging record 8fff1c43",
+      "dependencies": {
+        "db_record": "hr_employee_staging: 8fff1c43-4593-46ea-a00f-a2eeaade87d5"
+      },
+      "planned_action": "DELETE",
+      "status": "DELETED",
+      "executed_at": "2026-10-29T16:22:55.258Z"
+    },
+    {
+      "id": "STORAGE-STAGING-FILE-418a1cb6",
+      "system": "File Storage",
+      "resource_type": "physical_file",
+      "target": "auth-service/uploads/staging",
+      "object_id": "418a1cb6-10d2-49c6-aa47-02f7d8ab5fd5_synthetic_swc_candidate.pdf",
+      "testRunId": "tr_failclosed_20261029_mvtlveqv",
+      "identification_reason": "Leftover synthetic test PDF from initial failclosed test run upload trial",
+      "dependencies": {
+        "db_record": null
+      },
+      "planned_action": "DELETE",
+      "status": "DELETED",
+      "executed_at": "2026-10-29T16:22:55.258Z"
+    },
+    {
+      "id": "STORAGE-STAGING-FILE-f12a1ecd",
+      "system": "File Storage",
+      "resource_type": "physical_file",
+      "target": "auth-service/uploads/staging",
+      "object_id": "f12a1ecd-a28c-4f62-9c53-35fefc779535_synthetic_swc_candidate.pdf",
+      "testRunId": "tr_failclosed_20261029_mvtlveqv",
+      "identification_reason": "Leftover synthetic test PDF from initial failclosed test run upload trial",
+      "dependencies": {
+        "db_record": null
+      },
+      "planned_action": "DELETE",
+      "status": "DELETED",
+      "executed_at": "2026-10-29T16:22:55.258Z"
+    },
+    {
+      "id": "STORAGE-FIXTURE-3a64aaff",
+      "system": "File Storage",
+      "resource_type": "physical_file",
+      "target": "auth-service/uploads",
+      "object_id": "3a64aaff-3b11-4c6a-8a18-719ff2df9e13_fixture_conflict_pricing.xlsx",
+      "testRunId": "pre_oct28_test_fixture",
+      "identification_reason": "Unreferenced test fixture spreadsheet from conflict pricing test",
+      "dependencies": {
+        "db_record": null
+      },
+      "planned_action": "DELETE",
+      "status": "DELETED",
+      "executed_at": "2026-10-29T16:22:55.258Z"
+    },
+    {
+      "id": "STORAGE-FIXTURE-88d99f8b",
+      "system": "File Storage",
+      "resource_type": "physical_file",
+      "target": "auth-service/uploads",
+      "object_id": "88d99f8b-554f-493d-a02e-02d612f5edcb_fixture_empty.xlsx",
+      "testRunId": "pre_oct28_test_fixture",
+      "identification_reason": "Unreferenced test fixture spreadsheet for empty file validation",
+      "dependencies": {
+        "db_record": null
+      },
+      "planned_action": "DELETE",
+      "status": "DELETED",
+      "executed_at": "2026-10-29T16:22:55.258Z"
+    },
+    {
+      "id": "STORAGE-FIXTURE-9fe764d6",
+      "system": "File Storage",
+      "resource_type": "physical_file",
+      "target": "auth-service/uploads",
+      "object_id": "9fe764d6-99b3-4d2a-8861-af76a2566427_fixture_vendor_csv.csv",
+      "testRunId": "pre_oct28_test_fixture",
+      "identification_reason": "Unreferenced test fixture CSV from vendor upload validation",
+      "dependencies": {
+        "db_record": null
+      },
+      "planned_action": "DELETE",
+      "status": "DELETED",
+      "executed_at": "2026-10-29T16:22:55.258Z"
+    },
+    {
+      "id": "STORAGE-FIXTURE-b6e18dcc",
+      "system": "File Storage",
+      "resource_type": "physical_file",
+      "target": "auth-service/uploads",
+      "object_id": "b6e18dcc-e549-4644-be52-89ca8a29c820_fixture_text_sop.pdf",
+      "testRunId": "pre_oct28_test_fixture",
+      "identification_reason": "Unreferenced test fixture SOP PDF from parser test",
+      "dependencies": {
+        "db_record": null
+      },
+      "planned_action": "DELETE",
+      "status": "DELETED",
+      "executed_at": "2026-10-29T16:22:55.258Z"
+    },
+    {
+      "id": "STORAGE-FIXTURE-b9cba5db",
+      "system": "File Storage",
+      "resource_type": "physical_file",
+      "target": "auth-service/uploads",
+      "object_id": "b9cba5db-3f1b-4843-9454-8af5ab7f3873_fixture_conflict_pricing.xlsx",
+      "testRunId": "pre_oct28_test_fixture",
+      "identification_reason": "Unreferenced test fixture spreadsheet from conflict pricing test",
+      "dependencies": {
+        "db_record": null
+      },
+      "planned_action": "DELETE",
+      "status": "DELETED",
+      "executed_at": "2026-10-29T16:22:55.258Z"
+    },
+    {
+      "id": "STORAGE-FIXTURE-cafd1d13",
+      "system": "File Storage",
+      "resource_type": "physical_file",
+      "target": "auth-service/uploads",
+      "object_id": "cafd1d13-52e9-42fb-bd63-bd5754d596d4_fixture_text_sop.pdf",
+      "testRunId": "pre_oct28_test_fixture",
+      "identification_reason": "Unreferenced test fixture SOP PDF from parser test",
+      "dependencies": {
+        "db_record": null
+      },
+      "planned_action": "DELETE",
+      "status": "DELETED",
+      "executed_at": "2026-10-29T16:22:55.258Z"
+    },
+    {
+      "id": "STORAGE-FIXTURE-eabaa706",
+      "system": "File Storage",
+      "resource_type": "physical_file",
+      "target": "auth-service/uploads",
+      "object_id": "eabaa706-5b64-44b5-887d-cd2e006c8a07_fixture_vendor_csv.csv",
+      "testRunId": "pre_oct28_test_fixture",
+      "identification_reason": "Unreferenced test fixture CSV from vendor upload validation",
+      "dependencies": {
+        "db_record": null
+      },
+      "planned_action": "DELETE",
+      "status": "DELETED",
+      "executed_at": "2026-10-29T16:22:55.258Z"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT_TEST-EMPLOYEES",
+      "system": "PostgreSQL (Test hrbot_test)",
+      "resource_type": "table",
+      "target": "public.employees",
+      "object_id": "all_rows",
+      "testRunId": "isolated_test_runs",
+      "identification_reason": "Table in test database verified at 0 rows (cleaned by previous test teardown)",
+      "dependencies": {},
+      "planned_action": "NONE",
+      "status": "ALREADY_CLEAN"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT_TEST-PROFILES",
+      "system": "PostgreSQL (Test hrbot_test)",
+      "resource_type": "table",
+      "target": "public.hr_employee_profiles",
+      "object_id": "all_rows",
+      "testRunId": "isolated_test_runs",
+      "identification_reason": "Table in test database verified at 0 rows",
+      "dependencies": {},
+      "planned_action": "NONE",
+      "status": "ALREADY_CLEAN"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT_TEST-STAGING",
+      "system": "PostgreSQL (Test hrbot_test)",
+      "resource_type": "table",
+      "target": "public.hr_employee_staging",
+      "object_id": "all_rows",
+      "testRunId": "isolated_test_runs",
+      "identification_reason": "Table in test database verified at 0 rows",
+      "dependencies": {},
+      "planned_action": "NONE",
+      "status": "ALREADY_CLEAN"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT_TEST-TASKS",
+      "system": "PostgreSQL (Test hrbot_test)",
+      "resource_type": "table",
+      "target": "public.hr_sync_tasks",
+      "object_id": "all_rows",
+      "testRunId": "isolated_test_runs",
+      "identification_reason": "Table in test database verified at 0 rows",
+      "dependencies": {},
+      "planned_action": "NONE",
+      "status": "ALREADY_CLEAN"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT_TEST-LOGS",
+      "system": "PostgreSQL (Test hrbot_test)",
+      "resource_type": "table",
+      "target": "public.auth_audit_logs",
+      "object_id": "all_rows",
+      "testRunId": "isolated_test_runs",
+      "identification_reason": "Table in test database verified at 0 rows",
+      "dependencies": {},
+      "planned_action": "NONE",
+      "status": "ALREADY_CLEAN"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT_TEST-CONVERSATIONS",
+      "system": "PostgreSQL (Test hrbot_test)",
+      "resource_type": "table",
+      "target": "public.ai_conversations",
+      "object_id": "all_rows",
+      "testRunId": "isolated_test_runs",
+      "identification_reason": "Table in test database verified at 0 rows",
+      "dependencies": {},
+      "planned_action": "NONE",
+      "status": "ALREADY_CLEAN"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT_TEST-MESSAGES",
+      "system": "PostgreSQL (Test hrbot_test)",
+      "resource_type": "table",
+      "target": "public.ai_messages",
+      "object_id": "all_rows",
+      "testRunId": "isolated_test_runs",
+      "identification_reason": "Table in test database verified at 0 rows",
+      "dependencies": {},
+      "planned_action": "NONE",
+      "status": "ALREADY_CLEAN"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT_TEST-AGENTS",
+      "system": "PostgreSQL (Test hrbot_test)",
+      "resource_type": "table",
+      "target": "public.user_agents",
+      "object_id": "all_rows",
+      "testRunId": "isolated_test_runs",
+      "identification_reason": "Table in test database verified at 0 rows",
+      "dependencies": {},
+      "planned_action": "NONE",
+      "status": "ALREADY_CLEAN"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT-VERSION_TESTS",
+      "system": "PostgreSQL (Production hrbot)",
+      "resource_type": "table",
+      "target": "public.version_tests",
+      "object_id": "all_rows",
+      "testRunId": null,
+      "identification_reason": "Table verified at 0 rows",
+      "dependencies": {},
+      "planned_action": "NONE",
+      "status": "ALREADY_CLEAN"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT-GOLDEN_QUESTIONS",
+      "system": "PostgreSQL (Production hrbot)",
+      "resource_type": "table",
+      "target": "public.golden_questions",
+      "object_id": "all_rows",
+      "testRunId": null,
+      "identification_reason": "Table verified at 0 rows",
+      "dependencies": {},
+      "planned_action": "NONE",
+      "status": "ALREADY_CLEAN"
+    },
+    {
+      "id": "QDRANT-HR_DOCS-TEST_VECTORS",
+      "system": "Qdrant Vector DB",
+      "resource_type": "vector_points",
+      "target": "hr_docs",
+      "object_id": "test_points",
+      "testRunId": null,
+      "identification_reason": "All 100 points strictly correspond to 19 official SOTRANS policy documents; 0 test points found",
+      "dependencies": {},
+      "planned_action": "NONE",
+      "status": "ALREADY_CLEAN"
+    },
+    {
+      "id": "NOCODB-HOSO_NHANSU-SYNTHETIC",
+      "system": "NocoDB",
+      "resource_type": "table_rows",
+      "target": "nc_08u4___Hoso_Nhansu",
+      "object_id": "synthetic_rows",
+      "testRunId": null,
+      "identification_reason": "0 synthetic records found; all 12 rows are historical baseline documents",
+      "dependencies": {},
+      "planned_action": "NONE",
+      "status": "ALREADY_CLEAN"
+    },
+    {
+      "id": "GOOGLE_SHEETS-SYNTHETIC",
+      "system": "Google Sheets",
+      "resource_type": "sheet_rows",
+      "target": "SOTRANS HR Sheet",
+      "object_id": "synthetic_rows",
+      "testRunId": null,
+      "identification_reason": "Synthetic candidate 8fff1c43 was blocked from approval; no sync tasks were created for it",
+      "dependencies": {},
+      "planned_action": "NONE",
+      "status": "ALREADY_CLEAN"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT-PENDING_RETRY_TASKS",
+      "system": "PostgreSQL (Production hrbot)",
+      "resource_type": "table_rows",
+      "target": "public.hr_sync_tasks",
+      "object_id": "pending_retry_rows",
+      "testRunId": null,
+      "identification_reason": "0 pending, 0 retrying, 0 failed tasks; all 96 historical tasks are status=success",
+      "dependencies": {},
+      "planned_action": "NONE",
+      "status": "ALREADY_CLEAN"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT-EMPLOYEES",
+      "system": "PostgreSQL (Production hrbot)",
+      "resource_type": "table_rows",
+      "target": "public.employees",
+      "object_id": "6_baseline_employees",
+      "testRunId": null,
+      "identification_reason": "Production active employees (NGÔ ĐẶNG TUẤN UYÊN, PHAN DƯƠNG THANH BÌNH, NGUYỄN TRẦN THIỆN NHÂN, LÊ THÀNH NHÂN, NGUYỄN TRƯỜNG NAM, NGUYỄN VĂN HIẾU)",
+      "dependencies": {
+        "profiles": "6 corresponding hr_employee_profiles",
+        "sync_tasks": "96 sync tasks"
+      },
+      "planned_action": "PRESERVE",
+      "status": "PRESERVED_PRODUCTION"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT-PROFILES",
+      "system": "PostgreSQL (Production hrbot)",
+      "resource_type": "table_rows",
+      "target": "public.hr_employee_profiles",
+      "object_id": "6_baseline_profiles",
+      "testRunId": null,
+      "identification_reason": "Production active employee profiles",
+      "dependencies": {
+        "employees": "6 corresponding employees"
+      },
+      "planned_action": "PRESERVE",
+      "status": "PRESERVED_PRODUCTION"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT-STAGING-BASELINE",
+      "system": "PostgreSQL (Production hrbot)",
+      "resource_type": "table_rows",
+      "target": "public.hr_employee_staging",
+      "object_id": "10_baseline_records",
+      "testRunId": null,
+      "identification_reason": "6 historical onboarding records for active employees + 4 duplicate detection compliance audit records",
+      "dependencies": {},
+      "planned_action": "PRESERVE",
+      "status": "PRESERVED_PRODUCTION"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT-SYNC_TASKS",
+      "system": "PostgreSQL (Production hrbot)",
+      "resource_type": "table_rows",
+      "target": "public.hr_sync_tasks",
+      "object_id": "96_baseline_tasks",
+      "testRunId": null,
+      "identification_reason": "Historical sync log for baseline employee lifecycle events",
+      "dependencies": {},
+      "planned_action": "PRESERVE",
+      "status": "PRESERVED_PRODUCTION"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT-USERS",
+      "system": "PostgreSQL (Production hrbot)",
+      "resource_type": "table_rows",
+      "target": "public.users",
+      "object_id": "14_tenant_users",
+      "testRunId": null,
+      "identification_reason": "Standard production tenant accounts across STL, SWC, VTX and Admin",
+      "dependencies": {},
+      "planned_action": "PRESERVE",
+      "status": "PRESERVED_PRODUCTION"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT-AUTH_AUDIT_LOGS",
+      "system": "PostgreSQL (Production hrbot)",
+      "resource_type": "table_rows",
+      "target": "public.auth_audit_logs",
+      "object_id": "all_audit_logs",
+      "testRunId": null,
+      "identification_reason": "Regulatory compliance and traceability audit logs required by security policy",
+      "dependencies": {},
+      "planned_action": "PRESERVE",
+      "status": "PRESERVED_PRODUCTION"
+    },
+    {
+      "id": "STORAGE-SCREENSHOTS-E2E",
+      "system": "File Storage",
+      "resource_type": "directory_files",
+      "target": "scratch/screenshots",
+      "object_id": "5_e2e_screenshots",
+      "testRunId": "tr_final08_20261029_mvtphpwf",
+      "identification_reason": "Playwright E2E verification evidence required for release audit baseline",
+      "dependencies": {},
+      "planned_action": "PRESERVE",
+      "status": "PRESERVED_PRODUCTION"
+    },
+    {
+      "id": "POSTGRESQL-HRBOT-USER_AGENTS",
+      "system": "PostgreSQL (Production hrbot)",
+      "resource_type": "table_rows",
+      "target": "public.user_agents",
+      "object_id": "3_user_agents",
+      "testRunId": null,
+      "identification_reason": "Real user Personal AI Agents (Excel-Data-Pro, Email-Assistant) actively in service",
+      "dependencies": {},
+      "planned_action": "PRESERVE",
+      "status": "PRESERVED_PRODUCTION"
+    }
+  ]
+}

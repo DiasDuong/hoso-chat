@@ -1,0 +1,3 @@
+CREATE DATABASE n8n;
+CREATE DATABASE hr_kb;
+ALTER DATABASE hr_kb SET timezone TO 'Asia/Ho_Chi_Minh';

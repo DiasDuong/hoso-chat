@@ -1,0 +1,22 @@
+{
+  "id": "odSyncReconcile01",
+  "name": "OneDrive_Reconciliation_and_Sync",
+  "active": 1,
+  "nodes": "[{\"parameters\":{\"rule\":{\"interval\":[{\"field\":\"cronExpression\",\"expression\":\"*/15 * * * *\"}]}},\"id\":\"1a2b3c4d-0001-4000-8000-000000000001\",\"name\":\"Schedule Trigger (Every 15m)\",\"type\":\"n8n-nodes-base.scheduleTrigger\",\"typeVersion\":1.2,\"position\":[200,300]},{\"parameters\":{\"method\":\"POST\",\"url\":\"http://hr-auth:3000/api/onedrive/reconcile\",\"sendHeaders\":true,\"headerParameters\":{\"parameters\":[{\"name\":\"Authorization\",\"value\":\"Bearer 2ca9f995352866f7081e3f85f00fc759b0dd8661c910cfcebf479d1386b8cd2b\"},{\"name\":\"Content-Type\",\"value\":\"application/json\"}]},\"options\":{\"timeout\":60000}},\"id\":\"1a2b3c4d-0002-4000-8000-000000000002\",\"name\":\"Trigger Reconcile API\",\"type\":\"n8n-nodes-base.httpRequest\",\"typeVersion\":4.2,\"position\":[440,300]},{\"parameters\":{\"jsCode\":\"const res = $input.first().json;\\nconst report = res.report || {};\\nconst summary = `Reconcile: ${report.syncedCount || 0} đã đồng bộ, ${report.freshCount || 0} nguyên vẹn, ${report.errorCount || 0} lỗi trên tổng số ${report.totalScanned || 0} nguồn.`;\\nreturn [{ json: { success: res.success, summary, report, timestamp: new Date().toISOString() } }];\"},\"id\":\"1a2b3c4d-0003-4000-8000-000000000003\",\"name\":\"Audit Reconcile Summary\",\"type\":\"n8n-nodes-base.code\",\"typeVersion\":2,\"position\":[680,300]},{\"parameters\":{\"httpMethod\":\"POST\",\"path\":\"onedrive-graph-notify\",\"responseMode\":\"responseNode\",\"options\":{\"rawBody\":true}},\"id\":\"1a2b3c4d-0004-4000-8000-000000000004\",\"name\":\"Graph Notification Webhook (Disabled until Public HTTPS)\",\"type\":\"n8n-nodes-base.webhook\",\"typeVersion\":2,\"position\":[200,520],\"disabled\":true,\"webhookId\":\"onedrive-graph-notify-hook\"}]",
+  "connections": "{\"Schedule Trigger (Every 15m)\":{\"main\":[[{\"node\":\"Trigger Reconcile API\",\"type\":\"main\",\"index\":0}]]},\"Trigger Reconcile API\":{\"main\":[[{\"node\":\"Audit Reconcile Summary\",\"type\":\"main\",\"index\":0}]]}}",
+  "settings": "{\"executionOrder\":\"v1\",\"timezone\":\"Asia/Ho_Chi_Minh\"}",
+  "staticData": "{\"node:Schedule Trigger (Every 15m)\":{\"recurrenceRules\":[null],\"recurrenceRuleSignatures\":[null]}}",
+  "pinData": null,
+  "versionId": "631ffcbf-f171-4715-b04b-4d92e1462a73",
+  "triggerCount": 1,
+  "meta": null,
+  "parentFolderId": null,
+  "createdAt": "2026-10-21 09:49:03.241",
+  "updatedAt": "2026-10-21 09:51:57",
+  "isArchived": 0,
+  "versionCounter": 1,
+  "description": null,
+  "activeVersionId": "631ffcbf-f171-4715-b04b-4d92e1462a73",
+  "nodeGroups": "[]",
+  "sourceWorkflowId": null
+}

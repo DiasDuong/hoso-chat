@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs & temp
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.tmp/
+temp/
+tmp/
+
+# Database dumps, backups & binaries
+*.dump
+*.sql.bak
+*.bak*
+*.sqlite
+*.db
+backups/
+backup_*.dump
+
+# Uploads & User generated artifacts / storage
+uploads/
+files/
+files-staging/
+auth-service/uploads/
+auth-service/storage/
+auth-service/data/
+
+# Sensitive business & personnel data
+Hoso_Nhansu.xlsx
+tai-khoan-he-thong/
+release_packages/
+
+# Test artifacts, reports, screenshots & scratch
+scratch/
+scratch_*.*
+screenshots/
+reports/
+reports_*/
+audit-report/
+audit_*.js
+comprehensive_agent_audit.js
+
+# OS metadata
+.DS_Store
+Thumbs.db

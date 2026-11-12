@@ -1,0 +1,110 @@
+{
+  "total": 17,
+  "passed": 17,
+  "passRate": "100%",
+  "timestamp": "2026-10-30T02:53:50.817Z",
+  "results": [
+    {
+      "id": "SMOKE-01",
+      "name": "Gateway Proxy Health (/api/health on 8082)",
+      "status": "PASS",
+      "details": "Status: 200"
+    },
+    {
+      "id": "SMOKE-02",
+      "name": "Direct Backend API Health (/api/health on 3000)",
+      "status": "PASS",
+      "details": "Status: 200"
+    },
+    {
+      "id": "SMOKE-03",
+      "name": "Database Connection (Verified hrbot Production DB)",
+      "status": "PASS",
+      "details": "DB: hrbot, User: hrbot"
+    },
+    {
+      "id": "SMOKE-04",
+      "name": "Qdrant Vector DB Connectivity (/collections on 6333)",
+      "status": "PASS",
+      "details": "Status: 200"
+    },
+    {
+      "id": "SMOKE-05",
+      "name": "Xác thực ADMIN (admin_stl)",
+      "status": "PASS",
+      "details": "Role: ADMIN"
+    },
+    {
+      "id": "SMOKE-06",
+      "name": "Xác thực HR (hr_stl)",
+      "status": "PASS",
+      "details": "Role: HR"
+    },
+    {
+      "id": "SMOKE-07",
+      "name": "Xác thực EMPLOYEE (emp_stl)",
+      "status": "PASS",
+      "details": "Role: EMPLOYEE"
+    },
+    {
+      "id": "SMOKE-08",
+      "name": "General AI Phản hồi trực tiếp (/api/general/chat)",
+      "status": "PASS",
+      "details": "Reply: Hệ thống vận hành hoàn toàn bình thường,..."
+    },
+    {
+      "id": "SMOKE-09",
+      "name": "Personal AI Agent ReAct Loop & Tính toán tất định",
+      "status": "PASS",
+      "details": "Agent: Logistics Calculator Pro, Kết quả: 17.5M"
+    },
+    {
+      "id": "SMOKE-10",
+      "name": "Universal Tool Registry (Đầy đủ 6 công cụ lõi)",
+      "status": "PASS",
+      "details": "Số công cụ: 6"
+    },
+    {
+      "id": "SMOKE-11",
+      "name": "File Intelligence Engine: Xử lý số liệu bảng tính không truncate",
+      "status": "PASS",
+      "details": "Sum = 8000000"
+    },
+    {
+      "id": "SMOKE-12",
+      "name": "HR Policy RAG Tra cứu văn bản nội bộ (18/2023/QC-SOTRANS)",
+      "status": "PASS",
+      "details": "best_sim: 0.86778575, sources: 5"
+    },
+    {
+      "id": "SMOKE-13",
+      "name": "Chat History API (/api/conversations)",
+      "status": "PASS",
+      "details": "Số phiên: 7"
+    },
+    {
+      "id": "SMOKE-14",
+      "name": "RBAC Guard: Chặn nhân viên thường truy cập danh sách nhân sự (HTTP 403)",
+      "status": "PASS",
+      "details": "Status: 403"
+    },
+    {
+      "id": "SMOKE-15",
+      "name": "CCCD Guard: Chặn cập nhật CCCD sai định dạng (9/12 số)",
+      "status": "PASS",
+      "details": "Status: 400"
+    },
+    {
+      "id": "SMOKE-16",
+      "name": "CSDL Production: Nhân viên gốc STL00014 & SWC00021 nguyên vẹn 100%",
+      "status": "PASS",
+      "details": "STL00014: NGUYỄN TRƯỜNG NAM, SWC00021: NGUYỄN VĂN HIẾU"
+    },
+    {
+      "id": "SMOKE-17",
+      "name": "CSDL Production: Tổng số lượng nhân sự bất biến (= 6 records)",
+      "status": "PASS",
+      "details": "Count: 6"
+    }
+  ]
+}

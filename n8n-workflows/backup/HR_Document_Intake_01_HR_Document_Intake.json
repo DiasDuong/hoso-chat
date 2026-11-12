@@ -1,0 +1,22 @@
+{
+  "id": "HR_Document_Intake_01",
+  "name": "HR_Document_Intake",
+  "active": 1,
+  "nodes": "[{\"parameters\":{\"httpMethod\":\"POST\",\"path\":\"hr-intake-batch\",\"responseMode\":\"responseNode\",\"options\":{}},\"id\":\"intake-webhook-01\",\"name\":\"Webhook Intake Batch\",\"type\":\"n8n-nodes-base.webhook\",\"typeVersion\":2,\"position\":[180,300],\"webhookId\":\"hr-intake-batch-hook\"},{\"parameters\":{\"jsCode\":\"\\nconst body = $input.first().json.body || $input.first().json;\\nconst headers = $input.first().json.headers || {};\\nconst expected = \\\"8973d464f5f1475b83d6ab88d222d824\\\";\\nconst incoming = body.secret || headers['x-n8n-auth-token'] || headers['x-internal-secret'] || '';\\nconst isAuthorized = (incoming === expected);\\n\\nreturn [{\\n  json: {\\n    isAuthorized,\\n    batch_id: body.batch_id,\\n    company_id: body.company_id || 'STL',\\n    user_id: body.user_id,\\n    username: body.username,\\n    conversation_id: body.conversation_id,\\n    file_count: body.file_count || 1,\\n    files: body.files || []\\n  }\\n}];\\n\"},\"id\":\"intake-auth-check\",\"name\":\"Validate Secret\",\"type\":\"n8n-nodes-base.code\",\"typeVersion\":2,\"position\":[400,300]},{\"parameters\":{\"conditions\":{\"boolean\":[{\"value1\":\"={{ $json.isAuthorized }}\",\"value2\":true}]}},\"id\":\"intake-if-auth\",\"name\":\"IF Authorized\",\"type\":\"n8n-nodes-base.if\",\"typeVersion\":2,\"position\":[620,300]},{\"parameters\":{\"respondWith\":\"json\",\"responseBody\":\"{\\\"success\\\": false, \\\"error\\\": \\\"401 Unauthorized: Invalid secret\\\"}\",\"options\":{\"responseCode\":401}},\"id\":\"intake-respond-401\",\"name\":\"Respond 401\",\"type\":\"n8n-nodes-base.respondToWebhook\",\"typeVersion\":1.1,\"position\":[860,440]},{\"parameters\":{\"method\":\"POST\",\"url\":\"http://hr-auth:3000/api/hoso/intake/internal/execute-batch-ocr\",\"sendHeaders\":true,\"headerParameters\":{\"parameters\":[{\"name\":\"Content-Type\",\"value\":\"application/json\"},{\"name\":\"x-n8n-auth-token\",\"value\":\"8973d464f5f1475b83d6ab88d222d824\"}]},\"sendBody\":true,\"specifyBody\":\"json\",\"jsonBody\":\"={{ JSON.stringify({ batch_id: $json.batch_id, company_id: $json.company_id, user_id: $json.user_id, username: $json.username, conversation_id: $json.conversation_id, secret: \\\"8973d464f5f1475b83d6ab88d222d824\\\" }) }}\",\"options\":{\"timeout\":120000}},\"id\":\"intake-call-backend-ocr\",\"name\":\"Execute Batch OCR via Backend\",\"type\":\"n8n-nodes-base.httpRequest\",\"typeVersion\":4.2,\"position\":[860,200]},{\"parameters\":{\"respondWith\":\"firstIncomingItem\",\"options\":{\"responseCode\":200}},\"id\":\"intake-respond-success\",\"name\":\"Respond Staged Result\",\"type\":\"n8n-nodes-base.respondToWebhook\",\"typeVersion\":1.1,\"position\":[1100,200]}]",
+  "connections": "{\"Webhook Intake Batch\":{\"main\":[[{\"node\":\"Validate Secret\",\"type\":\"main\",\"index\":0}]]},\"Validate Secret\":{\"main\":[[{\"node\":\"IF Authorized\",\"type\":\"main\",\"index\":0}]]},\"IF Authorized\":{\"main\":[[{\"node\":\"Execute Batch OCR via Backend\",\"type\":\"main\",\"index\":0}],[{\"node\":\"Respond 401\",\"type\":\"main\",\"index\":0}]]},\"Execute Batch OCR via Backend\":{\"main\":[[{\"node\":\"Respond Staged Result\",\"type\":\"main\",\"index\":0}]]}}",
+  "settings": "{\"executionOrder\":\"v1\"}",
+  "staticData": null,
+  "pinData": null,
+  "versionId": "a3175c15-6d77-489a-a42b-7d4af0677df0",
+  "triggerCount": 0,
+  "meta": null,
+  "parentFolderId": null,
+  "createdAt": "2026-10-31 14:27:55.923",
+  "updatedAt": "2026-10-31 14:27:55.923",
+  "isArchived": 0,
+  "versionCounter": 1,
+  "description": null,
+  "activeVersionId": "a3175c15-6d77-489a-a42b-7d4af0677df0",
+  "nodeGroups": "[]",
+  "sourceWorkflowId": null
+}
