@@ -79,8 +79,14 @@ router.get('/', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) => {
         COALESCE(e.resignation_date, p.resignation_date, '') AS resignation_date,
         COALESCE(e.resignation_reason, p.resignation_reason, '') AS resignation_reason,
         e.status,
+        COALESCE(p.employment_status, e.employment_status, e.status, 'ACTIVE') AS employment_status,
+        COALESCE(p.job_grade, '') AS job_grade,
+        e.is_deleted,
+        e.deleted_at,
         e.created_at,
         e.updated_at,
+        COALESCE(p.updated_by, e.updated_by, p.uploaded_by, '') AS updated_by,
+        COALESCE(p.uploaded_by, p.updated_by, e.updated_by, '') AS uploaded_by,
         u.user_id AS linked_user_id,
         u.username AS linked_username,
         u.role AS linked_role,
@@ -115,7 +121,13 @@ router.get('/', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) => {
           p.date_of_birth,
           p.gender,
           p.resignation_date,
-          p.resignation_reason
+          p.resignation_reason,
+          p.employment_status,
+          p.job_grade,
+          p.is_deleted,
+          p.deleted_at,
+          p.updated_by,
+          p.uploaded_by
         FROM hr_employee_profiles p
         WHERE (p.company_id = e.company_id OR p.company_id IS NULL)
           AND (
@@ -266,7 +278,7 @@ router.get('/', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) => {
 
 /**
  * SYNC 1. GET /api/employees/sync/status - Kiểm tra trạng thái và số lượng hồ sơ giữa 3 nơi
- * Phân biệt rõ các trạng thái: WORKER_RUNNING, SYNC_PENDING, SYNC_SUCCESS, SYNC_FAILED, DATA_MISMATCH
+ * Phân biệt rõ 3 lớp toàn vẹn: Sync Pipeline, Reconciliation, Data Integrity
  */
 router.get('/sync/status', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) => {
   try {
@@ -275,11 +287,11 @@ router.get('/sync/status', verifyToken, requireRoles('ADMIN', 'HR'), async (req,
 
     const taskStatsRes = await db.query(
       `SELECT 
-         COUNT(*) FILTER (WHERE status = 'failed') as failed_count,
-         COUNT(*) FILTER (WHERE status IN ('pending', 'processing', 'pending_nocodb', 'processing_nocodb', 'pending_sheets', 'processing_sheets')) as pending_count,
-         MAX(completed_at) as last_success_time,
-         (SELECT last_error FROM hr_sync_tasks WHERE status = 'failed' ORDER BY updated_at DESC LIMIT 1) as last_failure_error
-       FROM hr_sync_tasks 
+         COUNT(*) FILTER (WHERE status = 'FAILED' OR status = 'BLOCKED_DUPLICATE_KEY') as failed_count,
+         COUNT(*) FILTER (WHERE status IN ('PENDING', 'PROCESSING')) as pending_count,
+         MAX(processed_at) as last_success_time,
+         (SELECT last_error FROM employee_sync_outbox WHERE status IN ('FAILED', 'BLOCKED_DUPLICATE_KEY') ORDER BY updated_at DESC LIMIT 1) as last_failure_error
+       FROM employee_sync_outbox 
        WHERE created_at > NOW() - INTERVAL '24 hours'`
     );
     const taskStats = taskStatsRes.rows[0] || {};
@@ -287,37 +299,50 @@ router.get('/sync/status', verifyToken, requireRoles('ADMIN', 'HR'), async (req,
     const pendingTasksCount = parseInt(taskStats.pending_count || '0', 10);
     const lastSuccessTime = taskStats.last_success_time || recon.timestamp;
 
-    const missingInNocoCount = (recon.missing_in_nocodb || []).length;
     const missingInSheetsCount = (recon.missing_in_sheets || []).length;
+    const duplicatesCount = (recon.duplicates_in_sheets || []).length;
     const statusMismatchCount = (recon.status_mismatches || []).length;
-    const totalMissingCount = missingInNocoCount + missingInSheetsCount;
+    const dataMismatchCount = (recon.data_mismatches || []).length;
+    const testRecordsCount = (recon.test_records_in_sheets || []).length;
+    const staleRecordsCount = (recon.stale_in_sheets || []).length;
+    const needsVerificationCount = (recon.needs_verification_in_sheets || []).length;
+    const totalMissingCount = missingInSheetsCount;
 
-    // Differentiate states strictly per specification:
-    // - WORKER_RUNNING: Worker is active but tasks/sync pending
-    // - SYNC_PENDING: Tasks queued or executing
-    // - SYNC_SUCCESS: Reconciled and 100% matched across all 3 systems
-    // - SYNC_FAILED: Tasks failed
-    // - DATA_MISMATCH: Count or record mismatch between SoR, NocoDB, and Google Sheets
     let state = 'WORKER_RUNNING';
     let statusMessage = 'Hệ thống đồng bộ đang hoạt động';
 
-    if (totalMissingCount > 0 || statusMismatchCount > 0 || !recon.is_consistent) {
-      state = 'DATA_MISMATCH';
-      statusMessage = `Dữ liệu chưa đồng nhất: thiếu ${missingInNocoCount} ở NocoDB, ${missingInSheetsCount} ở Sheets${statusMismatchCount > 0 ? `, lệch trạng thái ${statusMismatchCount}` : ''}`;
-    } else if (failedTasksCount > 0) {
+    if (failedTasksCount > 0) {
       state = 'SYNC_FAILED';
       statusMessage = `Có ${failedTasksCount} tác vụ đồng bộ thất bại trong 24h`;
+    } else if (duplicatesCount > 0) {
+      state = 'DATA_INTEGRITY_WARNING';
+      statusMessage = `Phát hiện ${duplicatesCount} khóa employee_id bị trùng trên Google Sheets!`;
+    } else if (missingInSheetsCount > 0) {
+      state = 'DATA_MISMATCH';
+      statusMessage = `Dữ liệu chưa đồng nhất: thiếu ${missingInSheetsCount} hồ sơ trên Google Sheets`;
+    } else if (testRecordsCount > 0 || staleRecordsCount > 0) {
+      state = 'DATA_INTEGRITY_WARNING';
+      statusMessage = `Phát hiện ${testRecordsCount + staleRecordsCount} dòng kiểm thử / dư thừa trên Google Sheets!`;
+    } else if (statusMismatchCount > 0) {
+      state = 'DATA_MISMATCH';
+      statusMessage = `Lệch trạng thái xóa mềm ở ${statusMismatchCount} hồ sơ`;
+    } else if (dataMismatchCount > 0) {
+      state = 'DATA_MISMATCH';
+      statusMessage = `Lệch nội dung dữ liệu ở ${dataMismatchCount} hồ sơ`;
+    } else if (needsVerificationCount > 0) {
+      state = 'DATA_INTEGRITY_WARNING';
+      statusMessage = `Có ${needsVerificationCount} dòng dữ liệu ngoài phạm vi quản lý cần xác minh`;
     } else if (pendingTasksCount > 0) {
       state = 'SYNC_PENDING';
       statusMessage = `Đang xử lý ${pendingTasksCount} tác vụ đồng bộ`;
     } else if (recon.is_consistent) {
       state = 'SYNC_SUCCESS';
-      statusMessage = 'Đã đồng bộ và xác nhận thành công 100%';
+      statusMessage = 'Đã đối soát và xác nhận đồng bộ toàn vẹn 100%';
     }
 
     const recentTasks = await db.query(
       `SELECT target_system, status, COUNT(*) as count 
-       FROM hr_sync_tasks 
+       FROM employee_sync_outbox 
        WHERE created_at > NOW() - INTERVAL '24 hours' 
        GROUP BY target_system, status`
     );
@@ -331,8 +356,9 @@ router.get('/sync/status', verifyToken, requireRoles('ADMIN', 'HR'), async (req,
       reconciled_count: recon.reconciled_count,
       missing_count: totalMissingCount,
       failed_tasks_count: failedTasksCount,
-      error_message: failedTasksCount > 0 ? taskStats.last_failure_error : (totalMissingCount > 0 ? statusMessage : null),
+      error_message: failedTasksCount > 0 ? taskStats.last_failure_error : (duplicatesCount > 0 ? statusMessage : null),
       counts: recon.counts,
+      integrity_layers: recon.integrity_layers,
       status: {
         is_synchronized: recon.is_consistent,
         state: state,
@@ -341,10 +367,16 @@ router.get('/sync/status', verifyToken, requireRoles('ADMIN', 'HR'), async (req,
         google_sheets_connected: true
       },
       reconciliation: {
-        missing_in_nocodb: recon.missing_in_nocodb,
+        matched: recon.matched_count,
         missing_in_sheets: recon.missing_in_sheets,
+        duplicates_in_sheets: recon.duplicates_in_sheets,
         status_mismatches: recon.status_mismatches,
-        orphaned_in_nocodb: recon.orphaned_in_nocodb
+        data_mismatches: recon.data_mismatches,
+        stale_in_sheets: recon.stale_in_sheets,
+        test_records_in_sheets: recon.test_records_in_sheets,
+        needs_verification_in_sheets: recon.needs_verification_in_sheets,
+        cleaned_in_sheets: recon.cleaned_in_sheets,
+        fixed_in_sheets: recon.fixed_in_sheets
       },
       recent_tasks_24h: recentTasks.rows
     });
@@ -363,8 +395,10 @@ router.get('/sync/status', verifyToken, requireRoles('ADMIN', 'HR'), async (req,
  */
 router.post('/sync/reconcile', verifyToken, requireRoles('ADMIN'), async (req, res) => {
   try {
+    const { cleanStale = true } = req.body || {};
     const result = await reconcileEmployees({
       autoFix: true,
+      cleanStale: cleanStale !== false,
       actor: req.user.username
     });
 
@@ -372,11 +406,11 @@ router.post('/sync/reconcile', verifyToken, requireRoles('ADMIN'), async (req, r
       actor_user_id: req.user.user_id,
       actor_username: req.user.username,
       action: 'hr_sync_reconciliation_executed',
-      status: result.is_consistent || (result.fixed_in_nocodb.length > 0 || result.fixed_in_sheets.length > 0) ? 'SUCCESS' : 'FAILED',
+      status: result.is_consistent || (result.cleaned_in_sheets?.length > 0 || result.fixed_in_sheets?.length > 0) ? 'SUCCESS' : 'FAILED',
       ip_address: req.ip,
       metadata: {
         reconciled_count: result.reconciled_count,
-        fixed_in_nocodb: result.fixed_in_nocodb,
+        cleaned_in_sheets: result.cleaned_in_sheets,
         fixed_in_sheets: result.fixed_in_sheets,
         duration_ms: result.duration_ms
       }
@@ -384,12 +418,46 @@ router.post('/sync/reconcile', verifyToken, requireRoles('ADMIN'), async (req, r
 
     return res.json({
       success: true,
-      message: 'Đối soát và sửa lệch dữ liệu hoàn tất!',
+      message: 'Đối soát, dọn dẹp và sửa lệch dữ liệu hoàn tất!',
       data: result
     });
   } catch (err) {
     console.error('Reconciliation error:', err);
     return res.status(500).json({ success: false, error: 'Lỗi khi đối soát dữ liệu: ' + err.message });
+  }
+});
+
+/**
+ * SYNC 4B. POST /api/employees/sync/clean-stale - Dọn dẹp riêng các dòng kiểm thử và hồ sơ dư thừa đã xác minh khỏi Google Sheets
+ */
+router.post('/sync/clean-stale', verifyToken, requireRoles('ADMIN'), async (req, res) => {
+  try {
+    const result = await reconcileEmployees({
+      autoFix: false,
+      cleanStale: true,
+      actor: req.user.username
+    });
+
+    await logAudit({
+      actor_user_id: req.user.user_id,
+      actor_username: req.user.username,
+      action: 'hr_sync_cleanup_stale_executed',
+      status: 'SUCCESS',
+      ip_address: req.ip,
+      metadata: {
+        cleaned_in_sheets: result.cleaned_in_sheets,
+        duration_ms: result.duration_ms
+      }
+    });
+
+    return res.json({
+      success: true,
+      message: `Đã dọn dẹp ${result.counts?.google_sheets_cleaned || 0} dòng kiểm thử / dư thừa khỏi Google Sheets!`,
+      data: result
+    });
+  } catch (err) {
+    console.error('Clean stale error:', err);
+    return res.status(500).json({ success: false, error: 'Lỗi khi dọn dẹp dữ liệu kiểm thử: ' + err.message });
   }
 });
 
@@ -1500,7 +1568,9 @@ router.post('/', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) => {
     position,
     email,
     citizen_id,
-    status
+    status,
+    job_grade,
+    employment_status
   } = req.body || {};
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
@@ -1626,11 +1696,15 @@ router.post('/', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) => {
       }
     }
 
-    const empStatus = status && ['ACTIVE', 'INACTIVE'].includes(status) ? status : 'ACTIVE';
+    const empStatus = status && ['ACTIVE', 'INACTIVE', 'RESIGNED', 'DELETED'].includes(status) ? status : 'ACTIVE';
+    const empEmploymentStatus = employment_status && ['ACTIVE', 'PROBATION', 'SUSPENDED', 'RESIGNED', 'TERMINATED'].includes(String(employment_status).trim().toUpperCase()) 
+      ? String(employment_status).trim().toUpperCase() 
+      : (empStatus === 'RESIGNED' ? 'RESIGNED' : 'ACTIVE');
+    const cleanJobGrade = job_grade ? String(job_grade).replace(/\s*\[(ĐÃ XÓA|NGHỈ VIỆC|DA XOA|NGHI VIEC)\]/g, '').trim() : '';
 
     const insertRes = await client.query(
-      `INSERT INTO employees (employee_code, citizen_id, employee_name, company_id, department, position, email, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), now())
+      `INSERT INTO employees (employee_code, citizen_id, employee_name, company_id, department, position, email, status, employment_status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now())
        RETURNING *`,
       [
         cleanCode,
@@ -1640,7 +1714,8 @@ router.post('/', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) => {
         department ? department.trim() : null,
         position ? position.trim() : null,
         email ? email.trim() : null,
-        empStatus
+        empStatus,
+        empEmploymentStatus
       ]
     );
 
@@ -1658,7 +1733,9 @@ router.post('/', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) => {
       position: newEmp.position,
       email: newEmp.email,
       citizen_id: cleanCitizenId,
-      status: empStatus
+      status: empStatus,
+      employment_status: empEmploymentStatus,
+      job_grade: cleanJobGrade
     });
 
     await logAudit({
@@ -1699,7 +1776,7 @@ router.post('/', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) => {
  */
 router.put('/:id', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) => {
   const { id } = req.params;
-  const { employee_name, department, position, email, phone_number, citizen_id, status } = req.body || {};
+  const { employee_name, department, position, email, phone_number, citizen_id, status, job_grade, employment_status } = req.body || {};
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
   let client = null;
@@ -1776,28 +1853,54 @@ router.put('/:id', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) =>
       }
     }
 
-    if (status && !['ACTIVE', 'INACTIVE', 'RESIGNED', 'DELETED'].includes(status.trim().toUpperCase())) {
-      return res.status(400).json({ success: false, error: 'Trạng thái hồ sơ chỉ có thể là ACTIVE, INACTIVE, RESIGNED hoặc DELETED.' });
+    const VALID_EMPLOYMENT_STATUSES = ['ACTIVE', 'PROBATION', 'SUSPENDED', 'RESIGNED', 'TERMINATED'];
+    let newEmpStatus = currentEmp.employment_status || (currentEmp.status === 'RESIGNED' ? 'RESIGNED' : 'ACTIVE');
+    if (employment_status !== undefined) {
+      const normalized = String(employment_status).trim().toUpperCase();
+      if (!VALID_EMPLOYMENT_STATUSES.includes(normalized)) {
+        return res.status(400).json({
+          success: false,
+          error: `Trạng thái nhân sự không hợp lệ (${employment_status}). Các trạng thái hợp lệ: ${VALID_EMPLOYMENT_STATUSES.join(', ')}.`
+        });
+      }
+      newEmpStatus = normalized;
+      changes.employment_status = { from: currentEmp.employment_status, to: newEmpStatus };
     }
 
-    if (status !== undefined && status.trim().toUpperCase() !== currentEmp.status) {
-      await logAudit({
-        actor_user_id: req.user.user_id,
-        actor_username: req.user.username,
-        action: 'employee_update_rejected',
-        status: 'BAD_REQUEST',
-        ip_address: ip,
-        metadata: {
-          employee_id: id,
-          current_status: currentEmp.status,
-          attempted_status: status.trim().toUpperCase(),
-          reason: 'Cannot alter lifecycle status via generic profile update endpoint'
-        }
-      });
-      return res.status(400).json({
-        success: false,
-        error: 'Thao tác không hợp lệ: Không được phép thay đổi trực tiếp trạng thái vòng đời nhân sự qua API cập nhật thông tin. Vui lòng sử dụng các chức năng nghiệp vụ tương ứng (Nghỉ việc, Tái tuyển dụng/Tái kích hoạt, Xóa mềm hoặc Khôi phục).'
-      });
+    let cleanJobGrade = undefined;
+    if (job_grade !== undefined) {
+      cleanJobGrade = String(job_grade).replace(/\s*\[(ĐÃ XÓA|NGHỈ VIỆC|DA XOA|NGHI VIEC)\]/g, '').trim();
+      changes.job_grade = { from: currentEmp.job_grade, to: cleanJobGrade };
+    }
+
+    let newStatus = currentEmp.status;
+    if (employment_status !== undefined) {
+      if (newEmpStatus === 'RESIGNED') newStatus = 'RESIGNED';
+      else if (newEmpStatus === 'ACTIVE') newStatus = 'ACTIVE';
+    } else if (status !== undefined) {
+      if (!['ACTIVE', 'INACTIVE', 'RESIGNED', 'DELETED'].includes(status.trim().toUpperCase())) {
+        return res.status(400).json({ success: false, error: 'Trạng thái hồ sơ chỉ có thể là ACTIVE, INACTIVE, RESIGNED hoặc DELETED.' });
+      }
+
+      if (status.trim().toUpperCase() !== currentEmp.status) {
+        await logAudit({
+          actor_user_id: req.user.user_id,
+          actor_username: req.user.username,
+          action: 'employee_update_rejected',
+          status: 'BAD_REQUEST',
+          ip_address: ip,
+          metadata: {
+            employee_id: id,
+            current_status: currentEmp.status,
+            attempted_status: status.trim().toUpperCase(),
+            reason: 'Cannot alter lifecycle status via generic profile update endpoint'
+          }
+        });
+        return res.status(400).json({
+          success: false,
+          error: 'Thao tác không hợp lệ: Không được phép thay đổi trực tiếp trạng thái vòng đời nhân sự qua API cập nhật thông tin. Vui lòng sử dụng các chức năng nghiệp vụ tương ứng (Nghỉ việc, Tái tuyển dụng/Tái kích hoạt, Xóa mềm hoặc Khôi phục).'
+        });
+      }
     }
 
     // Ghi nhận diff thay đổi
@@ -1805,7 +1908,6 @@ router.put('/:id', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) =>
     const newDept = department !== undefined ? (department ? department.trim() : null) : currentEmp.department;
     const newPos = position !== undefined ? (position ? position.trim() : null) : currentEmp.position;
     const newEmail = email !== undefined ? (email ? email.trim() : null) : currentEmp.email;
-    const newStatus = status !== undefined ? status.trim().toUpperCase() : currentEmp.status;
 
     const cleanCitizenId = citizen_id !== undefined ? (citizen_id ? String(citizen_id).replace(/\D/g, '') : null) : undefined;
     const newCitizenId = cleanCitizenId !== undefined ? cleanCitizenId : currentEmp.citizen_id;
@@ -1891,6 +1993,7 @@ router.put('/:id', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) =>
       await client.query(`UPDATE users SET company_id = $1, updated_at = NOW() WHERE employee_id = $2`, [newCompanyId, id]);
     }
 
+    const actorUsername = req.user.username || 'superadmin';
     const updateRes = await client.query(
       `UPDATE employees 
        SET employee_name = $1,
@@ -1900,38 +2003,47 @@ router.put('/:id', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) =>
            status = $5,
            citizen_id = $6,
            company_id = $7,
+           updated_by = $8,
+           employment_status = $9,
            updated_at = now()
-       WHERE id = $8
+       WHERE id = $10
        RETURNING *`,
-      [newName, newDept, newPos, newEmail, newStatus, newCitizenId, newCompanyId, id]
+      [newName, newDept, newPos, newEmail, newStatus, newCitizenId, newCompanyId, actorUsername, newEmpStatus, id]
     );
 
-    // Cập nhật bảng hr_employee_profiles để đồng bộ dữ liệu tra cứu và số điện thoại / email
+    // Cập nhật bảng hr_employee_profiles để đồng bộ dữ liệu tra cứu và số điện thoại / email / job_grade / employment_status
     const cleanPhone = phone_number !== undefined ? (phone_number ? String(phone_number).trim() : '') : undefined;
-    if (cleanPhone !== undefined || email !== undefined || employee_name !== undefined || department !== undefined || position !== undefined) {
-      await client.query(
-        `UPDATE hr_employee_profiles
-         SET phone_number = COALESCE($1, phone_number),
-             email = COALESCE($2, email),
-             full_name = COALESCE($3, full_name),
-             department_staffing_plan = COALESCE($4, department_staffing_plan),
-             job_title = COALESCE($5, job_title),
-             updated_at = NOW()
-         WHERE (employee_id IS NOT NULL AND employee_id <> '' AND employee_id = $6)
-            OR (citizen_id IS NOT NULL AND citizen_id <> '' AND citizen_id = $7)`,
-        [
-          cleanPhone !== undefined ? cleanPhone : null,
-          email !== undefined ? newEmail : null,
-          employee_name !== undefined ? newName : null,
-          department !== undefined ? newDept : null,
-          position !== undefined ? newPos : null,
-          currentEmp.employee_code,
-          newCitizenId
-        ]
-      );
-      if (cleanPhone !== undefined) {
-        changes.phone_number = { to: cleanPhone };
-      }
+    await client.query(
+      `UPDATE hr_employee_profiles
+       SET phone_number = COALESCE($1, phone_number),
+           email = COALESCE($2, email),
+           full_name = COALESCE($3, full_name),
+           department_staffing_plan = COALESCE($4, department_staffing_plan),
+           job_title = COALESCE($5, job_title),
+           job_grade = CASE WHEN $6::text IS NOT NULL THEN $6::text ELSE job_grade END,
+           employment_status = $7,
+           status = $8,
+           updated_by = $9,
+           uploaded_by = COALESCE(uploaded_by, $9),
+           updated_at = NOW()
+       WHERE (employee_id IS NOT NULL AND employee_id <> '' AND employee_id = $10)
+          OR (citizen_id IS NOT NULL AND citizen_id <> '' AND citizen_id = $11)`,
+      [
+        cleanPhone !== undefined ? cleanPhone : null,
+        email !== undefined ? newEmail : null,
+        employee_name !== undefined ? newName : null,
+        department !== undefined ? newDept : null,
+        position !== undefined ? newPos : null,
+        cleanJobGrade !== undefined ? cleanJobGrade : null,
+        newEmpStatus,
+        newStatus,
+        actorUsername,
+        currentEmp.employee_code,
+        newCitizenId
+      ]
+    );
+    if (cleanPhone !== undefined) {
+      changes.phone_number = { to: cleanPhone };
     }
 
     await client.query('COMMIT');
@@ -1953,7 +2065,11 @@ router.put('/:id', verifyToken, requireRoles('ADMIN', 'HR'), async (req, res) =>
       phone_number: cleanPhone !== undefined ? cleanPhone : undefined,
       company_id: newCompanyId,
       citizen_id: newCitizenId,
-      status: newStatus
+      status: newStatus,
+      employment_status: newEmpStatus,
+      job_grade: cleanJobGrade !== undefined ? cleanJobGrade : undefined,
+      updated_by: actorUsername,
+      uploaded_by: actorUsername
     });
 
     if (Object.keys(changes).length > 0) {
@@ -2020,13 +2136,15 @@ router.delete('/:id', verifyToken, async (req, res) => {
 
     const currentEmp = existingRes.rows[0];
 
+    const actorUsername = req.user.username || 'superadmin';
+
     // 1. Thực hiện XÓA MỀM (Soft delete)
-    await db.query(`UPDATE employees SET status = 'DELETED', updated_at = NOW() WHERE id = $1`, [id]);
+    await db.query(`UPDATE employees SET is_deleted = true, deleted_at = NOW(), updated_by = $1, updated_at = NOW() WHERE id = $2`, [actorUsername, id]);
     await db.query(
       `UPDATE hr_employee_profiles 
-       SET status = 'DELETED', job_grade = '[ĐÃ XÓA]', updated_at = NOW() 
-       WHERE (employee_id = $1 AND employee_id <> '') OR (citizen_id IS NOT NULL AND citizen_id = $2)`,
-      [currentEmp.employee_code, currentEmp.citizen_id]
+       SET is_deleted = true, deleted_at = NOW(), updated_by = $1, uploaded_by = COALESCE(uploaded_by, $1), updated_at = NOW() 
+       WHERE (employee_id = $2 AND employee_id <> '') OR (citizen_id IS NOT NULL AND citizen_id = $3)`,
+      [actorUsername, currentEmp.employee_code, currentEmp.citizen_id]
     );
 
     // 2. Vô hiệu hóa tài khoản người dùng liên kết nếu có
@@ -2040,7 +2158,13 @@ router.delete('/:id', verifyToken, async (req, res) => {
       employee_name: currentEmp.employee_name,
       company_id: currentEmp.company_id,
       citizen_id: currentEmp.citizen_id,
-      status: 'DELETED'
+      employment_status: currentEmp.employment_status || (currentEmp.status === 'RESIGNED' ? 'RESIGNED' : 'ACTIVE'),
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+      status: currentEmp.status,
+      updated_by: actorUsername,
+      uploaded_by: actorUsername,
+      action_type: 'SOFT_DELETE'
     });
 
     await logAudit({
@@ -2141,21 +2265,24 @@ router.post('/:id/restore', verifyToken, async (req, res) => {
       }
     }
 
-    // 1. Tái kích hoạt trong bảng employees (status = 'ACTIVE')
-    await client.query(`UPDATE employees SET status = 'ACTIVE', updated_at = NOW() WHERE id = $1`, [id]);
+    const actorUsername = req.user.username || 'superadmin';
+
+    // 1. Tái kích hoạt trong bảng employees (is_deleted = false, deleted_at = NULL)
+    await client.query(`UPDATE employees SET is_deleted = false, deleted_at = NULL, updated_by = $1, updated_at = NOW() WHERE id = $2`, [actorUsername, id]);
 
     // 2. Tái kích hoạt tài khoản liên kết nếu có
     await client.query(`UPDATE users SET status = 'ACTIVE', updated_at = NOW() WHERE employee_id = $1`, [id]);
 
-    // 3. Tái kích hoạt trong bảng hr_employee_profiles (gỡ bỏ nhãn [ĐÃ XÓA])
+    // 3. Tái kích hoạt trong bảng hr_employee_profiles (gỡ bỏ xóa mềm, bảo toàn job_grade và employment_status)
     await client.query(
       `UPDATE hr_employee_profiles
-       SET status = 'ACTIVE',
-           job_grade = '',
-           full_name = REPLACE(REPLACE(full_name, ' [ĐÃ XÓA]', ''), ' [NGHỈ VIỆC]', ''),
+       SET is_deleted = false,
+           deleted_at = NULL,
+           updated_by = $1,
+           uploaded_by = COALESCE(uploaded_by, $1),
            updated_at = NOW()
-       WHERE employee_id = $1 OR (citizen_id IS NOT NULL AND citizen_id = $2)`,
-      [currentEmp.employee_code, currentEmp.citizen_id]
+       WHERE employee_id = $2 OR (citizen_id IS NOT NULL AND citizen_id = $3)`,
+      [actorUsername, currentEmp.employee_code, currentEmp.citizen_id]
     );
 
     await client.query('COMMIT');
@@ -2168,7 +2295,12 @@ router.post('/:id/restore', verifyToken, async (req, res) => {
       employee_name: currentEmp.employee_name,
       company_id: currentEmp.company_id,
       citizen_id: currentEmp.citizen_id,
-      status: 'ACTIVE',
+      employment_status: currentEmp.employment_status || (currentEmp.status === 'RESIGNED' ? 'RESIGNED' : 'ACTIVE'),
+      is_deleted: false,
+      deleted_at: null,
+      status: currentEmp.status,
+      updated_by: actorUsername,
+      uploaded_by: actorUsername,
       action_type: 'RESTORE'
     });
 
@@ -2258,15 +2390,19 @@ router.post('/:id/resign', verifyToken, async (req, res) => {
     const effectiveDate = resignation_date && String(resignation_date).trim() ? String(resignation_date).trim() : new Date().toISOString().split('T')[0];
     const effectiveReason = resignation_reason && String(resignation_reason).trim() ? String(resignation_reason).trim() : 'Chấm dứt hợp đồng lao động theo nguyện vọng';
 
+    const actorUsername = req.user.username || 'superadmin';
+
     // 1. Cập nhật bảng employees: status = 'RESIGNED'
     await db.query(
       `UPDATE employees 
        SET status = 'RESIGNED', 
+           employment_status = 'RESIGNED',
            resignation_date = $1, 
            resignation_reason = $2, 
+           updated_by = $3,
            updated_at = NOW() 
-       WHERE id = $3`,
-      [effectiveDate, effectiveReason, id]
+       WHERE id = $4`,
+      [effectiveDate, effectiveReason, actorUsername, id]
     );
 
     // 2. Vô hiệu hóa tài khoản Hub nếu có: status = 'INACTIVE'
@@ -2275,17 +2411,19 @@ router.post('/:id/resign', verifyToken, async (req, res) => {
       [id]
     );
 
-    // 3. Cập nhật bảng hr_employee_profiles: status = 'RESIGNED', job_grade = '[NGHỈ VIỆC]'
+    // 3. Cập nhật bảng hr_employee_profiles: status = 'RESIGNED', employment_status = 'RESIGNED', bảo toàn job_grade
     await db.query(
       `UPDATE hr_employee_profiles
        SET status = 'RESIGNED',
-           job_grade = '[NGHỈ VIỆC]',
+           employment_status = 'RESIGNED',
            resignation_date = $1,
            resignation_reason = $2,
            contract_end_date = COALESCE($1, contract_end_date),
+           updated_by = $3,
+           uploaded_by = COALESCE(uploaded_by, $3),
            updated_at = NOW()
-       WHERE (employee_id = $3 AND employee_id <> '') OR (citizen_id IS NOT NULL AND citizen_id = $4)`,
-      [effectiveDate, effectiveReason, currentEmp.employee_code, currentEmp.citizen_id]
+       WHERE (employee_id = $4 AND employee_id <> '') OR (citizen_id IS NOT NULL AND citizen_id = $5)`,
+      [effectiveDate, effectiveReason, actorUsername, currentEmp.employee_code, currentEmp.citizen_id]
     );
 
     // 4. Xếp hàng đồng bộ 3 hệ thống với action 'RESIGNED'
@@ -2297,8 +2435,11 @@ router.post('/:id/resign', verifyToken, async (req, res) => {
       company_id: currentEmp.company_id,
       citizen_id: currentEmp.citizen_id,
       status: 'RESIGNED',
+      employment_status: 'RESIGNED',
       resignation_date: effectiveDate,
       resignation_reason: effectiveReason,
+      updated_by: actorUsername,
+      uploaded_by: actorUsername,
       action_type: 'RESIGNED'
     });
 
@@ -2480,15 +2621,18 @@ router.post('/:id/reactivate', verifyToken, async (req, res) => {
       }
     }
 
+    const actorUsername = req.user.username || 'superadmin';
+
     // 1. Tái kích hoạt trong bảng employees
     await client.query(
       `UPDATE employees 
        SET status = 'ACTIVE', 
            resignation_date = NULL, 
            resignation_reason = NULL, 
+           updated_by = $1,
            updated_at = NOW() 
-       WHERE id = $1`,
-      [id]
+       WHERE id = $2`,
+      [actorUsername, id]
     );
 
     // 2. Tái kích hoạt trong hr_employee_profiles: status = 'ACTIVE' (xóa nhãn [NGHỈ VIỆC] và [ĐÃ XÓA])
@@ -2499,9 +2643,11 @@ router.post('/:id/reactivate', verifyToken, async (req, res) => {
            resignation_date = NULL,
            resignation_reason = NULL,
            full_name = REPLACE(REPLACE(full_name, ' [ĐÃ XÓA]', ''), ' [NGHỈ VIỆC]', ''),
+           updated_by = $1,
+           uploaded_by = COALESCE(uploaded_by, $1),
            updated_at = NOW()
-       WHERE (employee_id = $1 AND employee_id <> '') OR (citizen_id IS NOT NULL AND citizen_id = $2)`,
-      [currentEmp.employee_code, currentEmp.citizen_id]
+       WHERE (employee_id = $2 AND employee_id <> '') OR (citizen_id IS NOT NULL AND citizen_id = $3)`,
+      [actorUsername, currentEmp.employee_code, currentEmp.citizen_id]
     );
 
     await client.query('COMMIT');
@@ -2515,6 +2661,8 @@ router.post('/:id/reactivate', verifyToken, async (req, res) => {
       company_id: currentEmp.company_id,
       citizen_id: currentEmp.citizen_id,
       status: 'ACTIVE',
+      updated_by: actorUsername,
+      uploaded_by: actorUsername,
       action_type: 'RESTORE'
     });
 

@@ -6,7 +6,7 @@
     {
       "parameters": {
         "content": "## 📄 HR Employee Intake & Document Processing Pipeline (Phase 2)\nĐiều phối tiếp nhận hồ sơ nhân sự, xác thực JWT & quyền hạn, phân loại, Gemini Vision OCR, chuẩn hóa 53 trường và lưu Staging.",
-        "height": 460,
+        "height": 504,
         "width": 3120,
         "color": 4
       },
@@ -15,8 +15,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1080,
-        20
+        960,
+        256
       ]
     },
     {
@@ -31,8 +31,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        100,
-        200
+        112,
+        272
       ],
       "webhookId": "wh-hr-employee-lifecycle"
     },
@@ -48,8 +48,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        100,
-        320
+        784,
+        944
       ],
       "webhookId": "wh-hr-lifecycle-upload"
     },
@@ -65,8 +65,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        100,
-        440
+        112,
+        464
       ],
       "webhookId": "wh-hr-lifecycle-approval"
     },
@@ -82,110 +82,22 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        100,
-        560
+        112,
+        656
       ],
       "webhookId": "wh-hr-lifecycle-sync"
     },
     {
       "parameters": {
-        "httpMethod": "POST",
-        "path": "hr-intake-batch",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "id": "trig-hr-intake-batch",
-      "name": "Alias hr-intake-batch",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        100,
-        680
-      ],
-      "webhookId": "wh-hr-intake-batch"
-    },
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "hr-approval-callback",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "id": "trig-hr-approval-callback",
-      "name": "Alias hr-approval-callback",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        100,
-        800
-      ],
-      "webhookId": "wh-hr-approval-callback"
-    },
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "hr-sequential-sync",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "id": "trig-hr-sequential-sync",
-      "name": "Alias hr-sequential-sync",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        100,
-        920
-      ],
-      "webhookId": "wh-hr-sequential-sync"
-    },
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "hr-sync-retry",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "id": "trig-hr-sync-retry",
-      "name": "Alias hr-sync-retry",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        100,
-        1040
-      ],
-      "webhookId": "wh-hr-sync-retry"
-    },
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "*/15 * * * *"
-            }
-          ]
-        }
-      },
-      "id": "schedule-recovery",
-      "name": "Schedule HR_RECOVERY",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        100,
-        80
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "\nconst item = $input.first().json;\nconst body = item.body || item;\nconst headers = item.headers || {};\nconst expected = \"8973d464f5f1475b83d6ab88d222d824\";\n\n// Secret check from header or body\nconst incoming = body.secret || headers['x-n8n-internal-secret'] || headers['x-internal-secret'] || headers['x-n8n-auth-token'] || '';\nconst isScheduled = (!headers.host && !headers['content-type']) || !!item.timestamp;\nconst isAuthorized = isScheduled || (incoming === expected);\n\n// Infer event_type\nlet eventType = String(body.event_type || '').toUpperCase();\nif (!eventType) {\n  if (isScheduled) eventType = 'HR_RECOVERY';\n  else if (body.batch_id && (body.files || body.file_count)) eventType = 'HR_UPLOAD';\n  else if (body.action_type === 'APPROVAL_CALLBACK' || body.approved_by || (body.staging_id && !body.sync_task_id && !body.task_id)) eventType = 'HR_APPROVAL';\n  else if (body.sync_task_id || body.task_id || body.action_type === 'SEQUENTIAL_SYNC' || body.action_type === 'RETRY_SYNC') eventType = 'HR_RETRY_SYNC';\n  else eventType = 'HR_UPLOAD';\n}\n\nreturn [{\n  json: {\n    isAuthorized,\n    isScheduled,\n    event_type: eventType,\n    batch_id: body.batch_id || null,\n    file_id: body.file_id || null,\n    employee_id: body.employee_id || null,\n    staging_id: body.staging_id || null,\n    sync_task_id: body.sync_task_id || body.task_id || null,\n    task_id: body.sync_task_id || body.task_id || null,\n    company_id: body.company_id || 'STL',\n    sync_version: body.sync_version || 1,\n    idempotency_key: body.idempotency_key || ('idem_' + Date.now()),\n    correlation_id: body.correlation_id || ('corr_' + Date.now()),\n    created_at: body.created_at || new Date().toISOString(),\n    raw_payload: body\n  }\n}];\n"
+        "jsCode": "\nconst item = $input.first().json;\nconst body = item.body || item;\nconst headers = item.headers || {};\nconst expected = \"8973d464f5f1475b83d6ab88d222d824\";\n\n// Secret check from header or body\nconst incoming = body.secret || headers['x-n8n-internal-secret'] || headers['x-internal-secret'] || headers['x-n8n-auth-token'] || '';\nconst isAuthorized = (incoming === expected);\n\n// Infer event_type\nlet eventType = String(body.event_type || '').toUpperCase();\nif (!eventType) {\n  if (body.batch_id && (body.files || body.file_count)) eventType = 'HR_UPLOAD';\n  else if (body.action_type === 'APPROVAL_CALLBACK' || body.approved_by || (body.staging_id && !body.sync_task_id && !body.task_id)) eventType = 'HR_APPROVAL';\n  else if (body.sync_task_id || body.task_id || body.action_type === 'SEQUENTIAL_SYNC' || body.action_type === 'RETRY_SYNC') eventType = 'HR_RETRY_SYNC';\n  else eventType = 'UNKNOWN';\n}\n\nreturn [{\n  json: {\n    isAuthorized,\n    event_type: eventType,\n    batch_id: body.batch_id || null,\n    file_id: body.file_id || null,\n    employee_id: body.employee_id || null,\n    staging_id: body.staging_id || null,\n    sync_task_id: body.sync_task_id || body.task_id || null,\n    task_id: body.sync_task_id || body.task_id || null,\n    company_id: body.company_id || 'STL',\n    sync_version: body.sync_version || 1,\n    idempotency_key: body.idempotency_key || ('idem_' + Date.now()),\n    correlation_id: body.correlation_id || ('corr_' + Date.now()),\n    created_at: body.created_at || new Date().toISOString(),\n    raw_payload: body\n  }\n}];\n"
       },
       "id": "auth-normalize",
       "name": "Authorize & Normalize Event",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        400,
-        500
+        336,
+        656
       ]
     },
     {
@@ -218,8 +130,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        620,
-        500
+        560,
+        656
       ]
     },
     {
@@ -235,8 +147,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        860,
-        720
+        784,
+        752
       ]
     },
     {
@@ -269,8 +181,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        860,
-        400
+        784,
+        560
       ]
     },
     {
@@ -303,8 +215,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1120,
-        480
+        1008,
+        800
       ]
     },
     {
@@ -316,8 +228,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1360,
-        420
+        1232,
+        656
       ]
     },
     {
@@ -333,8 +245,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1600,
-        420
+        1456,
+        656
       ]
     },
     {
@@ -367,8 +279,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1360,
-        580
+        1232,
+        928
       ]
     },
     {
@@ -403,11 +315,11 @@
       "name": "Sync - Execute Sequential Step",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "onError": "continueRegularOutput",
       "position": [
-        1600,
-        540
-      ]
+        1456,
+        896
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -422,76 +334,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1840,
-        540
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://hr-auth:3000/api/hoso/intake/internal/scan-failed-sync",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "x-n8n-auth-token",
-              "value": "8973d464f5f1475b83d6ab88d222d824"
-            },
-            {
-              "name": "x-internal-secret",
-              "value": "8973d464f5f1475b83d6ab88d222d824"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ secret: \"8973d464f5f1475b83d6ab88d222d824\" }) }}",
-        "options": {
-          "timeout": 30000
-        }
-      },
-      "id": "recovery-http",
-      "name": "Recovery - Scan Failed Sync",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "onError": "continueRegularOutput",
-      "position": [
-        1600,
-        700
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "\nconst res = $input.first().json;\nconst tasks = res.tasks || [];\nreturn [{\n  json: {\n    event_type: 'HR_RECOVERY',\n    scanned_count: tasks.length,\n    status: 'recovery_scan_completed',\n    timestamp: new Date().toISOString(),\n    tasks\n  }\n}];\n"
-      },
-      "id": "recovery-audit",
-      "name": "Recovery - Audit Recovery Scan",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1840,
-        700
-      ]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify($json) }}",
-        "options": {
-          "responseCode": 200
-        }
-      },
-      "id": "recovery-resp",
-      "name": "Recovery - Respond Status",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        2080,
-        700
+        1680,
+        896
       ]
     },
     {
@@ -503,8 +347,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1120,
-        180
+        1008,
+        368
       ]
     },
     {
@@ -536,8 +380,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1340,
-        180
+        1232,
+        368
       ],
       "onError": "continueRegularOutput"
     },
@@ -571,8 +415,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1560,
-        180
+        1456,
+        368
       ]
     },
     {
@@ -588,21 +432,21 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1780,
-        80
+        2128,
+        656
       ]
     },
     {
       "parameters": {
-        "jsCode": "\nconst authRes = $input.first().json;\nconst user = authRes.user;\nconst bin = $('Auth - Extract Credentials').first().binary || {};\nconst prevJson = $('Auth - Extract Credentials').first().json;\n\nconst keys = Object.keys(bin);\nif (keys.length === 0) {\n  return [{\n    json: {\n      valid_files: false,\n      error: 'Vui lòng chọn ít nhất 1 tệp hồ sơ đính kèm (PDF, ảnh scan, Word, Excel).',\n      status_code: 400\n    }\n  }];\n}\n\nconst allowedExts = ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'tiff', 'docx', 'xlsx', 'txt', 'doc'];\nconst maxFileSize = 25 * 1024 * 1024; // 25MB\n\nconst validatedFiles = [];\nfor (const k of keys) {\n  const b = bin[k];\n  const fileName = b.fileName || 'file.pdf';\n  const ext = (fileName.split('.').pop() || '').toLowerCase();\n  if (!allowedExts.includes(ext)) {\n    return [{\n      json: {\n        valid_files: false,\n        error: 'Định dạng tệp \"' + fileName + '\" (.' + ext + ') không được hỗ trợ. Vui lòng tải lên PDF hoặc ảnh scan.',\n        status_code: 400\n      }\n    }];\n  }\n  const approxSize = Math.round(b.data ? b.data.length * 3 / 4 : (b.fileSize || 0));\n  if (approxSize > maxFileSize) {\n    return [{\n      json: {\n        valid_files: false,\n        error: 'Dung lượng tệp \"' + fileName + '\" vượt quá giới hạn tối đa 25MB.',\n        status_code: 400\n      }\n    }];\n  }\n  validatedFiles.push({\n    binaryKey: k,\n    fileName,\n    ext,\n    mimeType: b.mimeType || 'application/pdf',\n    approxSize\n  });\n}\n\nreturn [{\n  json: {\n    valid_files: true,\n    user,\n    batch_id: prevJson.batch_id,\n    correlation_id: prevJson.correlation_id,\n    idempotency_key: prevJson.idempotency_key,\n    conversation_id: prevJson.conversation_id,\n    company_id: prevJson.company_id || user.company_id,\n    validated_files: validatedFiles\n  },\n  binary: bin\n}];\n"
+        "jsCode": "\nconst authRes = $input.first().json;\nconst user = authRes.user;\nconst bin = $('Auth - Extract Credentials').first().binary || {};\nconst prevJson = $('Auth - Extract Credentials').first().json;\n\nfunction parseSize(s) {\n  if (typeof s === 'number') return s;\n  if (!s) return 0;\n  const str = String(s).trim();\n  const m = str.match(/^([0-9.]+)\\s*([a-zA-Z]*)$/);\n  if (!m) return parseInt(str.replace(/[^0-9]/g, ''), 10) || 0;\n  const num = parseFloat(m[1]);\n  const unit = m[2].toUpperCase();\n  if (unit === 'GB' || unit === 'GIB') return Math.round(num * 1024 * 1024 * 1024);\n  if (unit === 'MB' || unit === 'MIB') return Math.round(num * 1024 * 1024);\n  if (unit === 'KB' || unit === 'KIB') return Math.round(num * 1024);\n  return Math.round(num);\n}\n\nfunction checkFileSignature(base64Data, ext) {\n  // STRICT FAIL-CLOSED: Reject missing, empty, or non-string base64 data\n  if (!base64Data || typeof base64Data !== 'string') return false;\n  try {\n    const cleanB64 = base64Data.trim();\n    if (cleanB64.length < 8) return false;\n    const headBuf = Buffer.from(cleanB64.slice(0, 128), 'base64');\n    if (headBuf.length < 4) return false;\n    const hex = headBuf.toString('hex').toLowerCase();\n\n    switch (ext) {\n      case 'pdf':\n        // %PDF- (25504446)\n        return hex.startsWith('25504446');\n      case 'png':\n        // \\x89PNG\\r\\n\\x1a\\n (89504e470d0a1a0a)\n        return hex.startsWith('89504e470d0a1a0a') || hex.startsWith('89504e47');\n      case 'jpg':\n      case 'jpeg':\n        // \\xFF\\xD8\\xFF (ffd8ff)\n        return hex.startsWith('ffd8ff');\n      case 'webp': {\n        // RIFF (52494646) at offset 0, WEBP (57454250) at offset 8\n        if (headBuf.length < 12) return false;\n        const r = headBuf.slice(0, 4).toString('hex').toLowerCase();\n        const w = headBuf.slice(8, 12).toString('hex').toLowerCase();\n        return r === '52494646' && w === '57454250';\n      }\n      case 'docx':\n      case 'xlsx': {\n        // PK\\x03\\x04 (504b0304) Zip header (must be at least 30 bytes for valid local file header)\n        if (headBuf.length < 30) return false;\n        return hex.startsWith('504b0304');\n      }\n      case 'txt':\n      case 'csv':\n        // Plain text: non-empty, and no null bytes in header\n        return headBuf.length > 0 && !headBuf.includes(0x00);\n      default:\n        // Unknown extension -> FAIL-CLOSED\n        return false;\n    }\n  } catch (e) {\n    // FAIL-CLOSED: Reject on any exception\n    return false;\n  }\n}\n\nconst keys = Object.keys(bin);\nif (keys.length === 0) {\n  return [{\n    json: {\n      valid_files: false,\n      error: 'Vui lòng chọn ít nhất 1 tệp hồ sơ đính kèm (PDF, ảnh scan, Word, Excel).',\n      status_code: 400\n    }\n  }];\n}\n\nconst allowedExts = ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'tiff', 'docx', 'xlsx', 'txt'];\nconst maxFileSize = 25 * 1024 * 1024; // Official SOTRANS Standard: 25 MB\n\nconst validatedFiles = [];\nfor (const k of keys) {\n  const b = bin[k];\n  const fileName = b.fileName || 'file.pdf';\n  const ext = (fileName.split('.').pop() || '').toLowerCase();\n  \n  if (!allowedExts.includes(ext)) {\n    return [{\n      json: {\n        valid_files: false,\n        error: 'Định dạng tệp \"' + fileName + '\" (.' + ext + ') không được hỗ trợ. Vui lòng tải lên PDF hoặc ảnh scan hợp lệ.',\n        status_code: 400\n      }\n    }];\n  }\n\n  // File signature / magic bytes verification (Strict Fail-Closed)\n  if (!b.data || String(b.data).trim().length === 0) {\n    return [{\n      json: {\n        valid_files: false,\n        error: 'Tệp \"' + fileName + '\" không có dữ liệu nội dung hợp lệ.',\n        status_code: 400\n      }\n    }];\n  }\n\n  const isSigValid = checkFileSignature(b.data, ext);\n  if (!isSigValid) {\n    return [{\n      json: {\n        valid_files: false,\n        error: 'Chữ ký nhị phân (File Signature) của tệp \"' + fileName + '\" không khớp với định dạng .' + ext + ' hoặc tệp bị hỏng.',\n        status_code: 400\n      }\n    }];\n  }\n\n  let actualSize = parseSize(b.fileSize);\n  if (!actualSize && b.data && !String(b.data).startsWith('filesystem-')) {\n    actualSize = Math.round(b.data.length * 3 / 4);\n  }\n\n  if (actualSize > maxFileSize) {\n    return [{\n      json: {\n        valid_files: false,\n        error: 'Dung lượng tệp \"' + fileName + '\" (' + (actualSize / 1024 / 1024).toFixed(1) + 'MB) vượt quá giới hạn tối đa 25MB.',\n        status_code: 400\n      }\n    }];\n  }\n\n  validatedFiles.push({\n    binaryKey: k,\n    fileName,\n    ext,\n    mimeType: b.mimeType || 'application/pdf',\n    approxSize: actualSize\n  });\n}\n\nreturn [{\n  json: {\n    valid_files: true,\n    user,\n    batch_id: prevJson.batch_id,\n    correlation_id: prevJson.correlation_id,\n    idempotency_key: prevJson.idempotency_key,\n    conversation_id: prevJson.conversation_id,\n    company_id: prevJson.company_id || user.company_id,\n    validated_files: validatedFiles\n  },\n  binary: bin\n}];\n"
       },
       "id": "val-files-code",
       "name": "Validate - File Type & Size",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1780,
-        240
+        1680,
+        368
       ]
     },
     {
@@ -635,8 +479,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2000,
-        240
+        1904,
+        368
       ]
     },
     {
@@ -652,8 +496,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        2220,
-        140
+        2128,
+        464
       ]
     },
     {
@@ -665,21 +509,21 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2220,
-        320
+        2128,
+        272
       ]
     },
     {
       "parameters": {
-        "jsCode": "\nconst item = $input.first().json;\nconst files = item.files || [];\n\nfunction classify(fn) {\n  const f = (fn || '').toLowerCase();\n  if (/cccd|can cuoc|cmnd|dinh danh|citizen/i.test(f)) return 'CCCD_VNEID';\n  if (/vneid/i.test(f)) return 'VNEID';\n  if (/bhyt|bao hiem y te/i.test(f)) return 'BHYT';\n  if (/kham suc khoe|ksk|suc khoe/i.test(f)) return 'GIAY_KHAM_SUC_KHOE';\n  if (/so yeu ly lich|syll|ly lich/i.test(f)) return 'SO_YEU_LY_LICH';\n  if (/cv|resume|ho so ung vien/i.test(f)) return 'CV';\n  if (/don xin viec|don ung tuyen/i.test(f)) return 'DON_XIN_VIEC';\n  if (/ket hon|hon nhan/i.test(f)) return 'GIAY_DANG_KY_KET_HON';\n  if (/quyet dinh|qd|bo nhiem|tiep nhan/i.test(f)) return 'QUYET_DINH_TUYEN_DUNG';\n  if (/hop dong|hdld/i.test(f)) return 'HOP_DONG_LAO_DONG';\n  if (/bang|chung chi|tot nghiep/i.test(f)) return 'BANG_CAP_CHUNG_CHI';\n  return 'KHAC';\n}\n\nfor (const f of files) {\n  f.docType = classify(f.fileName);\n}\n\n// Output one item per file so OCR - Gemini Extraction runs independently per PDF\nconst outputItems = [];\nfor (let i = 0; i < files.length; i++) {\n  const f = files[i];\n  outputItems.push({\n    json: {\n      fileIndex: i,\n      totalFiles: files.length,\n      fileName: f.fileName,\n      docType: f.docType,\n      binaryKey: f.binaryKey,\n      fileSize: f.fileSize,\n      mimeType: f.mimeType,\n      fileStoragePath: f.fileStoragePath,\n      batch_id: item.batch_id,\n      correlation_id: item.correlation_id,\n      idempotency_key: item.idempotency_key,\n      conversation_id: item.conversation_id,\n      company_id: item.company_id,\n      user: item.user,\n      gemini_parts: [\n        {\n          inline_data: {\n            mime_type: f.mimeType,\n            data: f.base64Data\n          }\n        },\n        {\n          text: 'Tài liệu: ' + f.fileName + ' (Phân loại: ' + f.docType + ')\\nHãy bóc tách thông tin chi tiết của người lao động từ tài liệu này theo đúng 53 trường dữ liệu chuẩn của SOTRANS.'\n        }\n      ]\n    }\n  });\n}\n\nreturn outputItems;\n"
+        "jsCode": "\nconst item = $input.first().json;\nconst files = item.files || [];\n\nfunction removeAccents(str) {\n  return String(str || '')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/đ/g, 'd').replace(/Đ/g, 'D')\n    .toLowerCase()\n    .trim();\n}\n\n/**\n * Layer 1: Preliminary Filename-Based Classification\n * Executed BEFORE OCR (text is not yet available at this stage).\n * Accurately maps filename patterns to canonical document types.\n * Non-descriptive names (e.g. SWC00814.pdf) are assigned GENERAL pending Layer 2 content verification.\n */\nfunction classifyByFilename(fileName) {\n  const cleanFn = String(fileName || '').replace(/[\\._\\-]+/g, ' ');\n  const f = removeAccents(cleanFn);\n\n  if (/(?:can cuoc cong dan|cccd|vneid|dinh danh dien tu|cmnd|chung minh nhan dan|cuc canh sat quan ly hanh chinh|citizen|the can cuoc)/i.test(f)) {\n    return 'CCCD_VNEID';\n  }\n  if (/(?:the bao hiem y te|bao hiem y te|bhyt|ma the bhyt|co quan bhxh|bao hiem xa hoi|health insurance)/i.test(f)) {\n    return 'BHYT';\n  }\n  if (/(?:giay kham suc khoe|kham suc khoe|benh vien|ket luan suc khoe|phan loai suc khoe|\\bksk\\b|suc khoe|health check|medical)/i.test(f)) {\n    return 'GIAY_KHAM_SUC_KHOE';\n  }\n  if (/(?:so yeu ly lich|ly lich ca nhan|ly lich tu thuat|thanh phan gia dinh|\\bsyll\\b)/i.test(f)) {\n    return 'SO_YEU_LY_LICH';\n  }\n  if (/(?:don xin viec|don ung tuyen|phieu dang ky du tuyen|thu ung tuyen|\\bcv\\b|curriculum vitae|resume|ho so ung vien|job application)/i.test(f)) {\n    return 'DON_XIN_VIEC';\n  }\n  if (/(?:quyet dinh tuyen dung|tiep nhan va bo tri|qd dsmn|bo nhiem|ve viec tiep nhan|quyet dinh ve viec|quyet dinh|\\bqd\\b|decision)/i.test(f)) {\n    return 'QUYET_DINH_TUYEN_DUNG';\n  }\n  if (/(?:hop dong lao dong|\\bhdld\\b|phu luc hop dong|thoi han hop dong|nguoi su dung lao dong|hop dong|labor contract|employment contract)/i.test(f)) {\n    return 'HOP_DONG_LAO_DONG';\n  }\n  if (/(?:bang tot nghiep|chung chi|giay chung nhan kha nang chuyen mon|thuyen truong|may truong|hang fc|chung chi chuyen mon|bang dai hoc|bang cao dang|bang cu nhan|bang ky su|certificate|degree|diploma)/i.test(f)) {\n    return 'BANG_CAP_CHUNG_CHI';\n  }\n  if (/(?:bang thanh toan luong|bang luong|phieu luong|chuyen luong|don de nghi chuyen luong|salary|payroll)/i.test(f)) {\n    return 'LUONG_PHU_CAP';\n  }\n  if (/(?:giay chung nhan ket hon|dang ky ket hon|tinh trang hon nhan|hon nhan|ket hon|marriage)/i.test(f)) {\n    return 'GIAY_DANG_KY_KET_HON';\n  }\n\n  return 'GENERAL';\n}\n\nfor (const f of files) {\n  f.docType = classifyByFilename(f.fileName);\n  f.classification_layer = 'LAYER_1_FILENAME';\n}\n\nconst outputItems = [];\nfor (let i = 0; i < files.length; i++) {\n  const f = files[i];\n  outputItems.push({\n    json: {\n      fileIndex: i,\n      totalFiles: files.length,\n      fileName: f.fileName,\n      docType: f.docType,\n      classification_layer: f.classification_layer,\n      binaryKey: f.binaryKey,\n      fileSize: f.fileSize,\n      mimeType: f.mimeType,\n      fileStoragePath: f.fileStoragePath,\n      batch_id: item.batch_id,\n      correlation_id: item.correlation_id,\n      idempotency_key: item.idempotency_key,\n      conversation_id: item.conversation_id,\n      company_id: item.company_id || null,\n      user: item.user,\n      gemini_parts: [\n        {\n          inline_data: {\n            mime_type: f.mimeType,\n            data: f.base64Data\n          }\n        },\n        {\n          text: 'Tài liệu: ' + f.fileName + ' (Phân loại sơ bộ: ' + f.docType + ')\\nHãy bóc tách thông tin chi tiết của người lao động từ tài liệu này theo đúng 53 trường dữ liệu chuẩn của SOTRANS.'\n        }\n      ]\n    }\n  });\n}\n\nreturn outputItems;\n"
       },
       "id": "classify-code",
       "name": "Classify - Document Type",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2440,
-        320
+        2352,
+        272
       ]
     },
     {
@@ -709,151 +553,36 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2660,
-        320
+        2576,
+        272
       ],
       "retryOnFail": true,
       "maxTries": 2,
-      "onError": "continueRegularOutput",
       "credentials": {
         "httpHeaderAuth": {
           "id": "aX79fyjBak04yprX",
           "name": "Gemini Header"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "\nconst ocrOutputs = $input.all();\nconst classifyOutputs = $('Classify - Document Type').all();\nconst prevData = classifyOutputs[0] ? classifyOutputs[0].json : {};\n\nconst processedFiles = [];\n\nfor (let i = 0; i < classifyOutputs.length; i++) {\n  const f = classifyOutputs[i].json;\n  const ocrRes = ocrOutputs[i] ? ocrOutputs[i].json : {};\n  let extractedJson = {};\n  let parseError = null;\n\n  try {\n    if (ocrRes.candidates && ocrRes.candidates[0] && ocrRes.candidates[0].content) {\n      const parts = ocrRes.candidates[0].content.parts || [];\n      const rawText = parts.map(p => p.text || '').join('').trim();\n      const clean = rawText.replace(/^\\`\\`\\`json\\s*/i, '').replace(/\\`\\`\\`\\s*$/i, '').trim();\n      if (clean) {\n        extractedJson = JSON.parse(clean);\n        if (Array.isArray(extractedJson)) {\n          extractedJson = extractedJson[0] || {};\n        }\n      }\n    } else if (ocrRes.error) {\n      parseError = typeof ocrRes.error === 'string' ? ocrRes.error : (ocrRes.error.message || JSON.stringify(ocrRes.error));\n      console.warn('[OCR Gemini Error] File: ' + f.fileName + ', CorrId: ' + (prevData.correlation_id || 'unknown') + ': ' + parseError);\n    } else {\n      parseError = 'No valid candidates returned from Gemini response';\n      console.warn('[OCR Gemini Invalid Response] File: ' + f.fileName + ', CorrId: ' + (prevData.correlation_id || 'unknown'));\n    }\n  } catch (parseErr) {\n    parseError = parseErr.message;\n    console.warn('[OCR Parse JSON Error] File: ' + f.fileName + ', CorrId: ' + (prevData.correlation_id || 'unknown') + ': ' + parseErr.message);\n  }\n\n  // Preserve provenance for each extracted field\n  const provenance = {};\n  if (extractedJson && typeof extractedJson === 'object') {\n    for (const key of Object.keys(extractedJson)) {\n      if (key.startsWith('_')) continue;\n      const val = extractedJson[key];\n      if (val !== null && val !== undefined && val !== '') {\n        provenance[key] = {\n          fileName: f.fileName,\n          docType: f.docType,\n          binaryKey: f.binaryKey,\n          value: val\n        };\n      }\n    }\n  }\n\n  // Ensure rawExtracted is NEVER emptied for batches!\n  processedFiles.push({\n    fileIndex: i,\n    fileName: f.fileName,\n    binaryKey: f.binaryKey,\n    fileSize: f.fileSize,\n    mimeType: f.mimeType,\n    fileStoragePath: f.fileStoragePath,\n    docType: f.docType,\n    rawExtracted: extractedJson || {},\n    provenance: provenance,\n    ocrStatus: parseError ? 'failed' : 'success',\n    ocrError: parseError,\n    text: ''\n  });\n}\n\nreturn [{\n  json: {\n    batch_id: prevData.batch_id,\n    correlation_id: prevData.correlation_id,\n    idempotency_key: prevData.idempotency_key,\n    conversation_id: prevData.conversation_id,\n    company_id: prevData.company_id,\n    user: prevData.user,\n    processed_files: processedFiles\n  }\n}];\n"
+        "jsCode": "\nconst ocrOutputs = $input.all();\nconst classifyOutputs = $('Classify - Document Type').all();\nconst prevData = classifyOutputs[0] ? classifyOutputs[0].json : {};\n\nfunction removeAccents(str) {\n  return String(str || '')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/đ/g, 'd').replace(/Đ/g, 'D')\n    .toLowerCase()\n    .trim();\n}\n\n/**\n * Layer 2: Content-Based Verification & Reclassification\n * Inspects actual OCR text extracted by Gemini to verify or upgrade Layer 1 classification.\n */\nfunction classifyByContent(fileName, text) {\n  const cleanFn = String(fileName || '').replace(/[\\._\\-]+/g, ' ');\n  const combined = removeAccents(`${cleanFn} ${text || ''}`);\n\n  if (/(?:can cuoc cong dan|cccd|vneid|dinh danh dien tu|cmnd|chung minh nhan dan|cuc canh sat quan ly hanh chinh|the can cuoc)/i.test(combined)) {\n    return 'CCCD_VNEID';\n  }\n  if (/(?:the bao hiem y te|bao hiem y te|bhyt|ma the bhyt|co quan bhxh|bao hiem xa hoi)/i.test(combined)) {\n    return 'BHYT';\n  }\n  if (/(?:giay kham suc khoe|kham suc khoe|benh vien|ket luan suc khoe|phan loai suc khoe|\\bksk\\b)/i.test(combined)) {\n    return 'GIAY_KHAM_SUC_KHOE';\n  }\n  if (/(?:so yeu ly lich|ly lich ca nhan|ly lich tu thuat|thanh phan gia dinh)/i.test(combined)) {\n    return 'SO_YEU_LY_LICH';\n  }\n  if (/(?:don xin viec|don ung tuyen|phieu dang ky du tuyen|thu ung tuyen|curriculum vitae|\\bcv\\b)/i.test(combined)) {\n    return 'DON_XIN_VIEC';\n  }\n  if (/(?:quyet dinh tuyen dung|tiep nhan va bo tri|qd dsmn|bo nhiem|ve viec tiep nhan|quyet dinh ve viec|quyet dinh)/i.test(combined)) {\n    return 'QUYET_DINH_TUYEN_DUNG';\n  }\n  if (/(?:hop dong lao dong|\\bhdld\\b|phu luc hop dong|thoi han hop dong|nguoi su dung lao dong)/i.test(combined)) {\n    return 'HOP_DONG_LAO_DONG';\n  }\n  if (/(?:bang tot nghiep|chung chi|giay chung nhan kha nang chuyen mon|thuyen truong|may truong|hang fc|bang dai hoc|bang cao dang)/i.test(combined)) {\n    return 'BANG_CAP_CHUNG_CHI';\n  }\n  if (/(?:bang thanh toan luong|bang luong|phieu luong|chuyen luong|don de nghi chuyen luong)/i.test(combined)) {\n    return 'LUONG_PHU_CAP';\n  }\n  if (/(?:giay chung nhan ket hon|dang ky ket hon|tinh trang hon nhan)/i.test(combined)) {\n    return 'GIAY_DANG_KY_KET_HON';\n  }\n\n  return 'GENERAL';\n}\n\nconst processedFiles = [];\n\nfor (let i = 0; i < classifyOutputs.length; i++) {\n  const f = classifyOutputs[i].json;\n  const ocrRes = ocrOutputs[i] ? ocrOutputs[i].json : {};\n  let extractedJson = {};\n  let parseError = null;\n  let rawText = '';\n\n  try {\n    if (ocrRes.candidates && ocrRes.candidates[0] && ocrRes.candidates[0].content) {\n      const parts = ocrRes.candidates[0].content.parts || [];\n      rawText = parts.map(p => p.text || '').join('').trim();\n      const clean = rawText.replace(/^\\`\\`\\`json\\s*/i, '').replace(/\\`\\`\\`\\s*$/i, '').trim();\n      if (clean) {\n        extractedJson = JSON.parse(clean);\n        if (Array.isArray(extractedJson)) {\n          extractedJson = extractedJson[0] || {};\n        }\n      }\n    } else if (ocrRes.error) {\n      parseError = typeof ocrRes.error === 'string' ? ocrRes.error : (ocrRes.error.message || JSON.stringify(ocrRes.error));\n      console.warn('[OCR Gemini Error] File: ' + f.fileName + ', CorrId: ' + (prevData.correlation_id || 'unknown') + ': ' + parseError);\n    } else {\n      parseError = 'No valid candidates returned from Gemini response';\n      console.warn('[OCR Gemini Invalid Response] File: ' + f.fileName + ', CorrId: ' + (prevData.correlation_id || 'unknown'));\n    }\n  } catch (parseErr) {\n    parseError = 'Lỗi phân tích JSON từ kết quả OCR: ' + parseErr.message;\n    console.warn('[OCR Parse JSON Error] File: ' + f.fileName + ', CorrId: ' + (prevData.correlation_id || 'unknown') + ': ' + parseErr.message);\n  }\n\n  // Layer 2: Content-Based Verification / Reclassification\n  let finalDocType = f.docType;\n  let classificationLayer = f.classification_layer || 'LAYER_1_FILENAME';\n  if (rawText && (f.docType === 'GENERAL' || f.docType === 'KHAC')) {\n    const verifiedType = classifyByContent(f.fileName, rawText);\n    if (verifiedType !== 'GENERAL') {\n      finalDocType = verifiedType;\n      classificationLayer = 'LAYER_2_CONTENT_VERIFIED';\n    }\n  }\n\n  // Preserve provenance for each extracted field\n  const provenance = {};\n  if (extractedJson && typeof extractedJson === 'object') {\n    for (const key of Object.keys(extractedJson)) {\n      if (key.startsWith('_')) continue;\n      const val = extractedJson[key];\n      if (val !== null && val !== undefined && val !== '') {\n        provenance[key] = {\n          fileName: f.fileName,\n          docType: finalDocType,\n          binaryKey: f.binaryKey,\n          value: val\n        };\n      }\n    }\n  }\n\n  processedFiles.push({\n    fileIndex: i,\n    fileName: f.fileName,\n    binaryKey: f.binaryKey,\n    fileSize: f.fileSize,\n    mimeType: f.mimeType,\n    fileStoragePath: f.fileStoragePath,\n    docType: finalDocType,\n    classification_layer: classificationLayer,\n    rawExtracted: extractedJson || {},\n    provenance: provenance,\n    ocrStatus: parseError ? 'failed' : 'success',\n    ocrError: parseError,\n    text: rawText // Pass extracted rawText to downstream Backend Normalizer\n  });\n}\n\n// Check if ALL files failed OCR completely\nconst allOcrFailed = processedFiles.length > 0 && processedFiles.every(f => f.ocrStatus === 'failed');\nconst failureDetails = processedFiles.filter(f => f.ocrError).map(f => f.fileName + ': ' + f.ocrError).join('; ');\n\nreturn [{\n  json: {\n    batch_id: prevData.batch_id,\n    correlation_id: prevData.correlation_id,\n    idempotency_key: prevData.idempotency_key,\n    conversation_id: prevData.conversation_id,\n    company_id: prevData.company_id || null,\n    user: prevData.user,\n    processed_files: processedFiles,\n    all_ocr_failed: allOcrFailed,\n    error: allOcrFailed ? ('Lỗi nhận diện OCR toàn bộ tài liệu: ' + failureDetails) : null,\n    statusCode: allOcrFailed ? 502 : 200\n  }\n}];\n"
       },
       "id": "ocr-parse-code",
-      "name": "OCR - Parse & Fallback",
+      "name": "OCR - Parse JSON & Error Handling",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2880,
-        320
+        2800,
+        272
       ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://hr-auth:3000/api/hoso/intake/internal/normalize-canonical-fields",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "x-internal-secret",
-              "value": "8973d464f5f1475b83d6ab88d222d824"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ batch_id: $json.batch_id, files: $json.processed_files, secret: \"8973d464f5f1475b83d6ab88d222d824\" }) }}",
-        "options": {
-          "timeout": 900000
-        }
-      },
-      "id": "norm-fields-http",
-      "name": "Normalize - Canonical Employee Fields",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        3100,
-        320
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "jsCode": "\nconst normRes = $input.first().json;\nconst prevData = $('OCR - Parse & Fallback').first().json;\nconst candidateGroups = normRes.candidate_groups || [];\n\nconst primaryCandidate = candidateGroups[0] || {\n  merged_extracted: { full_name: 'Nhân viên mới' },\n  final_cccd_info: { cleanCccd: null, valid: false },\n  final_comp_detection: { company_id: prevData.company_id || 'STL' }\n};\n\nfor (const cand of candidateGroups) {\n  const merged = cand.merged_extracted || {};\n  const missing = [];\n  if (!merged.full_name || merged.full_name === 'Nhân viên mới' || /^(thieu|chua\\s*ro|swc\\d+|stl\\d+)$/i.test(merged.full_name)) {\n    missing.push('full_name');\n  }\n  if (!merged.citizen_id) {\n    missing.push('citizen_id');\n  }\n  cand.missing_required = missing;\n}\n\nconst primaryMerged = primaryCandidate.merged_extracted || {};\nconst missingRequired = [];\nif (!primaryMerged.full_name || primaryMerged.full_name === 'Nhân viên mới' || /^(thieu|chua\\s*ro|swc\\d+|stl\\d+)$/i.test(primaryMerged.full_name)) {\n  missingRequired.push('full_name');\n}\nif (!primaryMerged.citizen_id) {\n  missingRequired.push('citizen_id');\n}\n\nreturn [{\n  json: {\n    batch_id: prevData.batch_id,\n    correlation_id: prevData.correlation_id,\n    idempotency_key: prevData.idempotency_key,\n    conversation_id: prevData.conversation_id,\n    company_id: prevData.company_id,\n    user: prevData.user,\n    candidate_groups: candidateGroups,\n    primary_candidate: primaryCandidate,\n    missing_required: missingRequired\n  }\n}];\n"
-      },
-      "id": "val-req-fields-code",
-      "name": "Validate - Required Fields",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3320,
-        320
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://hr-auth:3000/api/hoso/intake/internal/validate-duplicates",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "x-internal-secret",
-              "value": "8973d464f5f1475b83d6ab88d222d824"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ candidate: $json.primary_candidate, candidates: $json.candidate_groups, user: $json.user, secret: \"8973d464f5f1475b83d6ab88d222d824\" }) }}",
-        "options": {
-          "timeout": 120000
-        }
-      },
-      "id": "val-dup-http",
-      "name": "Validate - Citizen ID & Duplicate",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        3540,
-        320
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://hr-auth:3000/api/hoso/intake/internal/persist-staging",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "x-internal-secret",
-              "value": "8973d464f5f1475b83d6ab88d222d824"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ (() => {\n        const dupRes = $input.first().json;\n        const reqData = $('Validate - Required Fields').first().json;\n        const valCandidates = dupRes.validated_candidates || [];\n\n        let preparedCandidates = [];\n        if (Array.isArray(valCandidates) && valCandidates.length > 0) {\n          preparedCandidates = valCandidates.map(vc => ({\n            combined_file_names: vc.combined_file_names || vc.fileName || \"Tài liệu hồ sơ\",\n            file_storage_path: vc.file_storage_path || vc.fileStoragePath,\n            total_size: vc.total_size || vc.fileSize || 0,\n            mime_type: vc.mime_type || vc.mimeType || \"application/pdf\",\n            merged_extracted: vc.merged_extracted || vc.extracted || {},\n            final_cccd_info: vc.final_cccd_info || vc.cccdInfo || {},\n            final_company_id: vc.final_company_id || reqData.company_id || reqData.user.company_id,\n            final_company_status: vc.final_company_status || \"unknown\",\n            final_company_evidence: vc.final_company_evidence || null,\n            validation: vc.validation || {}\n          }));\n        } else {\n          const cand = reqData.primary_candidate || {};\n          preparedCandidates = [{\n            combined_file_names: cand.combined_file_names || \"Tài liệu hồ sơ\",\n            file_storage_path: cand.file_storage_path,\n            total_size: cand.total_size,\n            mime_type: cand.mime_type,\n            merged_extracted: dupRes.merged_extracted || cand.merged_extracted,\n            final_cccd_info: dupRes.final_cccd_info || cand.final_cccd_info,\n            final_company_id: dupRes.final_company_id || reqData.company_id || reqData.user.company_id,\n            final_company_status: dupRes.final_company_status || \"unknown\",\n            final_company_evidence: dupRes.final_company_evidence || null,\n            validation: dupRes.validation || {}\n          }];\n        }\n\n        return JSON.stringify({\n          batch_id: reqData.batch_id,\n          correlation_id: reqData.correlation_id,\n          idempotency_key: reqData.idempotency_key,\n          conversation_id: reqData.conversation_id,\n          user: reqData.user,\n          candidates: preparedCandidates,\n          secret: \"8973d464f5f1475b83d6ab88d222d824\"\n        });\n      })() }}",
-        "options": {
-          "timeout": 120000
-        }
-      },
-      "id": "persist-staging-http",
-      "name": "Persist - Employee Staging",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        3760,
-        320
-      ],
-      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ (() => {\n        const persistRes = $input.first().json;\n        const dupRes = $('Validate - Citizen ID & Duplicate').first().json;\n        const reqData = $('Validate - Required Fields').first().json;\n        const cand = reqData.primary_candidate || {};\n        const stagedRecord = (persistRes.staged_results && persistRes.staged_results[0]) || {};\n        const val = dupRes.validation || {};\n        const merged = dupRes.merged_extracted || cand.merged_extracted || {};\n\n        const extractedProfile = {\n          full_name: merged.full_name || stagedRecord.full_name || \"\",\n          employee_code: stagedRecord.employee_code || merged.employee_id || \"\",\n          citizen_id: stagedRecord.citizen_id || merged.citizen_id || \"\",\n          date_of_birth: stagedRecord.date_of_birth || merged.date_of_birth || \"\",\n          gender: stagedRecord.gender || merged.gender || \"\",\n          ethnicity: merged.ethnicity || \"Kinh\",\n          place_of_origin: merged.place_of_origin || \"\",\n          permanent_address: merged.permanent_address || \"\",\n          current_address: merged.current_address || \"\",\n          company_id: stagedRecord.company_id || merged.company_id || reqData.company_id || \"STL\",\n          department: stagedRecord.department || merged.department_staffing_plan || \"\",\n          job_title: stagedRecord.job_title || merged.job_title || \"\",\n          employment_start_date: stagedRecord.employment_start_date || merged.employment_start_date || \"\",\n          recruitment_decision_no: stagedRecord.recruitment_decision_no || merged.recruitment_decision_no || \"\",\n          base_salary: stagedRecord.base_salary || merged.base_salary || \"\",\n          productivity_responsibility_pay: merged.productivity_responsibility_pay || \"\",\n          attendance_bonus: merged.attendance_bonus || \"\",\n          meal_allowance: merged.meal_allowance || \"\",\n          education_level: merged.education_level || \"\",\n          major: merged.major || \"\",\n          training_institution: merged.training_institution || \"\",\n          graduation_grade: merged.graduation_grade || \"\",\n          phone_number: stagedRecord.phone_number || merged.phone_number || \"\",\n          email: stagedRecord.email || merged.email || \"\"\n        };\n\n        const duplicateCheck = val.duplicate_check || {\n          is_duplicate: !!val.suspected_duplicate,\n          existing_employee: null,\n          diff: {},\n          duplicate_reason: val.duplicate_reason || null\n        };\n\n        const replyCard = persistRes.reply_card || \"\";\n\n        return JSON.stringify({\n          success: true,\n          batch_id: persistRes.batch_id || reqData.batch_id,\n          correlation_id: reqData.correlation_id,\n          file_name: stagedRecord.file_name || cand.combined_file_names,\n          company_id: stagedRecord.company_id || reqData.company_id,\n          staging_id: stagedRecord.id,\n          intake_mode: stagedRecord.intake_mode || val.intake_mode || \"new_profile\",\n          extracted_profile: extractedProfile,\n          duplicate_check: duplicateCheck,\n          metadata: dupRes.field_metadata || merged._metadata || {},\n          missing_fields: val.missing_fields || [],\n          uncertain_fields: val.uncertain_fields || [],\n          unreadable_fields: merged._unreadable_fields || [],\n          schema_metadata: dupRes.field_metadata || merged._schema_metadata || {},\n          staged_count: persistRes.staged_count || 1,\n          items: persistRes.staged_results || [stagedRecord],\n          staged_items: persistRes.staged_results || [stagedRecord],\n          reply: replyCard,\n          text: replyCard,\n          output: replyCard\n        });\n      })() }}",
+        "responseBody": "={{ (() => {\n    const res = $input.first().json;\n    const candResults = res.candidate_results || [];\n    const primaryCand = candResults[0] || {};\n    const replyCard = res.reply_card || \"\";\n\n    return JSON.stringify({\n      success: true,\n      batch_id: res.batch_id,\n      total_candidates: res.total_candidates || candResults.length,\n      staged_count: res.staged_count || 0,\n      insufficient_count: res.insufficient_count || 0,\n      duplicate_count: res.duplicate_count || 0,\n      failed_count: res.failed_count || 0,\n      candidate_results: candResults,\n      items: candResults,\n      staging_id: primaryCand.staging_id || null,\n      company_id: primaryCand.company_id || null,\n      intake_mode: (primaryCand.validation && primaryCand.validation.intake_mode) || primaryCand.status || \"new_profile\",\n      missing_fields: (primaryCand.validation && primaryCand.validation.missing_fields) || [],\n      uncertain_fields: (primaryCand.validation && primaryCand.validation.uncertain_fields) || [],\n      reply: replyCard,\n      text: replyCard,\n      output: replyCard,\n      idempotency_replayed: !!res.idempotency_replayed\n    });\n  })() }}",
         "options": {
           "responseCode": 200
         }
@@ -863,8 +592,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        3980,
-        320
+        3680,
+        208
       ]
     },
     {
@@ -892,14 +621,167 @@
         }
       },
       "id": "err-recovery-audit",
-      "name": "Error - Recovery & Audit Logging",
+      "name": "Audit - Log Intake Error",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2500,
-        80
+        2352,
+        560
       ],
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: \"400 Bad Request: Unsupported or missing lifecycle event_type. Supported types: HR_UPLOAD, HR_APPROVAL, HR_RETRY_SYNC.\" }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "respond-invalid-event",
+      "name": "Respond 400 - Invalid Event Type",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-ocr-valid",
+              "leftValue": "={{ $json.all_ocr_failed !== true && Array.isArray($json.processed_files) && $json.processed_files.some(f => f.ocrStatus === 'success') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-ocr-valid",
+      "name": "IF OCR Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3024,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ (() => { const err = $json.error || '502 Bad Gateway: Không thể nhận diện nội dung văn bản từ tài liệu OCR (Gemini Extraction Failed).'; return JSON.stringify({ success: false, error: err }); })() }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "id": "respond-ocr-err",
+      "name": "Respond OCR Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        3024,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://hr-auth:3000/api/hoso/intake/internal/process-staged-candidate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-internal-secret",
+              "value": "8973d464f5f1475b83d6ab88d222d824"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"batch_id\": \"{{ $json.batch_id }}\",\n  \"correlation_id\": \"{{ $json.correlation_id }}\",\n  \"idempotency_key\": \"{{ $json.idempotency_key }}\",\n  \"conversation_id\": \"{{ $json.conversation_id }}\",\n  \"company_id\": \"{{ $json.company_id }}\",\n  \"user\": {{ JSON.stringify($json.user) }},\n  \"files\": {{ JSON.stringify($json.processed_files) }}\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "ingestion-process-candidate",
+      "name": "Ingestion - Process Staged Candidate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3200,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-ingestion-valid",
+              "leftValue": "={{ $json.success === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-ingestion-valid",
+      "name": "IF Ingestion Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3440,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error || \"500 Internal Server Error: Lỗi xử lý tiếp nhận hồ sơ tại Backend.\" }) }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "respond-ingestion-err",
+      "name": "Respond Ingestion Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        3680,
+        384
+      ]
     }
   ],
   "connections": {
@@ -937,61 +819,6 @@
       ]
     },
     "Trigger HR_RETRY_SYNC": {
-      "main": [
-        [
-          {
-            "node": "Authorize & Normalize Event",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Alias hr-intake-batch": {
-      "main": [
-        [
-          {
-            "node": "Authorize & Normalize Event",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Alias hr-approval-callback": {
-      "main": [
-        [
-          {
-            "node": "Authorize & Normalize Event",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Alias hr-sequential-sync": {
-      "main": [
-        [
-          {
-            "node": "Authorize & Normalize Event",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Alias hr-sync-retry": {
-      "main": [
-        [
-          {
-            "node": "Authorize & Normalize Event",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Schedule HR_RECOVERY": {
       "main": [
         [
           {
@@ -1100,29 +927,7 @@
         ],
         [
           {
-            "node": "Recovery - Scan Failed Sync",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Recovery - Scan Failed Sync": {
-      "main": [
-        [
-          {
-            "node": "Recovery - Audit Recovery Scan",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Recovery - Audit Recovery Scan": {
-      "main": [
-        [
-          {
-            "node": "Recovery - Respond Status",
+            "node": "Respond 400 - Invalid Event Type",
             "type": "main",
             "index": 0
           }
@@ -1224,62 +1029,7 @@
       "main": [
         [
           {
-            "node": "OCR - Parse & Fallback",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "OCR - Parse & Fallback": {
-      "main": [
-        [
-          {
-            "node": "Normalize - Canonical Employee Fields",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Normalize - Canonical Employee Fields": {
-      "main": [
-        [
-          {
-            "node": "Validate - Required Fields",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Validate - Required Fields": {
-      "main": [
-        [
-          {
-            "node": "Validate - Citizen ID & Duplicate",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Validate - Citizen ID & Duplicate": {
-      "main": [
-        [
-          {
-            "node": "Persist - Employee Staging",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Persist - Employee Staging": {
-      "main": [
-        [
-          {
-            "node": "Respond - Upload Result",
+            "node": "OCR - Parse JSON & Error Handling",
             "type": "main",
             "index": 0
           }
@@ -1290,7 +1040,7 @@
       "main": [
         [
           {
-            "node": "Error - Recovery & Audit Logging",
+            "node": "Audit - Log Intake Error",
             "type": "main",
             "index": 0
           }
@@ -1301,7 +1051,87 @@
       "main": [
         [
           {
-            "node": "Error - Recovery & Audit Logging",
+            "node": "Audit - Log Intake Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF OCR Valid?": {
+      "main": [
+        [
+          {
+            "node": "Ingestion - Process Staged Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond OCR Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond OCR Error": {
+      "main": [
+        [
+          {
+            "node": "Audit - Log Intake Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OCR - Parse JSON & Error Handling": {
+      "main": [
+        [
+          {
+            "node": "IF OCR Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingestion - Process Staged Candidate": {
+      "main": [
+        [
+          {
+            "node": "IF Ingestion Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Ingestion Valid?": {
+      "main": [
+        [
+          {
+            "node": "Respond - Upload Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Ingestion Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond Ingestion Error": {
+      "main": [
+        [
+          {
+            "node": "Audit - Log Intake Error",
             "type": "main",
             "index": 0
           }
@@ -1310,9 +1140,7 @@
     }
   },
   "settings": {
-    "executionOrder": "v1",
-    "binaryMode": "separate"
+    "executionOrder": "v1"
   },
-  "nodeGroups": [],
   "meta": {}
 }

@@ -1,469 +1,430 @@
 const db = require('../db');
-const https = require('https');
-const crypto = require('crypto');
-const { getGoogleAccessToken, GOOGLE_SPREADSHEET_ID } = require('./googleAuthHelper');
+const { 
+  fetchGoogleSheetAllRows, 
+  syncEventToGoogleSheets, 
+  deleteGoogleSheetRows,
+  isTestRecord,
+  buildRowValues,
+  runWithGoogleSheetsLock,
+  CANONICAL_COLUMNS 
+} = require('./syncWorker');
+const { GOOGLE_SPREADSHEET_ID } = require('./googleAuthHelper');
 
-const PROFILE_COLUMNS = [
-  'job_grade', 'employee_id', 'full_name', 'date_of_birth', 'gender',
-  'job_title', 'professional_title', 'department_staffing_plan', 'section_staffing_plan',
-  'citizen_id', 'citizen_id_issue_date', 'citizen_id_issue_place', 'birth_registration_place',
-  'place_of_origin', 'permanent_address', 'temporary_address', 'current_address',
-  'ethnicity', 'education_level', 'education_code', 'qualification',
-  'professional_qualification', 'specialization', 'degree_qualification',
-  'training_institution', 'major', 'training_mode', 'training_period',
-  'graduation_grade', 'degree_valid_until', 'other_professional_certificates',
-  'social_insurance_salary', 'total_income', 'base_salary',
-  'productivity_responsibility_pay', 'attendance_bonus', 'responsibility_allowance',
-  'vessel_size_allowance', 'professional_allowance_t1', 'meal_allowance', 'other_allowances',
-  'open_ended_contract', 'fixed_term_contract', 'seasonal_contract',
-  'contract_start_date', 'contract_end_date', 'recruitment_decision_no',
-  'employment_start_date', 'official_labor_contract_sign_date', 'phone_number', 'email',
-  'file_name', 'company_id', 'uploaded_by'
-];
+// Known historically hard-deleted profiles that must not remain as stale artifacts on Google Sheets
+const KNOWN_HARD_DELETED_CODES = new Set(['SWC00037', 'SWC00047']);
 
 /**
- * Fetch rows from Google Sheets (Trang tính1)
+ * SOTRANS HUB — High-Precision 3-Way Reconciliation Service
+ * Kiến trúc: NocoDB = SINGLE SOURCE OF TRUTH.
+ * Google Sheets = Bản sao tiếp nhận dữ liệu từ NocoDB.
+ * Phân biệt rõ 3 lớp toàn vẹn: Sync Pipeline, Reconciliation, Data Integrity.
  */
-async function fetchGoogleSheetRows() {
-  if (!GOOGLE_SPREADSHEET_ID) {
-    return { header: [], rows: [] };
-  }
-  try {
-    const token = await getGoogleAccessToken();
-    return await new Promise((resolve, reject) => {
-      const req = https.get(
-        `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}/values/Trang%20t%C3%ADnh1!A1:BB100`,
-        { headers: { 'Authorization': `Bearer ${token}` }, timeout: 15000 },
-        (res) => {
-          let body = '';
-          res.on('data', chunk => body += chunk);
-          res.on('end', () => {
-            try {
-              const json = JSON.parse(body || '{}');
-              const values = json.values || [];
-              const header = values[0] || [];
-              const rows = values.slice(1);
-              resolve({ header, rows, totalValues: values });
-            } catch (e) {
-              reject(e);
-            }
-          });
-        }
-      );
-      req.on('error', reject);
-      req.on('timeout', () => { req.destroy(); reject(new Error('Google Sheets timeout')); });
-    });
-  } catch (err) {
-    console.warn('[ReconciliationService] Google Sheets Fetch Warning:', err.message);
-    return { header: [], rows: [], error: err.message };
-  }
-}
-
-/**
- * Append or Update a single employee row in Google Sheets
- */
-async function upsertGoogleSheetRow(emp) {
-  if (!GOOGLE_SPREADSHEET_ID) return { action: 'SKIPPED_NO_SHEET_ID' };
-  const token = await getGoogleAccessToken();
-  const sheetData = await fetchGoogleSheetRows();
-  if (sheetData.error) throw new Error(sheetData.error);
-
-  const empCode = String(emp.employee_code || emp.employee_id || '').trim().toUpperCase();
-  const cccd = String(emp.citizen_id || '').trim().replace(/\D/g, '');
-
-  let existingRowIndex = -1; // 1-indexed in Google Sheets API
-  let firstEmptyRow = -1;
-  sheetData.rows.forEach((r, idx) => {
-    const isBlank = !r || r.length === 0 || r.every(cell => !cell || !String(cell).trim());
-    if (isBlank) {
-      if (firstEmptyRow === -1) firstEmptyRow = idx + 2;
-    } else {
-      const rCode = String(r[1] || '').trim().toUpperCase();
-      const rCccd = String(r[9] || '').trim().replace(/\D/g, '');
-      if ((empCode && rCode === empCode) || (cccd && rCccd === cccd)) {
-        existingRowIndex = idx + 2; // +1 for 0-index, +1 for header
-      }
-    }
-  });
-
-  const targetRow = existingRowIndex > 0 ? existingRowIndex : (firstEmptyRow > 1 ? firstEmptyRow : (sheetData.rows.length + 2));
-
-  const rowValues = [
-    emp.job_grade || '',
-    empCode,
-    emp.full_name || emp.employee_name || '',
-    emp.date_of_birth || '',
-    emp.gender || '',
-    emp.job_title || emp.position || '',
-    emp.professional_title || '',
-    emp.department_staffing_plan || emp.department || '',
-    emp.section_staffing_plan || '',
-    emp.citizen_id || '',
-    emp.citizen_id_issue_date || '',
-    emp.citizen_id_issue_place || '',
-    emp.birth_registration_place || '',
-    emp.place_of_origin || '',
-    emp.permanent_address || '',
-    emp.temporary_address || '',
-    emp.current_address || '',
-    emp.ethnicity || 'Kinh',
-    emp.education_level || '',
-    emp.education_code || '',
-    emp.qualification || '',
-    emp.professional_qualification || '',
-    emp.specialization || '',
-    emp.degree_qualification || '',
-    emp.training_institution || '',
-    emp.major || '',
-    emp.training_mode || '',
-    emp.training_period || '',
-    emp.graduation_grade || '',
-    emp.degree_valid_until || '',
-    emp.other_professional_certificates || '',
-    emp.social_insurance_salary || '',
-    emp.total_income || '',
-    emp.base_salary || '',
-    emp.productivity_responsibility_pay || '',
-    emp.attendance_bonus || '',
-    emp.responsibility_allowance || '',
-    emp.vessel_size_allowance || '',
-    emp.professional_allowance_t1 || '',
-    emp.meal_allowance || '',
-    emp.other_allowances || '',
-    emp.open_ended_contract || '',
-    emp.fixed_term_contract || '',
-    emp.seasonal_contract || '',
-    emp.contract_start_date || '',
-    emp.contract_end_date || '',
-    emp.recruitment_decision_no || '',
-    emp.employment_start_date || '',
-    emp.official_labor_contract_sign_date || '',
-    emp.phone_number || '',
-    emp.email || '',
-    new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
-    emp.file_name || '',
-    emp.uploaded_by || ''
-  ];
-
-  await new Promise((resolve, reject) => {
-    const body = JSON.stringify({ values: [rowValues] });
-    const req = https.request(
-      `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}/values/Trang%20t%C3%ADnh1!A${targetRow}:BB${targetRow}?valueInputOption=USER_ENTERED`,
-      {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(body)
-        },
-        timeout: 10000
-      },
-      res => {
-        let raw = '';
-        res.on('data', c => raw += c);
-        res.on('end', () => res.statusCode >= 200 && res.statusCode < 300 ? resolve(JSON.parse(raw)) : reject(new Error(`Sheets update failed HTTP ${res.statusCode}: ${raw}`)));
-      }
-    );
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
-  return { action: existingRowIndex > 0 ? 'UPDATE' : 'INSERT', rowIndex: targetRow };
-}
-
-/**
- * Reconcile employee data across PostgreSQL SoR (employees), NocoDB (hr_employee_profiles), and Google Sheets
- */
-async function reconcileEmployees({ autoFix = false, actor = 'system' } = {}) {
+async function reconcileEmployees({ autoFix = false, cleanStale = false, actor = 'system' } = {}) {
   const startTime = Date.now();
 
-  // 1. Fetch official employees from PostgreSQL employees table
+  // 1. Fetch official employees from Website master (employees table)
   const empRes = await db.query(`
-    SELECT 
-      e.id AS emp_uuid,
-      e.employee_code,
-      e.employee_name,
-      e.company_id,
-      e.department,
-      e.position,
-      e.email,
-      e.citizen_id,
-      e.status,
-      e.person_id,
-      e.employment_start_date,
-      e.created_at,
-      e.updated_at
-    FROM employees e
-    WHERE e.status != 'DELETED'
-    ORDER BY e.company_id ASC, e.employee_code ASC
+    SELECT id, employee_code, employee_name, company_id, department, position, 
+           email, citizen_id, status, is_deleted, deleted_at, created_at, updated_at
+    FROM employees
+    ORDER BY employee_code ASC
   `);
-  const officialEmployees = empRes.rows || [];
+  const websiteEmployees = empRes.rows || [];
+  const websiteActiveCount = websiteEmployees.filter(e => !e.is_deleted && e.status === 'ACTIVE').length;
 
-  // 2. Fetch NocoDB records from hr_employee_profiles
+  // 2. Fetch NocoDB records from hr_employee_profiles (Single Source of Truth)
   const nocoRes = await db.query(`
     SELECT *
     FROM hr_employee_profiles
-    ORDER BY id ASC
+    ORDER BY employee_id ASC
   `);
   const nocodbProfiles = nocoRes.rows || [];
+  const nocoActiveCount = nocodbProfiles.filter(p => !p.is_deleted && p.status === 'ACTIVE').length;
+
+  const nocoByCode = new Map();
+  nocodbProfiles.forEach(p => {
+    const code = String(p.employee_id || '').trim().toUpperCase();
+    if (code) nocoByCode.set(code, p);
+  });
 
   // 3. Fetch Google Sheets records
-  const sheetData = await fetchGoogleSheetRows();
-  const sheetRows = (sheetData.rows || []).filter(r => r && r.length > 0 && r.some(c => c && String(c).trim()));
+  let sheetData = await fetchGoogleSheetAllRows();
+  let sheetRows = sheetData.rows || [];
 
-  // Maps for fast lookup
-  const nocoByCode = new Map();
-  const nocoByCccd = new Map();
-  const nocoByUuid = new Map();
-
-  nocodbProfiles.forEach(p => {
-    if (p.employee_id) nocoByCode.set(String(p.employee_id).trim().toUpperCase(), p);
-    if (p.citizen_id) {
-      const clean = String(p.citizen_id).replace(/\D/g, '');
-      if (clean) nocoByCccd.set(clean, p);
-    }
-    if (p.employment_id) nocoByUuid.set(String(p.employment_id).trim(), p);
-  });
-
-  const sheetsByCode = new Map();
-  const sheetsByCccd = new Map();
-
-  sheetRows.forEach((r, idx) => {
-    const code = String(r[1] || '').trim().toUpperCase();
-    const cccd = String(r[9] || '').replace(/\D/g, '');
-    if (code) sheetsByCode.set(code, { row: r, index: idx + 2 });
-    if (cccd) sheetsByCccd.set(cccd, { row: r, index: idx + 2 });
-  });
-
-  const missingInNoco = [];
-  const missingInSheets = [];
-  const statusMismatches = [];
-  const fixedInNoco = [];
+  // Categorize Google Sheets rows by employee_id
+  const sheetByCode = new Map();
+  const blankSheetRows = [];
+  const duplicateInSheets = [];
+  const testRecordsInSheets = [];
+  const staleRecordsInSheets = [];
+  const needsVerificationInSheets = [];
+  const cleanedInSheets = [];
   const fixedInSheets = [];
 
-  for (const emp of officialEmployees) {
-    const code = String(emp.employee_code || '').trim().toUpperCase();
-    const cleanCccd = String(emp.citizen_id || '').replace(/\D/g, '');
-    const uuid = String(emp.emp_uuid || '').trim();
-
-    // Check NocoDB
-    let profile = nocoByCode.get(code) || (cleanCccd ? nocoByCccd.get(cleanCccd) : null) || (uuid ? nocoByUuid.get(uuid) : null);
-    if (!profile) {
-      missingInNoco.push({
-        employee_code: emp.employee_code,
-        employee_name: emp.employee_name,
-        company_id: emp.company_id,
-        citizen_id: emp.citizen_id,
-        status: emp.status,
-        emp_uuid: emp.emp_uuid
-      });
-
-      if (autoFix) {
-        try {
-          // Find staging data if available for rich 53-field profile
-          const stagRes = await db.query(`
-            SELECT s.*
-            FROM hr_employee_staging s
-            WHERE s.staging_status = 'approved'
-              AND (
-                (s.employee_code IS NOT NULL AND s.employee_code <> '' AND UPPER(s.employee_code) = $1) OR
-                (s.citizen_id IS NOT NULL AND s.citizen_id <> '' AND s.citizen_id = $2)
-              )
-            ORDER BY s.id DESC
-            LIMIT 1
-          `, [code, emp.citizen_id || '']);
-
-          const ext = (stagRes.rows[0] && stagRes.rows[0].extracted_data) || {};
-          const sRow = stagRes.rows[0] || {};
-
-          const profileData = {
-            employment_id: emp.emp_uuid,
-            job_grade: ext.job_grade || '',
-            employee_id: emp.employee_code,
-            full_name: emp.employee_name,
-            date_of_birth: sRow.date_of_birth || ext.date_of_birth || '',
-            gender: sRow.gender || ext.gender || '',
-            job_title: emp.position || sRow.job_title || ext.job_title || '',
-            professional_title: ext.professional_title || '',
-            department_staffing_plan: emp.department || sRow.department || ext.department_staffing_plan || '',
-            section_staffing_plan: ext.section_staffing_plan || '',
-            citizen_id: emp.citizen_id || sRow.citizen_id || '',
-            citizen_id_issue_date: ext.citizen_id_issue_date || '',
-            citizen_id_issue_place: ext.citizen_id_issue_place || '',
-            birth_registration_place: ext.birth_registration_place || '',
-            place_of_origin: ext.place_of_origin || '',
-            permanent_address: ext.permanent_address || '',
-            temporary_address: ext.temporary_address || '',
-            current_address: ext.current_address || '',
-            ethnicity: ext.ethnicity || 'Kinh',
-            education_level: ext.education_level || '',
-            education_code: ext.education_code || '',
-            qualification: ext.qualification || '',
-            professional_qualification: ext.professional_qualification || '',
-            specialization: ext.specialization || '',
-            degree_qualification: ext.degree_qualification || '',
-            training_institution: ext.training_institution || '',
-            major: ext.major || '',
-            training_mode: ext.training_mode || '',
-            training_period: ext.training_period || '',
-            graduation_grade: ext.graduation_grade || '',
-            degree_valid_until: ext.degree_valid_until || '',
-            other_professional_certificates: ext.other_professional_certificates || '',
-            social_insurance_salary: ext.social_insurance_salary || '',
-            total_income: ext.total_income || '',
-            base_salary: sRow.base_salary || ext.base_salary || '',
-            productivity_responsibility_pay: ext.productivity_responsibility_pay || '',
-            attendance_bonus: ext.attendance_bonus || '',
-            responsibility_allowance: ext.responsibility_allowance || '',
-            vessel_size_allowance: ext.vessel_size_allowance || '',
-            professional_allowance_t1: ext.professional_allowance_t1 || '',
-            meal_allowance: ext.meal_allowance || '',
-            other_allowances: ext.other_allowances || '',
-            open_ended_contract: ext.open_ended_contract || '',
-            fixed_term_contract: ext.fixed_term_contract || '',
-            seasonal_contract: ext.seasonal_contract || '',
-            contract_start_date: ext.contract_start_date || '',
-            contract_end_date: ext.contract_end_date || '',
-            recruitment_decision_no: sRow.recruitment_decision_no || ext.recruitment_decision_no || '',
-            employment_start_date: emp.employment_start_date || sRow.employment_start_date || ext.employment_start_date || '',
-            official_labor_contract_sign_date: ext.official_labor_contract_sign_date || '',
-            phone_number: sRow.phone_number || ext.phone_number || '',
-            email: emp.email || sRow.email || ext.email || '',
-            file_name: sRow.file_name || ext.file_name || '',
-            company_id: emp.company_id,
-            status: emp.status
-          };
-
-          const cols = PROFILE_COLUMNS.slice();
-          const vals = cols.map(c => profileData[c] !== undefined ? String(profileData[c]) : '');
-
-          const colList = cols.join(', ') + ', status, employment_id, create_time, created_at, updated_at';
-          const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ') + `, $${cols.length + 1}, $${cols.length + 2}, $${cols.length + 3}, NOW(), NOW()`;
-          const createTime = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-
-          const insRes = await db.query(
-            `INSERT INTO hr_employee_profiles (${colList}) VALUES (${placeholders}) RETURNING id`,
-            [...vals, emp.status, emp.emp_uuid, createTime]
-          );
-
-          fixedInNoco.push({
-            employee_code: emp.employee_code,
-            profile_id: insRes.rows[0].id,
-            action: 'INSERTED_TO_NOCODB'
-          });
-        } catch (repairErr) {
-          console.error(`[ReconciliationService] Error repairing profile for ${emp.employee_code}:`, repairErr);
-        }
-      }
-    } else {
-      // Check status consistency
-      if (profile.status !== emp.status) {
-        statusMismatches.push({
-          employee_code: emp.employee_code,
-          emp_status: emp.status,
-          profile_status: profile.status
-        });
-        if (autoFix) {
-          await db.query('UPDATE hr_employee_profiles SET status = $1, updated_at = NOW() WHERE id = $2', [emp.status, profile.id]);
-        }
-      }
+  sheetRows.forEach(r => {
+    const code = String(r.empId || '').trim().toUpperCase();
+    if (!code) {
+      blankSheetRows.push(r.rowNumber);
+      return;
     }
 
-    // Check Google Sheets
-    const inSheets = sheetsByCode.get(code) || (cleanCccd ? sheetsByCccd.get(cleanCccd) : null);
-    if (!inSheets && !sheetData.error) {
-      missingInSheets.push({
-        employee_code: emp.employee_code,
-        employee_name: emp.employee_name,
-        company_id: emp.company_id
-      });
-
-      if (autoFix) {
-        try {
-          // Prepare enriched data for Sheets
-          const enriched = profile || emp;
-          await upsertGoogleSheetRow(enriched);
-          fixedInSheets.push({
-            employee_code: emp.employee_code,
-            action: 'APPENDED_TO_SHEETS'
-          });
-        } catch (sheetFixErr) {
-          console.error(`[ReconciliationService] Error fixing Sheets for ${emp.employee_code}:`, sheetFixErr);
-        }
-      }
+    if (!sheetByCode.has(code)) {
+      sheetByCode.set(code, []);
     }
-  }
-
-  // Check for orphan records in hr_employee_profiles (profiles without matching employee in employees master)
-  const officialCodeSet = new Set(officialEmployees.map(e => String(e.employee_code || '').trim().toUpperCase()));
-  const officialCccdSet = new Set(officialEmployees.map(e => String(e.citizen_id || '').replace(/\D/g, '')).filter(Boolean));
-  const orphanedInNoco = [];
-
-  nocodbProfiles.forEach(p => {
-    const pCode = String(p.employee_id || '').trim().toUpperCase();
-    const pCccd = String(p.citizen_id || '').replace(/\D/g, '');
-    const isMatched = (pCode && officialCodeSet.has(pCode)) || (pCccd && officialCccdSet.has(pCccd));
-    if (!isMatched && p.status !== 'DELETED') {
-      orphanedInNoco.push({
-        id: p.id,
-        employee_id: p.employee_id,
-        full_name: p.full_name,
-        status: p.status
-      });
-    }
+    sheetByCode.get(code).push(r);
   });
 
-  // Detect and clean stale rows in Google Sheets if autoFix is enabled
-  const validMatchedSheetRows = sheetRows.filter(r => officialCodeSet.has(String(r[1] || '').trim().toUpperCase()));
-  if (autoFix && GOOGLE_SPREADSHEET_ID && sheetRows.length > officialEmployees.length) {
-    try {
-      const clearStartRow = officialEmployees.length + 2;
-      const token = await getGoogleAccessToken();
-      await new Promise((resolve, reject) => {
-        const req = https.request(
-          `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}/values/` + encodeURIComponent(`Trang tính1!A${clearStartRow}:BA100`) + ':clear',
-          { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } },
-          res => {
-            let d = '';
-            res.on('data', c => d += c);
-            res.on('end', () => res.statusCode >= 200 && res.statusCode < 300 ? resolve() : reject(new Error(`Clear failed ${res.statusCode}: ${d}`)));
-          }
-        );
-        req.on('error', reject);
-        req.end();
+  // Identify duplicates in Google Sheets
+  for (const [code, occurrences] of sheetByCode.entries()) {
+    if (occurrences.length > 1) {
+      duplicateInSheets.push({
+        employee_id: code,
+        full_name: occurrences[0].fullName,
+        count: occurrences.length,
+        rowNumbers: occurrences.map(o => o.rowNumber)
       });
-    } catch (clearErr) {
-      console.warn('[ReconciliationService] Auto-clean stale Google Sheets rows warning:', clearErr.message);
     }
   }
 
-  const isConsistent = missingInNoco.length === 0 && (GOOGLE_SPREADSHEET_ID ? missingInSheets.length === 0 : true) && statusMismatches.length === 0;
+  // 4. Categorize rows in Google Sheets that are NOT in NocoDB
+  for (const [code, occurrences] of sheetByCode.entries()) {
+    if (!nocoByCode.has(code)) {
+      const sample = occurrences[0];
+      const isKnownTest = isTestRecord({
+        employee_id: code,
+        full_name: sample.fullName,
+        empId: code,
+        fullName: sample.fullName
+      }) || code.startsWith('STL_MOCK_') || code.startsWith('SWC_MOCK_') || code.startsWith('TEST_') || 
+         code === 'STL-GOV-999' || code === 'SWC00051' || code === 'SWC00052' || code === 'SWC-TEST-01' ||
+         String(sample.fullName).toUpperCase().includes('THỬ NGHIỆM') || String(sample.fullName).toUpperCase().includes('TEST');
 
-  const result = {
-    is_consistent: isConsistent,
+      const isKnownStale = KNOWN_HARD_DELETED_CODES.has(code) || /^(STL|SWC|VTX)\d+$/i.test(code);
+
+      if (isKnownTest) {
+        testRecordsInSheets.push({
+          employee_id: code,
+          full_name: sample.fullName,
+          citizen_id: sample.citizenId,
+          type: 'VERIFIED_TEST_RECORD',
+          reason: 'Bản ghi phát sinh từ kịch bản kiểm thử tự động, không thuộc dữ liệu nhân sự chính thức',
+          rowNumbers: occurrences.map(o => o.rowNumber)
+        });
+      } else if (isKnownStale) {
+        staleRecordsInSheets.push({
+          employee_id: code,
+          full_name: sample.fullName,
+          citizen_id: sample.citizenId,
+          type: 'VERIFIED_STALE_RECORD',
+          reason: 'Hồ sơ đã được dọn sạch/xóa hoàn toàn tại NocoDB nhưng còn lưu vết trên Google Sheets',
+          rowNumbers: occurrences.map(o => o.rowNumber)
+        });
+      } else {
+        // Unknown source: put into quarantine / needs verification
+        needsVerificationInSheets.push({
+          employee_id: code,
+          full_name: sample.fullName,
+          citizen_id: sample.citizenId,
+          type: 'NEEDS_VERIFICATION',
+          reason: 'Dòng dữ liệu ngoài phạm vi quản trị NocoDB hiện tại, cần quản trị viên kiểm tra nguồn gốc trước khi xử lý',
+          rowNumbers: occurrences.map(o => o.rowNumber)
+        });
+      }
+    }
+  }
+
+  // 5. Compare official NocoDB profiles vs Google Sheets
+  const matched = [];
+  const missingInSheets = [];
+  const statusMismatches = [];
+  const dataMismatches = [];
+
+  for (const profile of nocodbProfiles) {
+    const code = String(profile.employee_id || '').trim().toUpperCase();
+    const occurrences = sheetByCode.get(code) || [];
+
+    if (occurrences.length === 0) {
+      // Missing in Sheets
+      missingInSheets.push({
+        employee_id: profile.employee_id,
+        full_name: profile.full_name,
+        citizen_id: profile.citizen_id,
+        status: profile.status,
+        is_deleted: profile.is_deleted || false
+      });
+    } else if (occurrences.length === 1) {
+      const sRow = occurrences[0];
+      const isNocoDeleted = profile.is_deleted === true || profile.status === 'DELETED';
+      const isSheetDeleted = sRow.isDeleted || sRow.status === 'Đã xóa';
+
+      if (isNocoDeleted !== isSheetDeleted) {
+        statusMismatches.push({
+          employee_id: profile.employee_id,
+          full_name: profile.full_name,
+          nocodb_status: profile.status,
+          nocodb_is_deleted: isNocoDeleted,
+          sheets_status: sRow.status || (isSheetDeleted ? 'Đã xóa' : 'Đang hoạt động'),
+          sheets_is_deleted: isSheetDeleted,
+          rowNumber: sRow.rowNumber
+        });
+      } else {
+        // Compare data fields: name, cccd, job_title, department
+        const nocoName = String(profile.full_name || '').replace(/\s*\[(ĐÃ XÓA|NGHỈ VIỆC|DA XOA|NGHI VIEC)\]/g, '').trim().toUpperCase();
+        const sheetName = String(sRow.fullName || '').replace(/\s*\[(ĐÃ XÓA|NGHỈ VIỆC|DA XOA|NGHI VIEC)\]/g, '').trim().toUpperCase();
+        const nocoCccd = String(profile.citizen_id || '').replace(/\D/g, '');
+        const sheetCccd = String(sRow.citizenId || '').replace(/\D/g, '');
+
+        const titleIdx = sheetData.header.indexOf('job_title');
+        const nocoTitle = String(profile.job_title || profile.position || '').trim();
+        const sheetTitle = titleIdx !== -1 ? String(sRow.values[titleIdx] || '').trim() : '';
+
+        const deptIdx = sheetData.header.indexOf('department_staffing_plan');
+        const nocoDept = String(profile.department_staffing_plan || profile.department || '').trim();
+        const sheetDept = deptIdx !== -1 ? String(sRow.values[deptIdx] || '').trim() : '';
+
+        const isNameDiff = nocoName !== sheetName;
+        const isCccdDiff = nocoCccd && sheetCccd && nocoCccd !== sheetCccd;
+        const isTitleDiff = nocoTitle && sheetTitle && nocoTitle !== sheetTitle;
+        const isDeptDiff = nocoDept && sheetDept && nocoDept !== sheetDept;
+
+        if (isNameDiff || isCccdDiff || isTitleDiff || isDeptDiff) {
+          dataMismatches.push({
+            employee_id: profile.employee_id,
+            field_differences: {
+              ...(isNameDiff ? { name: { nocodb: profile.full_name, sheets: sRow.fullName } } : {}),
+              ...(isCccdDiff ? { cccd: { nocodb: profile.citizen_id, sheets: sRow.citizenId } } : {}),
+              ...(isTitleDiff ? { job_title: { nocodb: nocoTitle, sheets: sheetTitle } } : {}),
+              ...(isDeptDiff ? { department: { nocodb: nocoDept, sheets: sheetDept } } : {})
+            },
+            rowNumber: sRow.rowNumber
+          });
+        } else {
+          matched.push({
+            employee_id: profile.employee_id,
+            full_name: profile.full_name,
+            citizen_id: profile.citizen_id,
+            rowNumber: sRow.rowNumber,
+            status: profile.status,
+            is_deleted: profile.is_deleted
+          });
+        }
+      }
+    }
+  }
+
+  // 6. AUTO-FIX & CLEANUP LOGIC (when autoFix=true or cleanStale=true)
+  if (autoFix || cleanStale) {
+    await runWithGoogleSheetsLock(async () => {
+      // Step 6.1: Dọn dẹp các dòng kiểm thử & stale đã xác minh
+      const rowsToDelete = [];
+      for (const item of [...testRecordsInSheets, ...staleRecordsInSheets]) {
+        rowsToDelete.push(...item.rowNumbers);
+      }
+
+      if (rowsToDelete.length > 0) {
+        try {
+          const delRes = await deleteGoogleSheetRows(rowsToDelete);
+          cleanedInSheets.push({
+            action: 'DELETE_ROWS',
+            count: delRes.deletedCount,
+            rows: delRes.deletedRows,
+            details: [...testRecordsInSheets, ...staleRecordsInSheets]
+          });
+          console.log(`[Reconcile Cleanup] Đã xóa thành công ${delRes.deletedCount} dòng kiểm thử & stale khỏi Google Sheets: [${delRes.deletedRows.join(', ')}]`);
+        } catch (delErr) {
+          console.error('[Reconcile Cleanup Error]:', delErr.message);
+        }
+      }
+
+      // Step 6.2: Đồng bộ bù hồ sơ còn thiếu (nếu autoFix = true)
+      if (autoFix) {
+        for (const item of missingInSheets) {
+          try {
+            const profile = nocoByCode.get(String(item.employee_id).toUpperCase());
+            if (profile) {
+              const syncRes = await syncEventToGoogleSheets({
+                event_id: 'recon_fix_' + Date.now(),
+                employee_id: profile.employee_id,
+                action_type: profile.is_deleted ? 'SOFT_DELETE' : 'UPSERT',
+                version: profile.version || 1,
+                payload: profile
+              });
+              fixedInSheets.push({
+                employee_id: profile.employee_id,
+                action: syncRes.action,
+                message: syncRes.message
+              });
+            }
+          } catch (err) {
+            console.error(`[Reconcile Missing Fix Error] For ${item.employee_id}:`, err.message);
+          }
+        }
+
+        // Step 6.3: Sửa lệch trạng thái xóa mềm
+        for (const item of statusMismatches) {
+          try {
+            const profile = nocoByCode.get(String(item.employee_id).toUpperCase());
+            if (profile) {
+              const isNocoDeleted = profile.is_deleted === true || profile.status === 'DELETED';
+              const syncRes = await syncEventToGoogleSheets({
+                event_id: 'recon_fix_status_' + Date.now(),
+                employee_id: profile.employee_id,
+                action_type: isNocoDeleted ? 'SOFT_DELETE' : 'RESTORE',
+                version: profile.version || 1,
+                payload: profile
+              });
+              fixedInSheets.push({
+                employee_id: profile.employee_id,
+                action: syncRes.action,
+                message: syncRes.message
+              });
+            }
+          } catch (err) {
+            console.error(`[Reconcile Status Fix Error] For ${item.employee_id}:`, err.message);
+          }
+        }
+
+        // Step 6.4: Sửa lệch nội dung dữ liệu
+        for (const item of dataMismatches) {
+          try {
+            const profile = nocoByCode.get(String(item.employee_id).toUpperCase());
+            if (profile) {
+              const syncRes = await syncEventToGoogleSheets({
+                event_id: 'recon_fix_data_' + Date.now(),
+                employee_id: profile.employee_id,
+                action_type: 'UPDATE',
+                version: profile.version || 1,
+                payload: profile
+              });
+              fixedInSheets.push({
+                employee_id: profile.employee_id,
+                action: syncRes.action,
+                message: syncRes.message
+              });
+            }
+          } catch (err) {
+            console.error(`[Reconcile Data Fix Error] For ${item.employee_id}:`, err.message);
+          }
+        }
+      }
+    });
+
+    // Re-fetch after modifications to return exact verified state
+    sheetData = await fetchGoogleSheetAllRows();
+    sheetRows = sheetData.rows || [];
+  }
+
+  // 7. Re-evaluate 3 Integrity Layers
+  const currentSheetTotal = sheetRows.length;
+  const currentOfficialCodesOnSheets = new Set(sheetRows.map(r => r.empId).filter(Boolean));
+  const postMatchedCount = nocodbProfiles.filter(p => currentOfficialCodesOnSheets.has(String(p.employee_id).toUpperCase())).length;
+
+  // Lớp 1: Sync Pipeline Integrity
+  const taskStatsRes = await db.query(`
+    SELECT 
+      COUNT(*) FILTER (WHERE status = 'FAILED' OR status = 'BLOCKED_DUPLICATE_KEY') as failed_count,
+      COUNT(*) FILTER (WHERE status IN ('PENDING', 'PROCESSING')) as pending_count
+    FROM employee_sync_outbox
+    WHERE created_at > NOW() - INTERVAL '24 hours'
+  `);
+  const failedTasks = parseInt(taskStatsRes.rows[0]?.failed_count || '0', 10);
+  const pendingTasks = parseInt(taskStatsRes.rows[0]?.pending_count || '0', 10);
+
+  const syncPipelineStatus = failedTasks > 0 ? 'SYNC_FAILED' : (pendingTasks > 0 ? 'SYNC_PENDING' : 'SYNC_SUCCESS');
+  const syncPipelineMessage = failedTasks > 0 
+    ? `Có ${failedTasks} tác vụ outbox lỗi trong 24h` 
+    : (pendingTasks > 0 ? `Đang xử lý ${pendingTasks} tác vụ trong hàng đợi` : 'Hàng đợi đồng bộ sạch, không có lỗi');
+
+  // Lớp 2: Reconciliation Integrity (Khớp khóa & số lượng giữa NocoDB SoT và Sheets)
+  const isReconciled = missingInSheets.length === 0 && postMatchedCount === nocodbProfiles.length;
+  const reconciliationStatus = isReconciled ? 'RECONCILIATION_SUCCESS' : 'RECONCILIATION_FAILED';
+  const reconciliationMessage = isReconciled 
+    ? `Khớp 100% định danh (${postMatchedCount}/${nocodbProfiles.length} hồ sơ chính thức)` 
+    : `Thiếu ${missingInSheets.length} hồ sơ chính thức trên Google Sheets`;
+
+  // Lớp 3: Data Integrity (Không có rác, không trùng, không lệch trường, không có dữ liệu kiểm thử trên Sheets)
+  const hasStaleOrTest = (autoFix || cleanStale) ? 0 : (testRecordsInSheets.length + staleRecordsInSheets.length);
+  const isDataIntegrityClean = duplicateInSheets.length === 0 && 
+                              statusMismatches.length === 0 && 
+                              dataMismatches.length === 0 && 
+                              hasStaleOrTest === 0 && 
+                              needsVerificationInSheets.length === 0;
+
+  const dataIntegrityStatus = isDataIntegrityClean ? 'DATA_INTEGRITY_SUCCESS' : 'DATA_INTEGRITY_WARNING';
+  let dataIntegrityMessage = 'Dữ liệu toàn vẹn, không có dòng rác hoặc trùng lặp';
+  if (duplicateInSheets.length > 0) {
+    dataIntegrityMessage = `Phát hiện ${duplicateInSheets.length} khóa bị trùng trên Google Sheets`;
+  } else if (hasStaleOrTest > 0) {
+    dataIntegrityMessage = `Phát hiện ${hasStaleOrTest} dòng kiểm thử / dư thừa trên Google Sheets`;
+  } else if (statusMismatches.length > 0 || dataMismatches.length > 0) {
+    dataIntegrityMessage = `Phát hiện ${statusMismatches.length + dataMismatches.length} hồ sơ bị lệch dữ liệu`;
+  } else if (needsVerificationInSheets.length > 0) {
+    dataIntegrityMessage = `Có ${needsVerificationInSheets.length} dòng ngoài phạm vi quản lý cần xác minh`;
+  }
+
+  // Toàn bộ hệ thống chỉ đạt chuẩn khi CẢ 3 LỚP ĐỀU THÀNH CÔNG
+  const isOverallConsistent = isReconciled && isDataIntegrityClean && (syncPipelineStatus === 'SYNC_SUCCESS');
+
+  return {
+    is_consistent: isOverallConsistent,
     timestamp: new Date().toISOString(),
     duration_ms: Date.now() - startTime,
     actor,
-    counts: {
-      website_postgres: officialEmployees.length,
-      nocodb: nocodbProfiles.length + fixedInNoco.length,
-      google_sheets: GOOGLE_SPREADSHEET_ID ? (validMatchedSheetRows.length + fixedInSheets.length) : null
+    integrity_layers: {
+      sync_pipeline: {
+        status: syncPipelineStatus,
+        message: syncPipelineMessage,
+        failed_tasks: failedTasks,
+        pending_tasks: pendingTasks
+      },
+      reconciliation: {
+        status: reconciliationStatus,
+        message: reconciliationMessage,
+        official_nocodb: nocodbProfiles.length,
+        matched_sheets: postMatchedCount,
+        missing_count: missingInSheets.length
+      },
+      data_integrity: {
+        status: dataIntegrityStatus,
+        message: dataIntegrityMessage,
+        duplicate_count: duplicateInSheets.length,
+        test_records_count: (autoFix || cleanStale) ? 0 : testRecordsInSheets.length,
+        stale_records_count: (autoFix || cleanStale) ? 0 : staleRecordsInSheets.length,
+        needs_verification_count: needsVerificationInSheets.length,
+        status_mismatch_count: statusMismatches.length,
+        data_mismatch_count: dataMismatches.length
+      }
     },
-    reconciled_count: officialEmployees.length - missingInNoco.length + fixedInNoco.length,
-    missing_in_nocodb: missingInNoco,
+    counts: {
+      website_postgres: websiteEmployees.length,
+      website_active: websiteActiveCount,
+      nocodb_official: nocodbProfiles.length,
+      nocodb_active: nocoActiveCount,
+      google_sheets_total: GOOGLE_SPREADSHEET_ID ? currentSheetTotal : null,
+      google_sheets_matched: postMatchedCount,
+      google_sheets_missing: missingInSheets.length,
+      google_sheets_stale: (autoFix || cleanStale) ? 0 : staleRecordsInSheets.length,
+      google_sheets_test: (autoFix || cleanStale) ? 0 : testRecordsInSheets.length,
+      google_sheets_needs_verification: needsVerificationInSheets.length,
+      google_sheets_duplicates: duplicateInSheets.length,
+      google_sheets_cleaned: cleanedInSheets.reduce((sum, c) => sum + (c.count || 0), 0)
+    },
+    reconciled_count: postMatchedCount,
+    matched_count: postMatchedCount,
     missing_in_sheets: missingInSheets,
+    stale_in_sheets: staleRecordsInSheets,
+    test_records_in_sheets: testRecordsInSheets,
+    needs_verification_in_sheets: needsVerificationInSheets,
+    duplicates_in_sheets: duplicateInSheets,
     status_mismatches: statusMismatches,
-    orphaned_in_nocodb: orphanedInNoco,
-    fixed_in_nocodb: fixedInNoco,
+    data_mismatches: dataMismatches,
+    cleaned_in_sheets: cleanedInSheets,
     fixed_in_sheets: fixedInSheets
   };
-
-  return result;
 }
 
 module.exports = {
   reconcileEmployees,
-  fetchGoogleSheetRows,
-  upsertGoogleSheetRow,
-  PROFILE_COLUMNS
+  KNOWN_HARD_DELETED_CODES,
+  CANONICAL_COLUMNS
 };

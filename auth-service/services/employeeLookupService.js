@@ -90,9 +90,10 @@ function buildStandardTable(rows, user = null) {
       if (col === 'employee_id') return r.employee_code || '';
       if (col === 'full_name') return r.employee_name || '';
       if (col === 'job_grade') {
-        if (r.status === 'DELETED') return '[ĐÃ XÓA]';
-        if (r.status === 'RESIGNED') return '[NGHỈ VIỆC]';
         return r.job_grade || '';
+      }
+      if (col === 'employment_status') {
+        return r.employment_status || (r.status === 'RESIGNED' ? 'RESIGNED' : 'ACTIVE');
       }
       if (col === 'citizen_id') return isAuthorizedStaff ? (r.citizen_id || '') : maskCccd(r.citizen_id);
       if (col === 'phone_number') return r.phone_number || '';

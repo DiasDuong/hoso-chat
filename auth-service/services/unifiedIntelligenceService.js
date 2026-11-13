@@ -234,7 +234,7 @@ async function executeSqlAggregation(intentObj, user, effectiveCompany) {
     statusClause = `status = 'RESIGNED'`;
   }
 
-  const baseWhere = `WHERE ${tenantClause} AND ${statusClause} AND (job_grade IS NULL OR job_grade NOT LIKE '%[ĐÃ XÓA]%')`;
+  const baseWhere = `WHERE ${tenantClause} AND ${statusClause} AND (is_deleted IS NOT TRUE)`;
 
   const compLabel = effectiveCompany === 'ALL' ? 'Toàn bộ Tập đoàn (STL, SWC, VTX)' : `Công ty ${effectiveCompany}`;
 
@@ -413,7 +413,7 @@ async function executeSqlEmployeeSearch(intentObj, user, effectiveCompany, page 
 
   const conds = [tenantClause];
   conds.push("(status IS NULL OR status = 'ACTIVE')");
-  conds.push("(job_grade IS NULL OR job_grade NOT LIKE '%[ĐÃ XÓA]%')");
+  conds.push("(is_deleted IS NOT TRUE)");
 
   if (intentObj.entities.department) {
     conds.push(`(department_staffing_plan ILIKE $${pIdx} OR section_staffing_plan ILIKE $${pIdx})`);

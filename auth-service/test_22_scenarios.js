@@ -10,7 +10,7 @@ const jwt = require('jsonwebtoken');
 
 const AUTH_URL = 'http://127.0.0.1:3000';
 const GATEWAY_URL = 'http://127.0.0.1:8082';
-const N8N_URL = 'http://n8n:5678';
+const N8N_URL = process.env.N8N_URL || 'http://127.0.0.1:5679';
 const JWT_SECRET = 'super_secret_jwt_key_hrbot_2026_!@#$';
 const N8N_SECRET = '8973d464f5f1475b83d6ab88d222d824';
 
@@ -330,7 +330,7 @@ async function runSuite() {
     testTaskId = insertRes.rows[0].id;
 
     // Trigger sequential sync via n8n webhook
-    const syncRes = await makeRequest(`${N8N_URL}/webhook/hr-sequential-sync`, {
+    const syncRes = await makeRequest(`${N8N_URL}/webhook/hr-lifecycle-sync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

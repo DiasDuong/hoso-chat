@@ -3689,6 +3689,269 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(6px
 }
 
 
+
+/* SOTRANS HUB - DIRECT CLEAN LOGIN & AI WORKSPACE STYLES */
+#homeViewWrap,
+.home-view-wrap,
+body.is-home-view .home-view-wrap {
+  display: none !important;
+}
+
+#btnSbGoHome,
+.sb-nav-home-btn {
+  display: none !important;
+}
+
+.public-auth-view {
+  min-height: 100vh !important;
+  height: 100vh !important;
+  width: 100vw !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  background: radial-gradient(circle at 50% 25%, #0f172a 0%, #090d16 100%) !important;
+  color: #0f172a !important;
+  font-family: 'Plus Jakarta Sans', 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px !important;
+  box-sizing: border-box !important;
+  font-size: 14px;
+}
+
+.auth-card-clean {
+  max-width: 440px;
+  width: 100%;
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.12);
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(56, 189, 248, 0.1);
+  overflow: hidden;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  animation: authCardFadeIn 0.3s ease-out;
+}
+
+@keyframes authCardFadeIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.auth-card-header {
+  padding: 26px 28px 20px;
+  background: linear-gradient(135deg, #0b1329 0%, #172554 100%);
+  color: #ffffff;
+  text-align: center;
+  position: relative;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.auth-card-logo {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
+  border-radius: 14px;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.3);
+}
+
+.auth-card-title {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  margin-bottom: 4px;
+}
+
+.auth-card-sub {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.auth-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(2, 132, 199, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #38bdf8;
+  letter-spacing: 0.04em;
+}
+
+.auth-card-body {
+  padding: 26px 28px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  background: #ffffff;
+}
+
+.auth-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-field-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.auth-input-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-input-icon {
+  position: absolute;
+  left: 12px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.auth-input-control {
+  width: 100%;
+  height: 42px;
+  padding: 0 40px 0 38px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: #0f172a;
+  background: #f8fafc;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.auth-input-control:focus {
+  background: #ffffff;
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+}
+
+.auth-toggle-pwd {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+.auth-toggle-pwd:hover {
+  color: #0284c7;
+}
+
+.auth-options-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-top: -2px;
+}
+
+.auth-remember-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #475569;
+  cursor: pointer;
+  user-select: none;
+}
+.auth-remember-label input {
+  accent-color: #0284c7;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.auth-ssl-badge {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.auth-msg-error {
+  font-size: 12.5px;
+  color: #dc2626;
+  padding: 10px 14px;
+  background: #fef2f2;
+  border-radius: 10px;
+  border: 1px solid #fecaca;
+  line-height: 1.45;
+}
+
+.auth-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 44px;
+  background: linear-gradient(135deg, #004b87 0%, #0284c7 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 75, 135, 0.35);
+  transition: all 0.2s ease;
+  margin-top: 4px;
+}
+.auth-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 75, 135, 0.45);
+}
+.auth-btn-primary:active {
+  transform: translateY(0);
+}
+
+.auth-card-foot {
+  padding: 14px 24px 16px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.auth-card-foot-tag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #003366;
+}
+
+.auth-card-foot-sub {
+  font-size: 10.5px;
+  color: #94a3b8;
+}
+
 /* ========================================================
    SOTRANS HUB — CORPORATE LOGISTICS DIGITAL PORTAL REDESIGN
    ======================================================== */
@@ -5502,7 +5765,7 @@ body.is-home-view .home-view-wrap {
   <!-- ================= SIDEBAR TỔNG HỢP ================= -->
   <aside class="sidebar" id="sidebar">
     <div class="sb-header">
-      <a href="javascript:void(0)" class="sb-brand" id="brandLink" title="SOTRANS Logistics — Trang chủ" onclick="switchWorkspaceMode('home', true)">
+      <a href="javascript:void(0)" class="sb-brand" id="brandLink" title="SOTRANS Hub — Trí Tuệ Nhân Tạo" onclick="switchWorkspaceMode('chat', true)">
         <div class="sb-logo">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
@@ -5527,7 +5790,7 @@ body.is-home-view .home-view-wrap {
     </div>
     <div class="sb-scroll-area">
     <!-- NÚT ĐIỀU HƯỚNG TRANG CHỦ SOTRANS HUB -->
-    <a href="javascript:void(0)" class="sb-nav-home-btn" id="btnSbGoHome" onclick="switchWorkspaceMode('home', true)" title="Quay lại Trang chủ SOTRANS Hub">
+    <a href="javascript:void(0)" class="sb-nav-home-btn" id="btnSbGoHome" style="display:none !important;" onclick="switchWorkspaceMode('chat', true)" title="SOTRANS Hub">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       <span class="hide-collapsed">Trang chủ SOTRANS Hub</span>
     </a>
@@ -6247,8 +6510,74 @@ body.is-home-view .home-view-wrap {
       <iframe id="adminFrame" src="about:blank"></iframe>
     </div>
 
-        <!-- KHUNG CHẾ ĐỘ 0: CỔNG ĐĂNG NHẬP & GIỚI THIỆU CÔNG KHAI (DÀNH CHO NGƯỜI CHƯA ĐĂNG NHẬP) -->
-    <div id="publicAuthView" style="display:none;"></div>
+        <!-- KHUNG CHẾ ĐỘ 0: CỔNG ĐĂNG NHẬP ĐƠN GIẢN SOTRANS HUB -->
+    <div id="publicAuthView" class="public-auth-view" style="display:none;">
+      <div class="auth-card-clean">
+        <div class="auth-card-header">
+          <div class="auth-card-logo">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+              <path d="m3.3 7 8.7 5 8.7-5"/>
+              <path d="M12 22V12"/>
+            </svg>
+          </div>
+          <div class="auth-card-title">SOTRANS HUB</div>
+          <div class="auth-card-sub">CỔNG TRÍ TUỆ NHÂN TẠO DOANH NGHIỆP</div>
+          <div class="auth-card-badge">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            HỆ THỐNG XÁC THỰC BẢO MẬT TẬP ĐOÀN
+          </div>
+        </div>
+
+        <form class="auth-card-body" onsubmit="handlePublicLoginSubmit(event)">
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="pubLoginUsername">Tên đăng nhập / Mã nhân sự</label>
+            <div class="auth-input-box">
+              <span class="auth-input-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </span>
+              <input type="text" id="pubLoginUsername" class="auth-input-control" placeholder="Nhập tên đăng nhập hoặc mã nhân sự..." autocomplete="username" required>
+            </div>
+          </div>
+
+          <div class="auth-field-group">
+            <label class="auth-field-label" for="pubLoginPassword">Mật khẩu bảo mật</label>
+            <div class="auth-input-box">
+              <span class="auth-input-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </span>
+              <input type="password" id="pubLoginPassword" class="auth-input-control" placeholder="Nhập mật khẩu truy cập..." autocomplete="current-password" required>
+              <button type="button" class="auth-toggle-pwd" onclick="toggleFieldPwd('pubLoginPassword', 'pubEyeIcon')" title="Hiện/Ẩn mật khẩu">
+                <svg id="pubEyeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="auth-options-row">
+            <label class="auth-remember-label">
+              <input type="checkbox" id="pubRememberMe" checked>
+              <span>Duy trì đăng nhập phiên làm việc</span>
+            </label>
+            <span class="auth-ssl-badge">Bảo mật SSL 256-bit</span>
+          </div>
+
+          <div id="publicLoginMsg" class="auth-msg-error" style="display:none"></div>
+
+          <button type="submit" class="auth-btn-primary" id="btnPubLoginSubmit">
+            <span>Đăng nhập hệ thống</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </form>
+
+        <div class="auth-card-foot">
+          <div class="auth-card-foot-tag">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>SOTRANS GROUP • CỔNG TRÍ TUỆ NHÂN TẠO DOANH NGHIỆP</span>
+          </div>
+          <div class="auth-card-foot-sub">SOTRANS Logistics (STL) • Vietranstimex (VTX) • Sowatco (SWC)</div>
+        </div>
+      </div>
+    </div>
     </div>
   </main>
 </div>
@@ -7856,16 +8185,9 @@ let userCustomAgents = (() => {
 
 function saveWorkspaceState(mode, subId, empSub, pushHistory = false) {
   try {
+    if (mode === 'home') mode = 'chat';
     localStorage.setItem('HR_LAST_ACTIVE_MODE', mode);
-    if (mode === 'home') {
-      if (window.location.hash !== '#home') {
-        if (pushHistory) {
-          history.pushState({ mode: 'home' }, '', '#home');
-        } else {
-          history.replaceState(null, '', '#home');
-        }
-      }
-    } else if (mode === 'admin') {
+    if (mode === 'admin') {
       let target = subId || currentAdminModule || 'employees';
       let sub = empSub || currentEmpSubTab || 'official';
       if (target === 'hard_delete') {
@@ -7921,7 +8243,7 @@ function resolveInitialWorkspaceState() {
 
   // Chặn người chưa đăng nhập truy cập bất kỳ khu vực AI/Admin nào
   if (!isAuth) {
-    if (hash && hash !== '#login' && hash !== '#') {
+    if (hash && hash !== '#login' && hash !== '#' && hash !== '#home') {
       window.pendingRedirectHash = hash;
     }
     return { mode: 'login' };
@@ -7929,7 +8251,7 @@ function resolveInitialWorkspaceState() {
 
   // 1. URL Hash
   if (hash === '#home' || hash.startsWith('#home/')) {
-    return { mode: 'home' };
+    return { mode: 'chat', agentId: 'general' };
   } else if (hash === '#admin/hard_delete' || hash.startsWith('#admin/hard_delete')) {
     return { mode: 'admin', adminModule: 'employees', empSubTab: 'official' };
   } else if (hash.startsWith('#admin/employees')) {
@@ -7980,10 +8302,10 @@ function resolveInitialWorkspaceState() {
   }
 
   // 3. LocalStorage persistence
-  let savedMode = 'home';
-  try { savedMode = localStorage.getItem('HR_LAST_ACTIVE_MODE') || 'home'; } catch(e) {}
+  let savedMode = 'chat';
+  try { savedMode = localStorage.getItem('HR_LAST_ACTIVE_MODE') || 'chat'; } catch(e) {}
   if (savedMode === 'home') {
-    return { mode: 'home' };
+    return { mode: 'chat', agentId: 'general' };
   }
   if (savedMode === 'admin') {
     let savedMod = 'employees';
@@ -8358,7 +8680,8 @@ function applyRolePermissions() {
 
   // 9. Cập nhật giao diện Chatbot hoặc Admin hoặc My Agents hoặc Home
   if (currentMode === 'home') {
-    switchWorkspaceMode('home');
+    currentMode = 'chat';
+    switchWorkspaceMode('chat');
   } else if (currentMode === 'admin' && canAccessAdminPortal) {
     if (!currentAdminModule) currentAdminModule = isHR ? 'employees' : 'docs';
     if (isHR && currentAdminModule !== 'employees' && currentAdminModule !== 'docs') {
@@ -8510,11 +8833,11 @@ async function checkPublicLandingHealth() {
 
 function showPublicAuthView(openModal = false) {
   currentMode = 'login';
-  document.body.classList.remove('is-public-auth');
-  document.body.classList.add('is-home-view');
+  document.body.classList.remove('is-home-view');
+  document.body.classList.add('is-public-auth');
 
-  if ($('homeViewWrap')) $('homeViewWrap').style.display = 'block';
-  if ($('publicAuthView')) $('publicAuthView').style.display = 'none';
+  if ($('homeViewWrap')) $('homeViewWrap').style.display = 'none';
+  if ($('publicAuthView')) $('publicAuthView').style.display = 'flex';
   if ($('chatViewWrap')) $('chatViewWrap').style.display = 'none';
   if ($('adminViewWrap')) $('adminViewWrap').style.display = 'none';
   if ($('myAgentsViewWrap')) $('myAgentsViewWrap').style.display = 'none';
@@ -8525,18 +8848,22 @@ function showPublicAuthView(openModal = false) {
   const mainHdr = document.querySelector('.main-header');
   if (mainHdr) mainHdr.style.display = 'none';
 
-  updateHomeViewUI();
+  const dlg = $('loginModal');
+  if (dlg && dlg.open) dlg.close();
 
-  if (openModal || window.location.hash === '#login') {
-    openLoginModal('login');
-  } else {
-    const dlg = $('loginModal');
-    if (dlg && dlg.open) dlg.close();
+  if (window.location.hash !== '#login') {
+    try { history.replaceState(null, '', '#login'); } catch(e) {}
   }
+
+  setTimeout(() => {
+    const u = $('pubLoginUsername');
+    if (u) u.focus();
+  }, 100);
 }
 
 function hidePublicAuthView() {
   document.body.classList.remove('is-public-auth');
+  document.body.classList.remove('is-home-view');
   const pubView = $('publicAuthView');
   if (pubView) pubView.style.display = 'none';
   const sb = $('sidebar');
@@ -8607,11 +8934,12 @@ async function handlePublicLoginSubmit(e) {
       const targetRedirect = window.pendingRedirectHash;
       window.pendingRedirectHash = null;
 
-      if (targetRedirect && targetRedirect !== '#login' && targetRedirect !== '#') {
+      if (targetRedirect && targetRedirect !== '#login' && targetRedirect !== '#' && targetRedirect !== '#home') {
         history.replaceState(null, '', targetRedirect);
         handleBrowserNavigationRoute();
       } else {
-        switchWorkspaceMode('home', true);
+        switchWorkspaceMode('chat', true);
+        switchAgent('general');
       }
     } else {
       if (msgEl) {
@@ -8826,20 +9154,7 @@ function switchWorkspaceMode(mode, pushHistory = false) {
   currentMode = mode;
 
   if (mode === 'home') {
-    saveWorkspaceState('home', null, null, pushHistory);
-    document.body.classList.add('is-home-view');
-    if ($('homeViewWrap')) $('homeViewWrap').style.display = 'block';
-    if ($('chatViewWrap')) $('chatViewWrap').style.display = 'none';
-    if ($('adminViewWrap')) $('adminViewWrap').style.display = 'none';
-    if ($('myAgentsViewWrap')) $('myAgentsViewWrap').style.display = 'none';
-    if ($('publicAuthView')) $('publicAuthView').style.display = 'none';
-    if ($('sbHistoryWrap')) $('sbHistoryWrap').style.display = 'none';
-
-    document.querySelectorAll('.agent-card').forEach(c => c.classList.remove('active'));
-    document.querySelectorAll('.admin-nav-item').forEach(c => c.classList.remove('active'));
-
-    updateHomeViewUI();
-    return;
+    mode = 'chat';
   }
   document.body.classList.remove('is-home-view');
   if ($('homeViewWrap')) $('homeViewWrap').style.display = 'none';
@@ -9036,7 +9351,7 @@ function initSidebar() {
       if ($('sidebar').classList.contains('collapsed')) {
         toggleSidebar(false);
       } else {
-        switchWorkspaceMode('home', true);
+        switchWorkspaceMode('chat', true);
       }
     };
   }
@@ -9456,11 +9771,12 @@ async function handleLoginSubmit() {
       const targetRedirect = window.pendingRedirectHash;
       window.pendingRedirectHash = null;
 
-      if (targetRedirect && targetRedirect !== '#login' && targetRedirect !== '#') {
+      if (targetRedirect && targetRedirect !== '#login' && targetRedirect !== '#' && targetRedirect !== '#home') {
         history.replaceState(null, '', targetRedirect);
         handleBrowserNavigationRoute();
       } else {
-        switchWorkspaceMode('home', true);
+        switchWorkspaceMode('chat', true);
+        switchAgent('general');
       }
     } else {
       if (msgEl) {
@@ -9519,31 +9835,15 @@ function logoutUser() {
   conversations = [];
   activeConvId = null;
   currentUser = { username: '', name: 'Khách', role: 'GUEST', company_id: null };
-  activeAgentId = '';
-  currentMode = 'home';
+  activeAgentId = 'general';
+  currentMode = 'login';
 
   if ($('adminFrame')) $('adminFrame').src = 'about:blank';
   closeLoginModal();
 
-  try { history.replaceState(null, '', '#home'); } catch(e) {}
+  try { history.replaceState(null, '', '#login'); } catch(e) {}
 
-  // Transition UI directly to guest home view
-  document.body.classList.remove('is-public-auth');
-  document.body.classList.add('is-home-view');
-  if ($('homeViewWrap')) $('homeViewWrap').style.display = 'block';
-  if ($('publicAuthView')) $('publicAuthView').style.display = 'none';
-  if ($('chatViewWrap')) $('chatViewWrap').style.display = 'none';
-  if ($('adminViewWrap')) $('adminViewWrap').style.display = 'none';
-  if ($('myAgentsViewWrap')) $('myAgentsViewWrap').style.display = 'none';
-  if ($('sbHistoryWrap')) $('sbHistoryWrap').style.display = 'none';
-
-  const sb = $('sidebar');
-  if (sb) sb.style.display = 'none';
-  const mainHdr = document.querySelector('.main-header');
-  if (mainHdr) mainHdr.style.display = 'none';
-
-  updateHomeViewUI();
-  applyRolePermissions();
+  showPublicAuthView(true);
 
   if (typeof showToast === 'function') {
     showToast('Đã đăng xuất tài khoản thành công.', 'info');
@@ -13371,8 +13671,8 @@ async function initChatWorkspaceOnStartup() {
 
   // 3. Khôi phục theo đúng chế độ đã lưu
   if (targetState.mode === 'home') {
-    switchWorkspaceMode('home');
-    return;
+    targetState.mode = 'chat';
+    targetState.agentId = 'general';
   }
   if (targetState.mode === 'admin' && canAdmin) {
     let targetMod = targetState.adminModule || (isHR ? 'employees' : 'docs');
@@ -13461,30 +13761,15 @@ function handleBrowserNavigationRoute() {
 
     if (isProtectedRoute) {
       window.pendingRedirectHash = hash;
-      try { history.replaceState(null, '', '#login'); } catch(e) {}
-      showPublicAuthView(true);
-      return;
     }
-
-    if (hash === '#login') {
-      showPublicAuthView(true);
-      return;
-    }
-
-    // Guest browsing public corporate sections or home
-    showPublicAuthView(false);
-    if (hash.startsWith('#section-') || hash === '#homeFooter') {
-      const secId = hash.replace('#', '');
-      setTimeout(() => scrollToHomeSection(secId), 50);
-    }
+    try { history.replaceState(null, '', '#login'); } catch(e) {}
+    showPublicAuthView(true);
     return;
   }
   hidePublicAuthView();
   const state = resolveInitialWorkspaceState();
   if (state.mode === 'home') {
-    if (currentMode !== 'home') {
-      switchWorkspaceMode('home', false);
-    }
+    switchWorkspaceMode('chat', false);
     return;
   }
   if (state.mode === 'admin') {

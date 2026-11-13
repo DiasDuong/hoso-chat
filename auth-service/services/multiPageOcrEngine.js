@@ -24,6 +24,7 @@ const execPromise = util.promisify(exec);
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = 'gemini-3.1-flash-lite';
+const ENABLE_BACKEND_OCR_FALLBACK = process.env.ENABLE_BACKEND_OCR_FALLBACK === 'true';
 
 /**
  * Standardize and clean CCCD
@@ -86,80 +87,7 @@ function levenshteinDistance(a, b) {
   return d[m][n];
 }
 
-/**
- * Common Vietnamese Surnames
- */
-const COMMON_VN_SURNAMES = new Set([
-  'nguyen', 'tran', 'le', 'pham', 'hoang', 'huynh', 'phan', 'vu', 'vo', 'dang', 'bui', 'do', 'ho', 'ngo',
-  'duong', 'ly', 'dao', 'dinh', 'doan', 'lam', 'trinh', 'mai', 'cao', 'truong', 'ha', 'luong', 'nong',
-  'trieu', 'luu', 'vuong', 'dam', 'chu', 'chau', 'to', 'phung', 'ta', 'giang', 'khong', 'quach', 'thai',
-  'van', 'la', 'thach', 'luc', 'tieu', 'kim', 'tong', 'than', 'hua', 'kieu', 'thieu', 'doan', 'du'
-]);
-
-/**
- * Check if a candidate name is a valid person's name
- */
-function isValidPersonName(name) {
-  if (!name || typeof name !== 'string') return false;
-  let clean = name.trim().replace(/\s+/g, ' ');
-
-  // Strip honorific prefixes: Ông, Bà, Anh, Chị
-  clean = clean.replace(/^(?:Ông|Bà|Anh|Chị|Ong|Ba|Mr|Mrs|Ms)\s+/i, '').trim();
-
-  if (clean.length < 4 || clean.length > 40) return false;
-
-  // Must NOT contain digits
-  if (/\d/.test(clean)) return false;
-
-  // Must NOT contain U+FFFD
-  if (clean.includes('\uFFFD')) return false;
-
-  // Must NOT contain forbidden special symbols/delimiters
-  if (/[\(\)\[\]\{\}\<\>\;\:\*\?\!\@\#\$\%\^\&\_\=\+\\\|\/\"~`—–]/.test(clean)) {
-    return false;
-  }
-
-  // Must NOT match administrative / document structure labels / locations / organizations
-  const lower = clean.toLowerCase();
-  const norm = removeAccents(lower);
-  if (/(?:^|\s)(?:chu in hoa|in hoa|viet hoa|khai sinh|ung vien|nguoi lao dong|tap su|khong|ho va ten|ho ten|chu ky|kinh gui|chuc vu|phong ban|noi lam viec|so dien thoai|kinh te van tai|cu nhan|nhan vien|giam doc|truong phong|don vi|cong ty|tong cong ty|quyet dinh|thu moi|gioi tinh|ngay sinh|noi sinh|que quan|thuong tru|quoc tich|dan toc|duong song|duong bo|duong thuy|hang hai|logistics|sotrans|sowatco|ho chi minh|viet nam|cong hoa|xa hoi|doc lap|tu do|hanh phuc|co phan)(?:\s|$)/i.test(norm)) {
-    return false;
-  }
-
-  const words = clean.split(' ').filter(w => w.length > 0);
-  if (words.length < 2 || words.length > 5) return false;
-
-  // Check each word's casing and phonetics
-  for (const w of words) {
-    // Single consonant cannot be a Vietnamese word (e.g. "n", "r", "k")
-    if (w.length === 1 && !/^[aăâeêioôơuưyáắấéếíóốớúứýàằầèềìòồờùừỳảẳẩẻểỉỏổởủửỷãẵẫẽễĩõỗỡũữỹạặậẹệịọộợụựỵ]$/i.test(w)) {
-      return false;
-    }
-    // Must contain at least one vowel
-    if (!/[aăâeêioôơuưyáắấéếíóốớúứýàằầèềìòồờùừỳảẳẩẻểỉỏổởủửỷãẵẫẽễĩõỗỡũữỹạặậẹệịọộợụựỵ]/i.test(w)) {
-      return false;
-    }
-    // Check casing: each word should be TitleCase or ALL_UPPERCASE or all_lowercase
-    const isUpper = w === w.toUpperCase();
-    const isLower = w === w.toLowerCase();
-    const isTitle = (w[0] === w[0].toUpperCase()) && (w.slice(1) === w.slice(1).toLowerCase());
-    if (!isUpper && !isLower && !isTitle) {
-      return false;
-    }
-    // Foreign non-Vietnamese letters
-    if (/[fzwj]/i.test(w)) {
-      return false;
-    }
-  }
-
-  // Check surname (first word)
-  const firstWordNorm = removeAccents(words[0]);
-  if (!COMMON_VN_SURNAMES.has(firstWordNorm)) {
-    if (/^(?:ilyuy|iluy|lyuy|uyr)/i.test(firstWordNorm)) return false;
-  }
-
-  return true;
-}
+const { isValidPersonName, COMMON_VN_SURNAMES } = require('./vietnameseEncodingGuard');
 
 /**
  * Classify document type of a specific page based on OCR text
@@ -454,6 +382,28 @@ QUY TẮC BẮT BUỘC:
  */
 async function processDocumentMultiPage(input, options = {}) {
   const fileName = options.fileName || 'document.pdf';
+
+  // Feature Flag Guard: Prevent local OCR processes when n8n is the designated OCR gateway
+  if (!ENABLE_BACKEND_OCR_FALLBACK) {
+    console.log(`[MultiPageOcrEngine] Local OCR fallback is disabled (ENABLE_BACKEND_OCR_FALLBACK=false). Skipping local PDF/Tesseract/Gemini processing for ${fileName}. OCR is handled exclusively by n8n Gemini 3.1 Flash-Lite.`);
+    return {
+      success: false,
+      fallback_disabled: true,
+      message: 'Backend OCR fallback is disabled. OCR extraction is delegated to n8n Gemini 3.1 Flash-Lite workflow.',
+      extracted: {},
+      aggregatedText: '',
+      auditLog: {
+        fileName,
+        totalPages: 0,
+        pageResults: [],
+        consensus: {},
+        conflicts: [],
+        requiresManualReview: true,
+        durationMs: 0
+      }
+    };
+  }
+
   const tmpId = `ocr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const tmpDir = path.join(os.tmpdir(), tmpId);
   fs.mkdirSync(tmpDir, { recursive: true });

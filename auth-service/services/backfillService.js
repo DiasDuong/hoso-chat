@@ -1,7 +1,7 @@
 const db = require('../db');
 const http = require('http');
 const https = require('https');
-const { getGoogleAccessToken } = require('./syncWorker');
+const { getGoogleAccessToken, fetchGoogleSheetAllRows } = require('./syncWorker');
 
 const GOOGLE_SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID || '1q_Sv9-p-pa5_yzoMSlbJfwz5vNqEhFFBaBhC3f0U6YI';
 
@@ -203,9 +203,8 @@ async function getSourceEmployees() {
     }
     codeTracker.set(empCode, r.emp_uuid);
 
-    let jobGrade = r.job_grade || '';
-    if (r.emp_status === 'DELETED') jobGrade = '[ĐÃ XÓA]';
-    else if (r.emp_status === 'RESIGNED') jobGrade = '[NGHỈ VIỆC]';
+    let jobGrade = String(r.job_grade || '').replace(/\s*\[(ĐÃ XÓA|NGHỈ VIỆC|DA XOA|NGHI VIEC)\]/g, '').trim();
+    const employmentStatus = r.employment_status || (r.emp_status === 'RESIGNED' ? 'RESIGNED' : 'ACTIVE');
 
     const norm = {
       emp_uuid: r.emp_uuid,
@@ -213,6 +212,7 @@ async function getSourceEmployees() {
       employee_id: empCode,
       employee_code: empCode,
       full_name: fullName,
+      employment_status: employmentStatus,
       citizen_id: cccd,
       job_grade: jobGrade,
       date_of_birth: normalizeDate(r.date_of_birth),
@@ -349,31 +349,15 @@ async function upsertNocoDBProfile(emp) {
 }
 
 /**
- * 3. Get all rows from Google Sheets
+ * 3. Get all rows from Google Sheets (Full sheet range, no 100-row truncate)
  */
 async function getGoogleSheetRows() {
-  const token = await getGoogleAccessToken();
-  return new Promise((resolve, reject) => {
-    const req = https.get(`https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}/values/Trang%20t%C3%ADnh1!A1:BA100`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    }, (res) => {
-      let body = '';
-      res.on('data', chunk => body += chunk);
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(body || '{}');
-          const values = json.values || [];
-          const header = values[0] || [];
-          const rows = values.slice(1);
-          resolve({ header, rows, totalValues: values });
-        } catch (e) {
-          reject(e);
-        }
-      });
-    });
-    req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('Google Sheets timeout')); });
-  });
+  const sheetData = await fetchGoogleSheetAllRows();
+  return {
+    header: sheetData.header || [],
+    rows: (sheetData.rows || []).map(r => r.values),
+    totalValues: sheetData.rawValues || []
+  };
 }
 
 /**

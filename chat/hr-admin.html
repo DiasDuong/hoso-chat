@@ -3149,8 +3149,10 @@ summary { cursor: pointer; color: #2563eb; font-size: 13.5px; font-weight: 600; 
           <select id="empStatusFilter" class="um-select" onchange="onEmpDropdownChange()">
             <option value="ACTIVE" selected>Đang làm việc (ACTIVE)</option>
             <option value="ALL">-- Tất cả trạng thái (ALL) --</option>
-            <option value="INACTIVE">Vô hiệu hóa (INACTIVE)</option>
+            <option value="PROBATION">Thử việc (PROBATION)</option>
+            <option value="SUSPENDED">Tạm hoãn (SUSPENDED)</option>
             <option value="RESIGNED">Đã nghỉ việc (RESIGNED)</option>
+            <option value="TERMINATED">Chấm dứt HĐLĐ (TERMINATED)</option>
             <option value="DELETED">Đã xóa mềm (DELETED)</option>
           </select>
 
@@ -4804,14 +4806,21 @@ summary { cursor: pointer; color: #2563eb; font-size: 13.5px; font-weight: 600; 
         <input type="text" id="editEmpPhoneInput" placeholder="0909xxxxxx" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13.5px">
       </div>
     </div>
-    <div>
-      <label style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:4px">Trạng thái hồ sơ</label>
-      <select id="editEmpStatusSelect" class="um-select" style="width:100%">
-        <option value="ACTIVE">Hoạt động (ACTIVE)</option>
-        <option value="INACTIVE">Vô hiệu hóa (INACTIVE)</option>
-        <option value="RESIGNED">Đã nghỉ việc (RESIGNED)</option>
-        <option value="DELETED">Đã xóa mềm (DELETED)</option>
-      </select>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div>
+        <label style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:4px">Cấp bậc (Job Grade)</label>
+        <input type="text" id="editEmpJobGradeInput" placeholder="Ví dụ: Bậc 1, Bậc 2, Chuyên viên..." style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13.5px">
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:4px">Trạng thái nhân sự (*)</label>
+        <select id="editEmpEmploymentStatusSelect" class="um-select" style="width:100%">
+          <option value="ACTIVE">Đang làm việc (ACTIVE)</option>
+          <option value="PROBATION">Thử việc (PROBATION)</option>
+          <option value="SUSPENDED">Tạm hoãn (SUSPENDED)</option>
+          <option value="RESIGNED">Đã nghỉ việc (RESIGNED)</option>
+          <option value="TERMINATED">Chấm dứt HĐLĐ (TERMINATED)</option>
+        </select>
+      </div>
     </div>
     <div id="editEmpMsg" style="display:none;font-size:13px;padding:8px 12px;border-radius:6px"></div>
     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px">
@@ -5082,41 +5091,97 @@ summary { cursor: pointer; color: #2563eb; font-size: 13.5px; font-weight: 600; 
   </div>
 </dialog>
 
-<!-- MODAL ĐỒNG BỘ DỮ LIỆU NHÂN SỰ (NOCODB & GOOGLE SHEETS) -->
-<dialog id="empSyncDlg" style="max-width:680px;width:95%;border-radius:16px;border:1px solid #cbd5e1;box-shadow:0 12px 30px rgba(0,0,0,0.15);padding:0;overflow:hidden">
+<!-- MODAL ĐỒNG BỘ DỮ LIỆU NHÂN SỰ (NOCODB → GOOGLE SHEETS) -->
+<dialog id="empSyncDlg" style="max-width:760px;width:95%;border-radius:16px;border:1px solid #cbd5e1;box-shadow:0 12px 30px rgba(0,0,0,0.15);padding:0;overflow:hidden">
   <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;background:#f8fafc">
     <b style="font-size:16px;color:#0f172a;display:flex;align-items:center;gap:8px">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-      Đồng bộ Hồ sơ Nhân sự (Website ⇄ Google Sheets ⇄ NocoDB)
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      Đồng bộ & Đối soát Dữ liệu Nhân sự (NocoDB SoT → Google Sheets)
     </b>
     <button class="btn ghost sm" type="button" onclick="$('empSyncDlg').close()" style="border-radius:8px">✕</button>
   </div>
 
   <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
-    <p style="margin:0;font-size:13px;color:#475569;line-height:1.5">
-      Hệ thống tự động đồng bộ khi tạo/sửa hồ sơ. Trong trường hợp dữ liệu tại Google Sheets hoặc NocoDB bị thiếu hoặc đã bị xóa để kiểm thử, bạn có thể thực hiện <b>Đồng bộ bù (Backfill)</b> để khôi phục toàn vẹn dữ liệu theo chuẩn 53 trường thông tin với khóa đối soát là <code>employee_id</code>.
+    <p style="margin:0;font-size:12.5px;color:#475569;line-height:1.5">
+      Quy tắc kiến trúc: <b>NocoDB = SINGLE SOURCE OF TRUTH</b> (Nguồn dữ liệu quyết định) • <b>Google Sheets</b> chỉ là bản sao tiếp nhận. Khóa đối soát bất biến: <code>employee_id</code>. Bảo vệ cách ly dữ liệu kiểm thử khỏi Production.
     </p>
 
     <!-- Thống kê số lượng hiện tại ở 3 nơi -->
     <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px">
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;text-align:center">
-        <div style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase">🌐 Website (Postgres)</div>
-        <div id="syncStatWebsite" style="font-size:24px;font-weight:800;color:#15803d;margin:4px 0">--</div>
-        <div style="font-size:11px;color:#166534">Nguồn dữ liệu gốc</div>
-      </div>
-      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px;text-align:center">
-        <div style="font-size:11px;font-weight:700;color:#0369a1;text-transform:uppercase">📊 Google Sheets</div>
-        <div id="syncStatSheets" style="font-size:24px;font-weight:800;color:#0284c7;margin:4px 0">--</div>
-        <div style="font-size:11px;color:#0369a1">Trang tính1</div>
+        <div style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase">🌐 Website (Postgres SoR)</div>
+        <div id="syncStatWebsite" style="font-size:22px;font-weight:800;color:#15803d;margin:4px 0">--</div>
+        <div id="syncSubWebsite" style="font-size:11px;color:#166534">Hoạt động: --</div>
       </div>
       <div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;padding:12px;text-align:center">
-        <div style="font-size:11px;font-weight:700;color:#6b21a8;text-transform:uppercase">🗄️ NocoDB</div>
-        <div id="syncStatNoco" style="font-size:24px;font-weight:800;color:#7c3aed;margin:4px 0">--</div>
-        <div style="font-size:11px;color:#6b21a8">HR Bot (hr_employee_profiles)</div>
+        <div style="font-size:11px;font-weight:700;color:#6b21a8;text-transform:uppercase">🗄️ NocoDB (Nguồn chuẩn SoT)</div>
+        <div id="syncStatNoco" style="font-size:22px;font-weight:800;color:#7c3aed;margin:4px 0">--</div>
+        <div id="syncSubNoco" style="font-size:11px;color:#6b21a8">hr_employee_profiles</div>
+      </div>
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:11px;font-weight:700;color:#0369a1;text-transform:uppercase">📊 Google Sheets (Bản sao)</div>
+        <div id="syncStatSheets" style="font-size:22px;font-weight:800;color:#0284c7;margin:4px 0">--</div>
+        <div id="syncSubSheets" style="font-size:11px;color:#0369a1">Khớp SoT: -- | Dư: --</div>
       </div>
     </div>
 
-    <!-- Trạng thái đồng bộ -->
+    <!-- 3 Lớp Kiểm Soát Toàn Vẹn Độc Lập -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px">
+      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Đánh giá 3 Lớp Toàn Vẹn Dữ Liệu:</div>
+      <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:10px">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+            <span style="font-size:11px;font-weight:700;color:#334155">1. Sync Pipeline</span>
+            <span id="syncLayerPipelineBadge" style="font-size:10px;padding:1px 6px;border-radius:4px;font-weight:700;background:#e2e8f0;color:#475569">--</span>
+          </div>
+          <div id="syncLayerPipelineText" style="font-size:11px;color:#64748b;line-height:1.3">Kiểm tra outbox queue...</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+            <span style="font-size:11px;font-weight:700;color:#334155">2. Reconciliation</span>
+            <span id="syncLayerReconBadge" style="font-size:10px;padding:1px 6px;border-radius:4px;font-weight:700;background:#e2e8f0;color:#475569">--</span>
+          </div>
+          <div id="syncLayerReconText" style="font-size:11px;color:#64748b;line-height:1.3">Đối soát định danh...</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+            <span style="font-size:11px;font-weight:700;color:#334155">3. Data Integrity</span>
+            <span id="syncLayerIntegrityBadge" style="font-size:10px;padding:1px 6px;border-radius:4px;font-weight:700;background:#e2e8f0;color:#475569">--</span>
+          </div>
+          <div id="syncLayerIntegrityText" style="font-size:11px;color:#64748b;line-height:1.3">Kiểm tra dòng rác & lệch...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bảng Chỉ Số Chi Tiết (6 thông số) -->
+    <div style="display:grid;grid-template-columns:repeat(6, 1fr);gap:8px">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px;text-align:center">
+        <div style="font-size:10px;font-weight:700;color:#166534">KHỚP SOT</div>
+        <div id="syncMetricMatched" style="font-size:16px;font-weight:800;color:#15803d;margin-top:2px">--</div>
+      </div>
+      <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:8px;padding:8px;text-align:center">
+        <div style="font-size:10px;font-weight:700;color:#be123c">THIẾU TRÊN SHEETS</div>
+        <div id="syncMetricMissing" style="font-size:16px;font-weight:800;color:#e11d48;margin-top:2px">--</div>
+      </div>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px;text-align:center">
+        <div style="font-size:10px;font-weight:700;color:#92400e">SAI LỆCH DỮ LIỆU</div>
+        <div id="syncMetricMismatches" style="font-size:16px;font-weight:800;color:#d97706;margin-top:2px">--</div>
+      </div>
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px;text-align:center">
+        <div style="font-size:10px;font-weight:700;color:#991b1b">DỮ LIỆU KIỂM THỬ</div>
+        <div id="syncMetricTest" style="font-size:16px;font-weight:800;color:#b91c1c;margin-top:2px">--</div>
+      </div>
+      <div style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:8px;text-align:center">
+        <div style="font-size:10px;font-weight:700;color:#334155">DƯ THỪA / STALE</div>
+        <div id="syncMetricStale" style="font-size:16px;font-weight:800;color:#475569;margin-top:2px">--</div>
+      </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px;text-align:center">
+        <div style="font-size:10px;font-weight:700;color:#64748b">CẦN XÁC MINH</div>
+        <div id="syncMetricNeedsVerification" style="font-size:16px;font-weight:800;color:#64748b;margin-top:2px">--</div>
+      </div>
+    </div>
+
+    <!-- Trạng thái tổng quát -->
     <div id="syncStatusBanner" style="padding:10px 14px;border-radius:8px;font-size:13px;display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border:1px solid #e2e8f0">
       <div style="display:flex;align-items:center;gap:8px">
         <span id="syncStatusDot" style="width:10px;height:10px;border-radius:50%;background:#94a3b8;display:inline-block"></span>
@@ -5139,8 +5204,9 @@ summary { cursor: pointer; color: #2563eb; font-size: 13.5px; font-weight: 600; 
   </div>
 
   <div style="padding:14px 20px;border-top:1px solid #e2e8f0;background:#f8fafc;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn ghost sm" type="button" id="btnSyncDryRun" onclick="runSyncDryRun()" style="border-color:#cbd5e1">🔍 Kiểm tra dự kiến (Dry-run)</button>
+      <button class="btn sm" type="button" id="btnSyncCleanStale" onclick="runCleanStaleRows()" style="background:#dc2626;color:#fff;border-color:#dc2626;font-weight:600">🧹 Dọn dẹp dòng kiểm thử & dư thừa</button>
       <button class="btn sm" type="button" id="btnSyncReconcile" onclick="runAutoReconcile()" style="background:#059669;color:#fff;border-color:#059669;font-weight:600">🔧 Tự động đối soát & Sửa lệch</button>
     </div>
     <div style="display:flex;gap:10px">
@@ -7018,11 +7084,11 @@ function getFilteredEmployees(){
 
   // 1. Lọc theo thẻ thống kê đang chọn
   if (currentEmpStatFilter === 'active') {
-    list = list.filter(e => (e.status === 'ACTIVE' || e.profile_status === 'ACTIVE'));
+    list = list.filter(e => !e.is_deleted && (e.employment_status === 'ACTIVE' || e.status === 'ACTIVE' || e.profile_status === 'ACTIVE'));
   } else if (currentEmpStatFilter === 'resigned') {
-    list = list.filter(e => (e.status === 'RESIGNED' || e.profile_status === 'RESIGNED'));
+    list = list.filter(e => (e.employment_status === 'RESIGNED' || e.status === 'RESIGNED' || e.profile_status === 'RESIGNED'));
   } else if (currentEmpStatFilter === 'deleted') {
-    list = list.filter(e => (e.status === 'DELETED' || e.profile_status === 'DELETED'));
+    list = list.filter(e => (e.is_deleted === true || e.status === 'DELETED' || e.profile_status === 'DELETED'));
   } else if (currentEmpStatFilter === 'ocr') {
     list = list.filter(e => !!(e.fileName || e.file_name || e.ocr_file_name));
   } else if (currentEmpStatFilter === 'has_user') {
@@ -7031,7 +7097,11 @@ function getFilteredEmployees(){
 
   // 2. Lọc theo dropdown trạng thái (nếu có chọn khác với thẻ)
   if (selectedStatus && selectedStatus !== 'ALL' && !['active', 'resigned', 'deleted'].includes(currentEmpStatFilter)) {
-    list = list.filter(e => (e.status === selectedStatus || e.profile_status === selectedStatus));
+    if (selectedStatus === 'DELETED') {
+      list = list.filter(e => (e.is_deleted === true || e.status === 'DELETED' || e.profile_status === 'DELETED'));
+    } else {
+      list = list.filter(e => !e.is_deleted && (e.employment_status === selectedStatus || e.status === selectedStatus || e.profile_status === selectedStatus));
+    }
   }
 
   // 3. Lọc theo dropdown tài khoản (nếu có chọn khác với thẻ)
@@ -7112,20 +7182,26 @@ function renderEmployeesTable(employees){
     const phone = esc(e.phone_number || '-');
     const email = e.email ? `<a href="mailto:${esc(e.email)}" style="color:#0284c7;text-decoration:none">${esc(e.email)}</a>` : '-';
     
-    // Trạng thái hồ sơ
-    const isEmpActive = (e.profile_status === 'ACTIVE' || e.status === 'ACTIVE');
-    const isEmpDeleted = (e.profile_status === 'DELETED' || e.status === 'DELETED');
-    const isEmpResigned = (e.profile_status === 'RESIGNED' || e.status === 'RESIGNED');
+    // Trạng thái hồ sơ & Người cập nhật gần nhất
+    const empStat = e.employment_status || (e.status === 'RESIGNED' ? 'RESIGNED' : 'ACTIVE');
+    const isEmpDeleted = (e.is_deleted === true || e.status === 'DELETED');
+    const uploaderOrUpdater = e.updated_by || e.uploaded_by || '';
+    const actorBadge = uploaderOrUpdater ? `<span style="font-size:10.5px;color:#64748b;font-weight:500;margin-top:2px" title="Người cập nhật gần nhất">bởi @${esc(uploaderOrUpdater)}</span>` : '';
     let statusPill = '';
-    if(isEmpActive){
-      statusPill = '<span class="status-pill" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:#10b981"></span>Đang làm việc</span>';
-    } else if(isEmpResigned){
+
+    if (isEmpDeleted) {
+      statusPill = `<div style="display:inline-flex;flex-direction:column;align-items:flex-start"><span class="status-pill" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:#ef4444"></span>Đã xóa mềm</span>${actorBadge}</div>`;
+    } else if (empStat === 'RESIGNED') {
       const resDateStr = e.resignation_date ? ` (${fmtDate(e.resignation_date)})` : '';
-      statusPill = `<span class="status-pill" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;display:inline-flex;align-items:center;gap:4px;white-space:nowrap" title="Đã nghỉ việc${resDateStr}"><span style="width:6px;height:6px;border-radius:50%;background:#f59e0b"></span>Đã nghỉ việc${resDateStr}</span>`;
-    } else if(isEmpDeleted){
-      statusPill = '<span class="status-pill" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:#ef4444"></span>Đã xóa mềm</span>';
+      statusPill = `<div style="display:inline-flex;flex-direction:column;align-items:flex-start"><span class="status-pill" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;display:inline-flex;align-items:center;gap:4px;white-space:nowrap" title="Đã nghỉ việc${resDateStr}"><span style="width:6px;height:6px;border-radius:50%;background:#f59e0b"></span>Đã nghỉ việc${resDateStr}</span>${actorBadge}</div>`;
+    } else if (empStat === 'PROBATION') {
+      statusPill = `<div style="display:inline-flex;flex-direction:column;align-items:flex-start"><span class="status-pill" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:#3b82f6"></span>Thử việc</span>${actorBadge}</div>`;
+    } else if (empStat === 'SUSPENDED') {
+      statusPill = `<div style="display:inline-flex;flex-direction:column;align-items:flex-start"><span class="status-pill" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#faf5ff;color:#6b21a8;border:1px solid #e9d5ff;display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:#a855f7"></span>Tạm hoãn</span>${actorBadge}</div>`;
+    } else if (empStat === 'TERMINATED') {
+      statusPill = `<div style="display:inline-flex;flex-direction:column;align-items:flex-start"><span class="status-pill" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:#ef4444"></span>Chấm dứt HĐLĐ</span>${actorBadge}</div>`;
     } else {
-      statusPill = '<span class="status-pill" style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:12px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:#94a3b8"></span>Vô hiệu hóa</span>';
+      statusPill = `<div style="display:inline-flex;flex-direction:column;align-items:flex-start"><span class="status-pill" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:#10b981"></span>Đang làm việc</span>${actorBadge}</div>`;
     }
 
     // File đính kèm / scan OCR
@@ -9955,7 +10031,8 @@ function openEditEmployeeModal(empId){
   $('editEmpPosInput').value = emp.job_title || emp.position || '';
   $('editEmpEmailInput').value = emp.email || '';
   if($('editEmpPhoneInput')) $('editEmpPhoneInput').value = emp.phone_number || '';
-  $('editEmpStatusSelect').value = (emp.profile_status || emp.status || 'ACTIVE');
+  if($('editEmpJobGradeInput')) $('editEmpJobGradeInput').value = emp.job_grade || '';
+  if($('editEmpEmploymentStatusSelect')) $('editEmpEmploymentStatusSelect').value = (emp.employment_status || emp.profile_status || emp.status || 'ACTIVE');
 
   const msg = $('editEmpMsg');
   if(msg) msg.style.display = 'none';
@@ -9977,7 +10054,8 @@ async function submitEditEmployee(){
   const pos = $('editEmpPosInput').value.trim();
   const email = $('editEmpEmailInput').value.trim();
   const phone = $('editEmpPhoneInput') ? $('editEmpPhoneInput').value.trim() : '';
-  const status = $('editEmpStatusSelect').value;
+  const jobGrade = $('editEmpJobGradeInput') ? $('editEmpJobGradeInput').value.trim() : '';
+  const employmentStatus = $('editEmpEmploymentStatusSelect') ? $('editEmpEmploymentStatusSelect').value : 'ACTIVE';
   const msg = $('editEmpMsg');
   const btn = $('btnSubmitEditEmp');
 
@@ -10006,7 +10084,8 @@ async function submitEditEmployee(){
         position: pos,
         email: email,
         phone_number: phone,
-        status: status
+        job_grade: jobGrade,
+        employment_status: employmentStatus
       })
     });
     const data = await res.json();
@@ -10332,6 +10411,22 @@ async function checkSyncStatus(){
   const resultMsg = $('syncResultMsg');
   const reconDetails = $('syncReconDetails');
 
+  // Metric breakdown elements
+  const metricMatched = $('syncMetricMatched');
+  const metricMissing = $('syncMetricMissing');
+  const metricMismatches = $('syncMetricMismatches');
+  const metricTest = $('syncMetricTest');
+  const metricStale = $('syncMetricStale');
+  const metricNeedsVerification = $('syncMetricNeedsVerification');
+
+  // Layer badges
+  const pipeBadge = $('syncLayerPipelineBadge');
+  const pipeText = $('syncLayerPipelineText');
+  const reconBadge = $('syncLayerReconBadge');
+  const reconText = $('syncLayerReconText');
+  const integBadge = $('syncLayerIntegrityBadge');
+  const integText = $('syncLayerIntegrityText');
+
   if(dryRunWrap) dryRunWrap.style.display = 'none';
   if(resultMsg) resultMsg.style.display = 'none';
   if(reconDetails) reconDetails.style.display = 'none';
@@ -10354,46 +10449,111 @@ async function checkSyncStatus(){
     }
 
     const counts = data.counts || {};
-    const webCount = counts.website_postgres ?? '--';
-    const sheetsCount = counts.google_sheets ?? '--';
-    const nocoCount = counts.nocodb ?? '--';
+    const webActive = counts.website_active ?? counts.website_postgres ?? '--';
+    const webTotal = counts.website_postgres ?? '--';
+    const nocoActive = counts.nocodb_active ?? counts.nocodb_official ?? '--';
+    const nocoTotal = counts.nocodb_official ?? '--';
+    const sheetsTotal = counts.google_sheets_total ?? '--';
+    const sheetsMatched = counts.google_sheets_matched ?? 0;
+    const sheetsDupes = counts.google_sheets_duplicates ?? 0;
+    const sheetsStale = counts.google_sheets_stale ?? 0;
+    const sheetsTest = counts.google_sheets_test ?? 0;
+    const sheetsNeedsVerif = counts.google_sheets_needs_verification ?? 0;
+    const sheetsMissing = counts.google_sheets_missing ?? 0;
+    const sheetsMismatches = counts.google_sheets_mismatches ?? 0;
 
-    if(statWebsite) statWebsite.textContent = webCount;
-    if(statSheets) statSheets.textContent = sheetsCount;
-    if(statNoco) statNoco.textContent = nocoCount;
+    if(statWebsite) statWebsite.textContent = webActive;
+    if($('syncSubWebsite')) $('syncSubWebsite').textContent = `Hoạt động: ${webActive} | Tổng: ${webTotal}`;
+
+    if(statNoco) statNoco.textContent = nocoActive;
+    if($('syncSubNoco')) $('syncSubNoco').textContent = `Hoạt động: ${nocoActive} | Bảng: hr_employee_profiles`;
+
+    if(statSheets) statSheets.textContent = sheetsTotal;
+    if($('syncSubSheets')) $('syncSubSheets').textContent = `Khớp SoT: ${sheetsMatched} | Dư: ${sheetsStale + sheetsTest}`;
+
+    // Update 6 metrics
+    if(metricMatched) metricMatched.textContent = sheetsMatched;
+    if(metricMissing) metricMissing.textContent = sheetsMissing;
+    if(metricMismatches) metricMismatches.textContent = sheetsMismatches;
+    if(metricTest) metricTest.textContent = sheetsTest;
+    if(metricStale) metricStale.textContent = sheetsStale;
+    if(metricNeedsVerification) metricNeedsVerification.textContent = sheetsNeedsVerif;
+
+    // Update 3 Integrity Layers
+    const layers = data.integrity_layers || {};
+    const pipe = layers.sync_pipeline || {};
+    const reconL = layers.reconciliation || {};
+    const integ = layers.data_integrity || {};
+
+    if(pipeBadge){
+      if(pipe.status === 'SYNC_SUCCESS'){
+        pipeBadge.textContent = 'THÀNH CÔNG';
+        pipeBadge.style.background = '#dcfce7';
+        pipeBadge.style.color = '#15803d';
+      } else if(pipe.status === 'SYNC_PENDING'){
+        pipeBadge.textContent = 'ĐANG XỬ LÝ';
+        pipeBadge.style.background = '#dbeafe';
+        pipeBadge.style.color = '#1d4ed8';
+      } else {
+        pipeBadge.textContent = 'LỖI';
+        pipeBadge.style.background = '#fee2e2';
+        pipeBadge.style.color = '#b91c1c';
+      }
+    }
+    if(pipeText) pipeText.textContent = pipe.message || 'Hàng đợi outbox sạch';
+
+    if(reconBadge){
+      if(reconL.status === 'RECONCILIATION_SUCCESS'){
+        reconBadge.textContent = 'KHỚP 100%';
+        reconBadge.style.background = '#dcfce7';
+        reconBadge.style.color = '#15803d';
+      } else {
+        reconBadge.textContent = 'LỆCH ĐỊNH DANH';
+        reconBadge.style.background = '#fee2e2';
+        reconBadge.style.color = '#b91c1c';
+      }
+    }
+    if(reconText) reconText.textContent = reconL.message || 'Đối soát theo employee_id';
+
+    if(integBadge){
+      if(inte.status === 'DATA_INTEGRITY_SUCCESS'){
+        integBadge.textContent = 'TOÀN VẸN';
+        integBadge.style.background = '#dcfce7';
+        integBadge.style.color = '#15803d';
+      } else {
+        integBadge.textContent = 'CẢNH BÁO';
+        integBadge.style.background = '#fef3c7';
+        integBadge.style.color = '#b45309';
+      }
+    }
+    if(integText) integText.textContent = integ.message || 'Không có dòng rác';
 
     const state = data.state;
+    const isFullySync = data.status && data.status.is_synchronized;
     const lastTime = data.last_success_time ? new Date(data.last_success_time).toLocaleString('vi-VN') : 'Chưa có';
 
-    if(state === 'SYNC_SUCCESS'){
+    // Tuyệt đối không hiển thị thành công 100% nếu Google Sheets còn dữ liệu dư thừa
+    if(isFullySync){
       if(banner){
         banner.style.background = '#f0fdf4';
         banner.style.borderColor = '#bbf7d0';
       }
       if(dot) dot.style.background = '#16a34a';
-      if(text) text.innerHTML = `<span style="color:#15803d;font-weight:700">✓ Đã đồng bộ và xác nhận thành công 100% (${data.reconciled_count || webCount}/${webCount} hồ sơ)</span><div style="font-size:11px;color:#166534;font-weight:400;margin-top:2px">Lần đồng bộ thành công gần nhất: ${lastTime} • Số bản ghi thiếu: 0 • Tác vụ lỗi: 0</div>`;
+      if(text) text.innerHTML = `<span style="color:#15803d;font-weight:700">✓ Đã đối soát & xác nhận thành công 100% (${sheetsMatched}/${nocoTotal} hồ sơ)</span><div style="font-size:11px;color:#166534;font-weight:400;margin-top:2px">Lần đồng bộ gần nhất: ${lastTime} • Cả 3 lớp toàn vẹn đạt chuẩn • Dòng dư thừa: 0</div>`;
+    } else if(state === 'DATA_INTEGRITY_WARNING' || sheetsStale > 0 || sheetsTest > 0){
+      if(banner){
+        banner.style.background = '#fffbeb';
+        banner.style.borderColor = '#fde68a';
+      }
+      if(dot) dot.style.background = '#f59e0b';
+      if(text) text.innerHTML = `<span style="color:#b45309;font-weight:700">⚠️ Google Sheets còn ${sheetsStale + sheetsTest} dòng kiểm thử / dư thừa</span><div style="font-size:11px;color:#92400e;margin-top:2px">NocoDB là nguồn chuẩn (3 hồ sơ). Bấm "Dọn dẹp dòng kiểm thử & dư thừa" để loại bỏ dữ liệu rác.</div>`;
     } else if(state === 'DATA_MISMATCH'){
       if(banner){
         banner.style.background = '#fffbeb';
         banner.style.borderColor = '#fde68a';
       }
       if(dot) dot.style.background = '#f59e0b';
-      if(text) text.innerHTML = `<span style="color:#b45309;font-weight:700">⚠️ Phát hiện lệch dữ liệu: Còn thiếu ${data.missing_count} hồ sơ!</span><div style="font-size:11px;color:#92400e;margin-top:2px">${data.status_message}</div>`;
-      
-      if(reconDetails && data.reconciliation){
-        reconDetails.style.display = 'block';
-        let detailHtml = '<div style="font-weight:700;color:#92400e;margin-bottom:4px">🔍 Chi tiết sai lệch phát hiện:</div>';
-        if(data.reconciliation.missing_in_nocodb?.length > 0){
-          detailHtml += `<div>• Thiếu trên NocoDB: <b>${data.reconciliation.missing_in_nocodb.map(m => m.employee_code || m.emp_uuid).join(', ')}</b></div>`;
-        }
-        if(data.reconciliation.missing_in_sheets?.length > 0){
-          detailHtml += `<div>• Thiếu trên Google Sheets: <b>${data.reconciliation.missing_in_sheets.map(m => m.employee_code || m.emp_uuid).join(', ')}</b></div>`;
-        }
-        if(data.reconciliation.status_mismatches?.length > 0){
-          detailHtml += `<div>• Lệch trạng thái: <b>${data.reconciliation.status_mismatches.map(m => `${m.employee_code} (${m.emp_status} vs ${m.profile_status})`).join(', ')}</b></div>`;
-        }
-        reconDetails.innerHTML = detailHtml;
-      }
+      if(text) text.innerHTML = `<span style="color:#b45309;font-weight:700">⚠️ Phát hiện lệch dữ liệu: ${data.status_message}</span><div style="font-size:11px;color:#92400e;margin-top:2px">NocoDB là nguồn chuẩn duy nhất. Bấm "Tự động đối soát & Sửa lệch" để khắc phục theo NocoDB.</div>`;
     } else if(state === 'SYNC_FAILED'){
       if(banner){
         banner.style.background = '#fef2f2';
@@ -10410,10 +10570,110 @@ async function checkSyncStatus(){
       if(text) text.innerHTML = `<span style="color:#1d4ed8;font-weight:700">⏳ ${data.status_message}</span>`;
     }
 
+    if(reconDetails && data.reconciliation){
+      const recon = data.reconciliation;
+      let hasIssues = false;
+      let detailHtml = '<div style="font-weight:700;color:#92400e;margin-bottom:6px">🔍 Chi tiết phân tích toàn vẹn dữ liệu:</div>';
+
+      if(recon.test_records_in_sheets?.length > 0){
+        hasIssues = true;
+        detailHtml += `<div style="color:#b91c1c;font-weight:600;margin-bottom:3px">• Dữ liệu kiểm thử trên Sheets (${recon.test_records_in_sheets.length} hồ sơ): ` +
+          recon.test_records_in_sheets.map(t => `<b>${esc(t.employee_id)}</b> - ${esc(t.full_name)} [Dòng ${t.rowNumbers.join(', ')}]`).join('; ') + `</div>`;
+      }
+      if(recon.stale_in_sheets?.length > 0){
+        hasIssues = true;
+        detailHtml += `<div style="color:#475569;font-weight:600;margin-bottom:3px">• Hồ sơ dư thừa / Stale (${recon.stale_in_sheets.length} hồ sơ): ` +
+          recon.stale_in_sheets.map(s => `<b>${esc(s.employee_id)}</b> - ${esc(s.full_name)} [Dòng ${s.rowNumbers.join(', ')}]`).join('; ') + `</div>`;
+      }
+      if(recon.duplicates_in_sheets?.length > 0){
+        hasIssues = true;
+        detailHtml += `<div style="color:#b91c1c;font-weight:600;margin-bottom:3px">• Trùng khóa employee_id trên Sheets: ` +
+          recon.duplicates_in_sheets.map(d => `<b>${esc(d.employee_id)}</b> (${d.count} dòng: ${d.rowNumbers.join(', ')})`).join('; ') + `</div>`;
+      }
+      if(recon.missing_in_sheets?.length > 0){
+        hasIssues = true;
+        detailHtml += `<div style="margin-bottom:3px">• Thiếu trên Google Sheets: <b>` + recon.missing_in_sheets.map(m => esc(m.employee_id)).join(', ') + `</b></div>`;
+      }
+      if(recon.status_mismatches?.length > 0){
+        hasIssues = true;
+        detailHtml += `<div style="margin-bottom:3px">• Lệch trạng thái: ` + recon.status_mismatches.map(m => `<b>${esc(m.employee_id)}</b> (NocoDB: ${esc(m.nocodb_status)} vs Sheets: ${esc(m.sheets_status)})`).join('; ') + `</div>`;
+      }
+      if(recon.data_mismatches?.length > 0){
+        hasIssues = true;
+        detailHtml += `<div style="margin-bottom:3px">• Lệch nội dung: <b>` + recon.data_mismatches.map(m => esc(m.employee_id)).join(', ') + `</b></div>`;
+      }
+      if(recon.needs_verification_in_sheets?.length > 0){
+        hasIssues = true;
+        detailHtml += `<div style="color:#64748b;margin-bottom:3px">• Cần xác minh nguồn gốc: <b>` + recon.needs_verification_in_sheets.map(m => esc(m.employee_id)).join(', ') + `</b></div>`;
+      }
+
+      if(hasIssues){
+        reconDetails.style.display = 'block';
+        reconDetails.innerHTML = detailHtml;
+      } else {
+        reconDetails.style.display = 'none';
+      }
+    }
+
     updateAutoSyncPill();
   } catch(err){
     if(dot) dot.style.background = '#ef4444';
     if(text) text.textContent = 'Lỗi kết nối API đồng bộ: ' + err.message;
+  }
+}
+
+async function runCleanStaleRows(){
+  const btn = $('btnSyncCleanStale');
+  const msg = $('syncResultMsg');
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = 'Đang dọn dẹp...';
+  }
+  if(msg){
+    msg.style.display = 'block';
+    msg.style.background = '#eff6ff';
+    msg.style.color = '#1d4ed8';
+    msg.textContent = '⏳ Đang tiến hành xóa an toàn các dòng kiểm thử và hồ sơ dư thừa khỏi Google Sheets...';
+  }
+
+  try {
+    const res = await fetch('/api/employees/sync/clean-stale', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${getAuthToken()}` }
+    });
+    const data = await res.json();
+    if(!res.ok || !data.success){
+      if(msg){
+        msg.style.background = '#fef2f2';
+        msg.style.color = '#dc2626';
+        msg.textContent = '❌ Lỗi dọn dẹp: ' + (data.error || res.statusText);
+      }
+      return;
+    }
+
+    const recon = data.data || {};
+    const cleanedCount = recon.counts?.google_sheets_cleaned || 0;
+    if(msg){
+      msg.style.background = '#f0fdf4';
+      msg.style.color = '#15803d';
+      msg.innerHTML = `<b>✓ Dọn dẹp dữ liệu kiểm thử & dư thừa thành công!</b><br>` +
+        `• Đã xóa khỏi Google Sheets: ${cleanedCount} dòng<br>` +
+        `• Số hồ sơ chuẩn còn lại trên Sheets: ${recon.counts?.google_sheets_total || 0} hồ sơ (khớp hoàn toàn NocoDB SoT)`;
+    }
+    toast(`Đã dọn dẹp ${cleanedCount} dòng rác khỏi Google Sheets!`, 'ok');
+    await checkSyncStatus();
+    updateAutoSyncPill();
+  } catch(err){
+    if(msg){
+      msg.style.background = '#fef2f2';
+      msg.style.color = '#dc2626';
+      msg.textContent = '❌ Lỗi kết nối: ' + err.message;
+    }
+  } finally {
+    if(btn){
+      btn.disabled = false;
+      btn.textContent = '🧹 Dọn dẹp dòng kiểm thử & dư thừa';
+    }
   }
 }
 
@@ -10428,13 +10688,17 @@ async function runAutoReconcile(){
     msg.style.display = 'block';
     msg.style.background = '#eff6ff';
     msg.style.color = '#1d4ed8';
-    msg.textContent = '⏳ Đang tiến hành đối soát và tự động sửa lệch dữ liệu an toàn...';
+    msg.textContent = '⏳ Đang tiến hành đối soát, dọn dẹp dòng rác và tự động sửa lệch dữ liệu an toàn...';
   }
 
   try {
     const res = await fetch('/api/employees/sync/reconcile', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${getAuthToken()}` }
+      headers: { 
+        'Authorization': `Bearer ${getAuthToken()}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ cleanStale: true })
     });
     const data = await res.json();
     if(!res.ok || !data.success){
@@ -10447,13 +10711,16 @@ async function runAutoReconcile(){
     }
 
     const recon = data.data || {};
+    const cleanedCount = recon.counts?.google_sheets_cleaned || 0;
+    const fixedCount = recon.fixed_in_sheets?.length || 0;
     if(msg){
       msg.style.background = '#f0fdf4';
       msg.style.color = '#15803d';
-      msg.innerHTML = `<b>✓ Đối soát và sửa lệch dữ liệu thành công!</b><br>` +
-        `• Đã đối soát: ${recon.reconciled_count} hồ sơ<br>` +
-        `• NocoDB đã sửa: ${recon.fixed_in_nocodb?.length || 0} hồ sơ<br>` +
-        `• Google Sheets đã sửa: ${recon.fixed_in_sheets?.length || 0} hồ sơ`;
+      msg.innerHTML = `<b>✓ Đối soát, dọn dẹp và sửa lệch dữ liệu thành công!</b><br>` +
+        `• Khớp hồ sơ chuẩn NocoDB: ${recon.reconciled_count} hồ sơ<br>` +
+        `• Đã dọn dẹp dòng kiểm thử/dư thừa: ${cleanedCount} dòng<br>` +
+        `• Đã sửa/bổ sung trên Sheets: ${fixedCount} hồ sơ` +
+        (recon.duplicates_in_sheets?.length > 0 ? `<br><span style="color:#b91c1c;font-weight:600">• Cảnh báo: Có ${recon.duplicates_in_sheets.length} hồ sơ trùng trên Sheets cần xử lý!</span>` : '');
     }
     toast('Đối soát và sửa lệch dữ liệu thành công!', 'ok');
     await checkSyncStatus();

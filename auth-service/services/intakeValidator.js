@@ -155,9 +155,9 @@ async function checkDatabaseCccdDuplicates(cleanCccd, targetCompany, user = {}, 
        WHERE (e.citizen_id = $1 OR LPAD(e.citizen_id, 12, '0') = LPAD($1, 12, '0'))
        UNION ALL
        SELECT 'hr_employee_profiles' AS source_table, p.id::text AS id, p.employee_id AS employee_code, p.full_name, p.citizen_id, p.company_id,
-              CASE WHEN p.job_grade = '[ĐÃ XÓA]' THEN 'DELETED'
-                   WHEN p.job_grade = '[NGHỈ VIỆC]' THEN 'RESIGNED'
-                   ELSE 'ACTIVE' END AS status,
+              CASE WHEN p.is_deleted = true OR p.status = 'DELETED' THEN 'DELETED'
+                   WHEN p.employment_status = 'RESIGNED' OR p.status = 'RESIGNED' THEN 'RESIGNED'
+                   ELSE COALESCE(p.employment_status, p.status, 'ACTIVE') END AS status,
               c.company_name
        FROM hr_employee_profiles p
        LEFT JOIN companies c ON p.company_id = c.id

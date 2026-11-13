@@ -451,6 +451,7 @@ async function executeStagingApproval(client, it, user) {
   if (it.intake_mode === 'insufficient_data') {
     const err = new Error(`Hồ sơ "${fullName}" thiếu dữ liệu định danh bắt buộc (insufficient_data). Không thể phê duyệt.`);
     err.status = 400;
+    err.code = 'INSUFFICIENT_DATA';
     throw err;
   }
 
@@ -559,6 +560,12 @@ async function executeStagingApproval(client, it, user) {
     const deptVal = diff.department_staffing_plan?.new_value || diff.department?.new_value;
     const posVal = diff.job_title?.new_value;
     const emailVal = diff.email?.new_value;
+
+    // Preserve DELETED or RESIGNED status if updating an existing employee (Rule BIZ-STATUS-01)
+    const existingEmpRes = await client.query('SELECT status FROM employees WHERE company_id = $1 AND employee_code = $2', [comp, targetCode]);
+    const existingEmp = existingEmpRes.rows[0] || {};
+    const targetStatus = (existingEmp.status === 'DELETED' || existingEmp.status === 'RESIGNED') ? existingEmp.status : undefined;
+
     if (deptVal || posVal || emailVal) {
       await client.query(
         `UPDATE employees SET
@@ -662,7 +669,10 @@ async function executeStagingApproval(client, it, user) {
     if (profCheck.rows.length > 0) {
       await client.query(
         `UPDATE hr_employee_profiles
-         SET job_grade = '',
+         SET is_deleted = false,
+             deleted_at = NULL,
+             employment_status = 'ACTIVE',
+             status = 'ACTIVE',
              resignation_date = NULL,
              resignation_reason = NULL,
              full_name = REPLACE(REPLACE(COALESCE(NULLIF($1, ''), full_name), ' [ĐÃ XÓA]', ''), ' [NGHỈ VIỆC]', ''),
@@ -761,7 +771,7 @@ async function executeStagingApproval(client, it, user) {
       const existingCheckGlobal = await client.query(
         `SELECT 'employees' as src, company_id, employee_code, employee_name as full_name FROM employees WHERE (citizen_id = $1 OR LPAD(citizen_id, 12, '0') = LPAD($1, 12, '0')) AND status != 'DELETED'
          UNION ALL
-         SELECT 'hr_employee_profiles' as src, company_id, employee_id as employee_code, full_name FROM hr_employee_profiles WHERE (citizen_id = $1 OR LPAD(citizen_id, 12, '0') = LPAD($1, 12, '0')) AND job_grade != '[ĐÃ XÓA]'
+         SELECT 'hr_employee_profiles' as src, company_id, employee_id as employee_code, full_name FROM hr_employee_profiles WHERE (citizen_id = $1 OR LPAD(citizen_id, 12, '0') = LPAD($1, 12, '0')) AND is_deleted = false
          LIMIT 1`,
         [cleanCitizenId]
       );
@@ -843,7 +853,7 @@ async function executeStagingApproval(client, it, user) {
         ext.permanent_address || '',
         ext.temporary_address || '',
         ext.current_address || '',
-        ext.ethnicity || 'Kinh',
+        ext.ethnicity || '',
         ext.education_level || '',
         ext.education_code || '',
         ext.qualification || '',
@@ -918,11 +928,15 @@ async function executeStagingApproval(client, it, user) {
       startDate = String(rawStartDate).trim();
     }
 
+    const actorUser = user?.username || it.uploaded_by || 'superadmin';
+
+    const empStatusVal = it.employment_status || ext.employment_status || 'ACTIVE';
+
     await client.query(`
       INSERT INTO employees (
-        id, person_id, employee_code, employee_name, company_id, department, position, email, status, citizen_id, employment_start_date, created_at, updated_at
+        id, person_id, employee_code, employee_name, company_id, department, position, email, status, employment_status, citizen_id, employment_start_date, updated_by, created_at, updated_at
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, 'ACTIVE', $9, $10, NOW(), NOW()
+        $1, $2, $3, $4, $5, $6, $7, $8, 'ACTIVE', $9, $10, $11, $12, NOW(), NOW()
       );
     `, [
       empId,
@@ -933,8 +947,10 @@ async function executeStagingApproval(client, it, user) {
       it.department || ext.department_staffing_plan || '',
       it.job_title || ext.job_title || '',
       it.email || ext.email || '',
+      empStatusVal,
       maskedCitizen,
-      startDate
+      startDate,
+      actorUser
     ]);
 
     // 3. Tạo hồ sơ chi tiết hr_employee_profiles
@@ -955,7 +971,7 @@ async function executeStagingApproval(client, it, user) {
         contract_start_date, contract_end_date, recruitment_decision_no,
         employment_start_date, official_labor_contract_sign_date, phone_number,
         email, create_time, file_name, company_id, version, created_at, updated_at,
-        uploaded_by
+        uploaded_by, updated_by, employment_status
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10,
@@ -968,7 +984,7 @@ async function executeStagingApproval(client, it, user) {
         $41, $42, $43, $44, $45,
         $46, $47, $48, $49, $50,
         $51, $52, $53, $54, $55, 1, NOW(), NOW(),
-        $56
+        $56, $57, $58
       ) RETURNING id;`,
       [
         empId,
@@ -989,7 +1005,7 @@ async function executeStagingApproval(client, it, user) {
         ext.permanent_address || '',
         ext.temporary_address || '',
         ext.current_address || '',
-        ext.ethnicity || 'Kinh',
+        ext.ethnicity || '',
         ext.education_level || '',
         ext.education_code || '',
         ext.qualification || '',
@@ -1026,7 +1042,9 @@ async function executeStagingApproval(client, it, user) {
         ext.create_time || new Date().toISOString(),
         it.file_name || 'MANUAL_INTAKE',
         comp,
-        it.uploaded_by || null
+        it.uploaded_by || actorUser,
+        actorUser,
+        empStatusVal
       ]
     );
     const profileId = profInsert.rows[0].id;
@@ -1098,9 +1116,6 @@ async function executeStagingApproval(client, it, user) {
           updated_at = NOW()
       WHERE id = $4;
     `, [officialCode, profileId, user.username, it.id]);
-
-    // 8. Transactional Outbox (Ghi trong cùng transaction)
-    await queueSyncTasks(it.id, client);
 
     return {
       type: 'created',
@@ -1516,16 +1531,31 @@ router.post('/approve', verifyToken, async (req, res) => {
       const valErrors = Array.isArray(pc.validation_errors) ? [...pc.validation_errors] : [];
 
       // FAIL-CLOSED: If dossier was staged with unverified / unavailable duplicate check, block approval
-      if (it.intake_mode === 'insufficient_data' || valErrors.some(e => e.code === 'DUPLICATE_CHECK_UNAVAILABLE')) {
-        return res.status(400).json({
+      if (valErrors.some(e => e.code === 'DUPLICATE_CHECK_UNAVAILABLE')) {
+        return res.status(503).json({
           success: false,
-          error: `Từ chối phê duyệt: Hồ sơ "${it.full_name}" đang ở chế độ dữ liệu chưa hoàn tất hoặc chưa thể đối soát trùng lặp (DUPLICATE_CHECK_UNAVAILABLE). Vui lòng cập nhật hoặc kiểm tra lại trước khi phê duyệt.`,
+          error: `Từ chối phê duyệt: Hồ sơ "${it.full_name}" chưa thể đối soát trùng lặp do CSDL kiểm tra tạm thời không sẵn sàng (DUPLICATE_CHECK_UNAVAILABLE). Vui lòng thử lại sau.`,
           code: 'DUPLICATE_CHECK_UNAVAILABLE',
           validation_errors: [{
             code: 'DUPLICATE_CHECK_UNAVAILABLE',
             severity: 'BLOCKING',
             blocking: true,
             safe_message: 'Hồ sơ chưa hoàn thành đối soát trùng lặp do CSDL kiểm tra tạm thời không sẵn sàng.'
+          }]
+        });
+      }
+
+      // FAIL-CLOSED: If dossier was staged with insufficient data, block approval with explicit INSUFFICIENT_DATA code
+      if (it.intake_mode === 'insufficient_data') {
+        return res.status(400).json({
+          success: false,
+          error: `Từ chối phê duyệt: Hồ sơ "${it.full_name}" đang ở chế độ dữ liệu chưa hoàn tất (INSUFFICIENT_DATA). Vui lòng cập nhật bổ sung trước khi phê duyệt.`,
+          code: 'INSUFFICIENT_DATA',
+          validation_errors: [{
+            code: 'INSUFFICIENT_DATA',
+            severity: 'BLOCKING',
+            blocking: true,
+            safe_message: 'Hồ sơ thiếu dữ liệu định danh bắt buộc (họ tên hoặc số CCCD).'
           }]
         });
       }
@@ -1674,6 +1704,7 @@ router.post('/approve', verifyToken, async (req, res) => {
         if (inXactDupCheck && inXactDupCheck.duplicateType === 'DUPLICATE_CHECK_UNAVAILABLE') {
           const err = new Error(`503 Service Unavailable: Dịch vụ đối soát trùng lặp CCCD không khả dụng trong giao dịch phê duyệt.`);
           err.status = 503;
+          err.code = 'DUPLICATE_CHECK_UNAVAILABLE';
           throw err;
         }
       }
@@ -1696,7 +1727,11 @@ router.post('/approve', verifyToken, async (req, res) => {
             action_type: 'RESTORE'
           });
         } else {
-          await queueSyncTasks(r.id);
+          try {
+            await queueSyncTasks(r.id);
+          } catch (syncErr) {
+            console.warn('[Approve] queueSyncTasks warning:', syncErr.message);
+          }
         }
       }
     }
@@ -1734,7 +1769,9 @@ router.post('/approve', verifyToken, async (req, res) => {
     await client.query('ROLLBACK');
     console.error('Lỗi phê duyệt hồ sơ:', err);
     const statusCode = err.status || 500;
-    return res.status(statusCode).json({ success: false, error: err.message });
+    const resp = { success: false, error: err.message };
+    if (err.code) resp.code = err.code;
+    return res.status(statusCode).json(resp);
   } finally {
     client.release();
   }
@@ -3239,11 +3276,11 @@ router.get('/export', verifyToken, async (req, res) => {
         whereClauses.push(`department_staffing_plan ILIKE $${params.length}`);
       }
       if (status === 'ACTIVE') {
-        whereClauses.push(`(job_grade != '[ĐÃ XÓA]' AND job_grade != '[NGHỈ VIỆC]')`);
+        whereClauses.push(`(is_deleted = false AND (employment_status = 'ACTIVE' OR status = 'ACTIVE'))`);
       } else if (status === 'DELETED') {
-        whereClauses.push(`job_grade = '[ĐÃ XÓA]'`);
+        whereClauses.push(`is_deleted = true`);
       } else if (status === 'RESIGNED') {
-        whereClauses.push(`job_grade = '[NGHỈ VIỆC]'`);
+        whereClauses.push(`(employment_status = 'RESIGNED' OR status = 'RESIGNED')`);
       }
       const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
       const profRes = await db.query(`SELECT * FROM hr_employee_profiles ${whereSql} ORDER BY id ASC`, params);
@@ -3490,7 +3527,11 @@ async function doApprovalForItems(itemsToProcess, user, canApprove, prefixMessag
             action_type: 'RESTORE'
           });
         } else {
-          await queueSyncTasks(r.id);
+          try {
+            await queueSyncTasks(r.id);
+          } catch (syncErr) {
+            console.warn('[Approve] queueSyncTasks warning:', syncErr.message);
+          }
         }
       }
     }
@@ -4306,13 +4347,617 @@ router.post('/internal/validate-token', verifyInternalAuth, async (req, res) => 
   }
 });
 
-// 2. POST /api/hoso/intake/internal/classify-document
+// 2. [DEPRECATED / REMOVED in Phase 1.1]: POST /api/hoso/intake/internal/classify-document
+// Document classification migrated 100% to n8n node "Classify - Document Type".
+// Proved 0 callers across all workflows, frontend, and tests.
 router.post('/internal/classify-document', verifyInternalAuth, (req, res) => {
+  return res.status(410).json({
+    success: false,
+    error: '410 Gone: Endpoint /internal/classify-document đã bị loại bỏ trong Phase 1.1. Logic phân loại đã được chuyển toàn diện sang n8n node "Classify - Document Type".'
+  });
+});
+
+// ============================================================================
+// 2B. UNIFIED INGESTION ENDPOINT (Phase 1.2):
+// POST /api/hoso/intake/internal/process-staged-candidate
+// Replaces the 4 sequential n8n calls:
+//   1. /normalize-canonical-fields
+//   2. /validate-duplicates
+//   3. /persist-staging
+//   4. /audit-log
+// ============================================================================
+router.post('/internal/process-staged-candidate', verifyInternalAuth, async (req, res) => {
+  let client = null;
   try {
-    const { fileName, textSnippet } = req.body || {};
-    const docType = classifyDocumentType(fileName || '', textSnippet || '');
-    return res.json({ success: true, docType, fileName });
+    const {
+      batch_id,
+      correlation_id,
+      idempotency_key,
+      conversation_id,
+      files,
+      candidates
+    } = req.body || {};
+
+    if (!batch_id) {
+      return res.status(400).json({ success: false, error: 'Thiếu batch_id bắt buộc.' });
+    }
+
+    const safeBatchId = toValidUUID(batch_id) || require('crypto').randomUUID();
+
+    // 1. Identity & Context Authentication (Anti-spoofing & RBAC)
+    const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_hrbot_2026_!@#$';
+    let verifiedUser = null;
+    let authHeader = req.headers['authorization'];
+    let token = req.body?.token;
+    if (!token && authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+
+    if (token) {
+      try {
+        const decoded = require('jsonwebtoken').verify(token, JWT_SECRET);
+        const uRes = await db.query(
+          `SELECT user_id, username, role, company_id, status FROM users WHERE user_id = $1 AND status = 'ACTIVE'`,
+          [decoded.user_id]
+        );
+        if (uRes.rows.length === 0) {
+          return res.status(401).json({ success: false, error: '401 Unauthorized: Người dùng không tồn tại hoặc tài khoản đã bị khóa.' });
+        }
+        verifiedUser = {
+          user_id: uRes.rows[0].user_id,
+          username: uRes.rows[0].username,
+          role: uRes.rows[0].role,
+          company_id: uRes.rows[0].company_id
+        };
+      } catch (jwtErr) {
+        return res.status(401).json({ success: false, error: '401 Unauthorized: JWT token không hợp lệ hoặc đã hết hạn.' });
+      }
+    } else if (req.body?.user && (req.body.user.user_id || req.body.user.username)) {
+      const u = req.body.user;
+      const uRes = await db.query(
+        `SELECT user_id, username, role, company_id, status FROM users WHERE (user_id = $1 OR username = $2) AND status = 'ACTIVE'`,
+        [u.user_id || null, u.username || '']
+      );
+      if (uRes.rows.length === 0) {
+        return res.status(401).json({ success: false, error: '401 Unauthorized: Người dùng không tồn tại trong hệ thống.' });
+      }
+      const realUser = uRes.rows[0];
+      // Anti-spoofing: Verify caller cannot escalate role or switch company arbitrarily
+      if (u.role && u.role !== realUser.role && realUser.role !== 'ADMIN' && realUser.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ success: false, error: '403 Forbidden: Quyền hạn (role) không hợp lệ so với cơ sở dữ liệu xác thực.' });
+      }
+      if (u.company_id && realUser.company_id && u.company_id.toUpperCase() !== realUser.company_id.toUpperCase()) {
+        return res.status(403).json({ success: false, error: `403 Forbidden: Bạn không có quyền thao tác hồ sơ cho đơn vị ${u.company_id}.` });
+      }
+      verifiedUser = {
+        user_id: realUser.user_id,
+        username: realUser.username,
+        role: realUser.role,
+        company_id: realUser.company_id
+      };
+    } else {
+      return res.status(401).json({ success: false, error: '401 Unauthorized: Thiếu token xác thực hoặc ngữ cảnh danh tính người dùng.' });
+    }
+
+    // Tenant tampering check: body.company_id vs verifiedUser.company_id
+    if (req.body.company_id && verifiedUser.company_id) {
+      if (req.body.company_id.toUpperCase() !== verifiedUser.company_id.toUpperCase()) {
+        return res.status(403).json({
+          success: false,
+          error: `403 Forbidden: Tài khoản thuộc ${verifiedUser.company_id} không có quyền ghi hồ sơ cho ${req.body.company_id}.`
+        });
+      }
+    }
+
+    // Permission check for upload
+    const canUpload = await hasPermission(verifiedUser.role, 'hr.intake.upload');
+    if (!canUpload) {
+      return res.status(403).json({ success: false, error: '403 Forbidden: Bạn không có quyền tải lên hồ sơ nhân sự.' });
+    }
+
+    let validConvId = toValidUUID(conversation_id);
+    if (validConvId) {
+      try {
+        const convCheck = await db.query(`SELECT id FROM ai_conversations WHERE id = $1`, [validConvId]);
+        if (convCheck.rows.length === 0) validConvId = null;
+      } catch(e) { validConvId = null; }
+    }
+
+    // 2. IDEMPOTENCY CHECK UNDER ADVISORY TRANSACTION LOCK
+    client = await db.getClient();
+    let existingStagingRows = [];
+    await client.query('BEGIN');
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext('intake_batch_' || $1))`, [safeBatchId]);
+
+      if (idempotency_key || correlation_id) {
+        const bRes = await client.query(
+          `SELECT s.* FROM hr_employee_staging s 
+           JOIN hr_intake_batches b ON s.batch_id = b.id 
+           WHERE b.n8n_execution_id = $1 OR b.n8n_execution_id = $2
+           ORDER BY s.created_at ASC, s.id ASC`,
+          [idempotency_key || '', correlation_id || '']
+        );
+        if (bRes.rows.length > 0) existingStagingRows = bRes.rows;
+      }
+      if (existingStagingRows.length === 0 && safeBatchId) {
+        const sRes = await client.query(
+          `SELECT * FROM hr_employee_staging WHERE batch_id = $1 ORDER BY created_at ASC, id ASC`,
+          [safeBatchId]
+        );
+        if (sRes.rows.length > 0) existingStagingRows = sRes.rows;
+      }
+
+      if (existingStagingRows.length > 0) {
+        await client.query('COMMIT');
+        client.release();
+
+        const canApprove = await hasPermission(verifiedUser.role, 'hr.intake.approve');
+        let replyCard = (existingStagingRows.length === 1)
+          ? renderStagingPreview(existingStagingRows[0], canApprove)
+          : renderBatchSummary(existingStagingRows, canApprove);
+
+        return res.json({
+          success: true,
+          batch_id: existingStagingRows[0].batch_id,
+          total_candidates: existingStagingRows.length,
+          staged_count: existingStagingRows.filter(r => r.intake_mode !== 'insufficient_data' && r.intake_mode !== 'duplicate').length,
+          failed_count: 0,
+          candidate_results: existingStagingRows.map(r => ({
+            staging_id: r.id,
+            full_name: r.full_name,
+            citizen_id: r.citizen_id,
+            status: r.intake_mode === 'insufficient_data' ? 'insufficient_data' : (r.suspected_duplicate ? 'duplicate' : 'staged'),
+            company_id: r.company_id
+          })),
+          reply_card: replyCard,
+          idempotency_replayed: true
+        });
+      }
+
+    // 3. Prepare Files and Candidate Groups
+    const rawFiles = Array.isArray(files) ? files : [];
+    let candidateGroups = [];
+
+    const { isValidPersonName } = require('../services/vietnameseEncodingGuard');
+
+    if (rawFiles.length > 0) {
+      const singleFileResults = [];
+      for (let idx = 0; idx < rawFiles.length; idx++) {
+        const f = rawFiles[idx];
+        const fileName = f.fileName || f.file_name || 'document.pdf';
+        let rawExtracted = f.rawExtracted || f.extracted || {};
+        let text = f.text || '';
+        const ocrStatus = f.ocrStatus || (f.ocrError ? 'failed' : 'success');
+        const ocrError = f.ocrError || null;
+
+        if (text && (!rawExtracted.full_name || !rawExtracted.citizen_id)) {
+          const fallbackExtracted = extractProfileFromText(text, fileName);
+          rawExtracted = {
+            ...fallbackExtracted,
+            ...rawExtracted,
+            full_name: (rawExtracted.full_name && rawExtracted.full_name !== 'Nhân viên mới')
+              ? rawExtracted.full_name
+              : (fallbackExtracted.full_name || null),
+            citizen_id: (rawExtracted.citizen_id && String(rawExtracted.citizen_id).replace(/\D/g, '').length >= 9)
+              ? String(rawExtracted.citizen_id).replace(/\D/g, '')
+              : (fallbackExtracted.citizen_id || null)
+          };
+        }
+
+        const docType = f.docType || classifyDocumentType(fileName, text);
+        const cleanExtracted = {};
+        const provenance = f.provenance ? { ...f.provenance } : {};
+
+        for (const rawKey of Object.keys(rawExtracted)) {
+          if (rawKey.startsWith('_')) continue;
+          const canonicalKey = FIELD_ALIASES[rawKey] || rawKey;
+          const normVal = normalizeFieldValue(canonicalKey, rawExtracted[rawKey]);
+          cleanExtracted[canonicalKey] = normVal;
+          if (normVal && !provenance[canonicalKey]) {
+            provenance[canonicalKey] = {
+              fileName,
+              docType,
+              originalValue: normVal
+            };
+          }
+        }
+
+        const cccdInfo = standardizeAndValidateCccd(cleanExtracted.citizen_id);
+        if (cccdInfo.valid && cccdInfo.cleanCccd) {
+          cleanExtracted.citizen_id = cccdInfo.cleanCccd;
+        }
+
+        const missingFields = [];
+        const uncertainFields = Array.isArray(rawExtracted._uncertain_fields)
+          ? [...rawExtracted._uncertain_fields]
+          : (rawExtracted._uncertain_fields ? [String(rawExtracted._uncertain_fields)] : []);
+        const unreadableFields = Array.isArray(rawExtracted._unreadable_fields)
+          ? [...rawExtracted._unreadable_fields]
+          : (rawExtracted._unreadable_fields ? [String(rawExtracted._unreadable_fields)] : []);
+
+        const hasValidName = cleanExtracted.full_name &&
+          cleanExtracted.full_name !== 'Nhân viên mới' &&
+          cleanExtracted.full_name !== 'NHÂN VIÊN MỚI' &&
+          isValidPersonName(cleanExtracted.full_name);
+
+        if (!hasValidName) {
+          if (!cleanExtracted.full_name || cleanExtracted.full_name === 'Nhân viên mới' || cleanExtracted.full_name === 'NHÂN VIÊN MỚI') {
+            cleanExtracted.full_name = null;
+            missingFields.push('full_name');
+          } else {
+            uncertainFields.push('full_name');
+          }
+        }
+
+        if (!cccdInfo.valid || !cleanExtracted.citizen_id) {
+          missingFields.push('citizen_id');
+          uncertainFields.push('citizen_id');
+        }
+
+        if (ocrStatus === 'failed') {
+          unreadableFields.push('entire_document');
+        }
+
+        const compDetection = detectCompany(cleanExtracted, text);
+
+        singleFileResults.push({
+          fileName,
+          fileSize: f.fileSize || f.file_size || 0,
+          mimeType: f.mimeType || f.mime_type || 'application/pdf',
+          fileStoragePath: f.fileStoragePath || f.file_storage_path || null,
+          rawText: text,
+          extracted: cleanExtracted,
+          docType,
+          cccdInfo,
+          compDetection,
+          provenance,
+          missingFields,
+          uncertainFields,
+          unreadableFields,
+          ocrStatus,
+          ocrError
+        });
+      }
+
+      for (const item of singleFileResults) {
+        const cccd = item.cccdInfo.cleanCccd;
+        const normName = removeAccents(item.extracted.full_name || '');
+        const dob = item.extracted.date_of_birth || '';
+
+        let matchedGroup = null;
+        if (cccd) {
+          matchedGroup = candidateGroups.find(g => g.cccd === cccd);
+        }
+        if (!matchedGroup && normName && normName !== 'nhan vien moi') {
+          matchedGroup = candidateGroups.find(g => {
+            const gName = removeAccents(g.primaryExtracted.full_name || '');
+            if (gName === normName) {
+              if (dob && g.primaryExtracted.date_of_birth) {
+                return g.primaryExtracted.date_of_birth === dob;
+              }
+              return true;
+            }
+            return false;
+          });
+        }
+
+        if (matchedGroup) {
+          matchedGroup.items.push(item);
+          if (!matchedGroup.cccd && cccd) matchedGroup.cccd = cccd;
+        } else {
+          candidateGroups.push({
+            cccd: cccd || null,
+            primaryExtracted: { ...item.extracted },
+            items: [item]
+          });
+        }
+      }
+    } else if (Array.isArray(candidates) && candidates.length > 0) {
+      candidateGroups = candidates.map(c => {
+        const mergedExt = c.merged_extracted || c;
+        const cccdVal = c.citizen_id || c.cccd || mergedExt.citizen_id || null;
+        return {
+          cccd: cccdVal,
+          primaryExtracted: mergedExt,
+          items: c.items || [{
+            fileName: c.combined_file_names || c.fileName || 'document.pdf',
+            fileSize: c.total_size || c.fileSize || 0,
+            mimeType: c.mime_type || 'application/pdf',
+            fileStoragePath: c.file_storage_path || null,
+            rawText: c.raw_text || '',
+            extracted: mergedExt,
+            docType: c.primary_doc_type || 'CCCD',
+            cccdInfo: standardizeAndValidateCccd(cccdVal),
+            compDetection: detectCompany(mergedExt, c.raw_text || ''),
+            provenance: c.provenance || {},
+            missingFields: c.missing_fields || [],
+            uncertainFields: c.uncertain_fields || [],
+            unreadableFields: c.unreadable_fields || [],
+            ocrStatus: c.ocr_status || 'success'
+          }]
+        };
+      });
+    } else {
+      return res.status(400).json({ success: false, error: 'Thiếu dữ liệu files hoặc candidates để xử lý.' });
+    }
+
+    // 4. PARTIAL SUCCESS PER CANDIDATE PROCESSING (Independent Sub-transactions)
+    const candidateResults = [];
+    const successfullyStagedRows = [];
+    let stagedCount = 0;
+    let insufficientCount = 0;
+    let duplicateCount = 0;
+    let failedCount = 0;
+
+    for (let cIdx = 0; cIdx < candidateGroups.length; cIdx++) {
+      const grp = candidateGroups[cIdx];
+      const items = grp.items;
+      try {
+        let mergedExtracted = {};
+        const provenance = {};
+        const conflicts = {};
+
+        if (items.length === 1) {
+          const it = items[0];
+          mergedExtracted = { ...it.extracted };
+          for (const k of Object.keys(mergedExtracted)) {
+            if (mergedExtracted[k]) {
+              provenance[k] = { fileName: it.fileName, docType: it.docType, originalValue: mergedExtracted[k] };
+            }
+          }
+        } else {
+          for (const field of CANONICAL_53_FIELDS) {
+            if (field === 'Create_Time' || field === 'fileName') continue;
+            const preferredTypes = FIELD_DOCUMENT_SOURCES[field] || [];
+            const candidateValues = [];
+
+            for (const it of items) {
+              const val = it.extracted[field];
+              if (val && String(val).trim() !== '') {
+                candidateValues.push({ val, docType: it.docType, fileName: it.fileName });
+              }
+            }
+
+            if (candidateValues.length === 0) {
+              mergedExtracted[field] = '';
+            } else if (candidateValues.length === 1) {
+              mergedExtracted[field] = candidateValues[0].val;
+              provenance[field] = { fileName: candidateValues[0].fileName, docType: candidateValues[0].docType };
+            } else {
+              const distinctVals = Array.from(new Set(candidateValues.map(c => c.val)));
+              if (distinctVals.length > 1) {
+                conflicts[field] = candidateValues.map(c => ({
+                  source: c.fileName,
+                  docType: c.docType,
+                  value: c.val
+                }));
+              }
+              let chosen = null;
+              for (const prefType of preferredTypes) {
+                chosen = candidateValues.find(c => c.docType === prefType);
+                if (chosen) break;
+              }
+              if (!chosen) chosen = candidateValues[0];
+              mergedExtracted[field] = chosen.val;
+              provenance[field] = { fileName: chosen.fileName, docType: chosen.docType };
+            }
+          }
+        }
+
+        const combinedFileNames = items.length === 1
+          ? items[0].fileName
+          : `[Hồ sơ đa chứng từ: ${items.length} tệp] ` + items.map(it => it.fileName).join(', ');
+        const totalSize = items.reduce((acc, it) => acc + (it.fileSize || 0), 0);
+        const primaryDocType = items[0].docType || 'CCCD';
+        const finalCccdInfo = grp.cccd ? standardizeAndValidateCccd(grp.cccd) : standardizeAndValidateCccd(mergedExtracted.citizen_id);
+        const finalCompDetection = items.find(it => it.compDetection && it.compDetection.company_id)?.compDetection || items[0].compDetection || {};
+
+        let finalCompanyId = finalCompDetection.company_id;
+        let finalCompanyStatus = finalCompDetection.company_status || 'unknown';
+        let finalCompanyEvidence = finalCompDetection.company_evidence || null;
+
+        if (verifiedUser.role !== 'ADMIN' && verifiedUser.role !== 'SUPER_ADMIN' && verifiedUser.company_id) {
+          finalCompanyId = verifiedUser.company_id;
+          if (finalCompDetection.company_id && finalCompDetection.company_id !== verifiedUser.company_id && finalCompDetection.company_status === 'suggested') {
+            finalCompanyStatus = 'conflict';
+            finalCompanyEvidence = `Cảnh báo lệch đơn vị: Tài khoản thuộc ${verifiedUser.company_id}, nhưng tài liệu phát hiện từ khóa đơn vị ${finalCompDetection.company_id}.`;
+          }
+        } else if (!finalCompanyId) {
+          finalCompanyId = verifiedUser.company_id || 'STL';
+        }
+
+        // Live Duplicate Check & Schema Validation against Postgres
+        const validation = await validateStagingProfile(mergedExtracted, verifiedUser, finalCompDetection, finalCccdInfo);
+
+        const fieldMetadata = buildSchemaMetadata(mergedExtracted, primaryDocType, provenance, conflicts, {
+          unreadableFields: mergedExtracted._unreadable_fields || [],
+          uncertainFields: validation.uncertain_fields || mergedExtracted._uncertain_fields || []
+        });
+
+        mergedExtracted._metadata = fieldMetadata;
+        mergedExtracted._schema_metadata = fieldMetadata;
+        mergedExtracted._provenance = provenance;
+        mergedExtracted._conflicts = conflicts;
+        mergedExtracted._document_types = items.map(it => it.docType);
+
+        // Status Determination
+        let candStatus = 'staged';
+        const hasValidName = mergedExtracted.full_name &&
+          mergedExtracted.full_name !== 'Nhân viên mới' &&
+          mergedExtracted.full_name !== 'NHÂN VIÊN MỚI' &&
+          isValidPersonName(mergedExtracted.full_name);
+
+        if (!finalCccdInfo.valid || !hasValidName || validation.intake_mode === 'insufficient_data') {
+          candStatus = 'insufficient_data';
+          insufficientCount++;
+        } else if (validation.suspected_duplicate || ['CROSS_COMPANY_DUPLICATE', 'ACTIVE_SAME_COMPANY_DUPLICATE'].includes(validation.duplicate_classification)) {
+          candStatus = 'duplicate';
+          duplicateCount++;
+        } else if (validation.validation_errors && validation.validation_errors.some(e => e.blocking && e.code !== 'INSUFFICIENT_DATA')) {
+          candStatus = 'validation_failed';
+          failedCount++;
+        } else {
+          candStatus = 'staged';
+          stagedCount++;
+        }
+
+        // Insert into hr_employee_staging (Sub-transaction per candidate)
+        const insertStaging = await client.query(
+          `INSERT INTO hr_employee_staging (
+            batch_id, conversation_id, file_name, file_storage_path, file_size, mime_type,
+            full_name, citizen_id, employee_code, date_of_birth, gender,
+            job_title, department, email, phone_number, recruitment_decision_no,
+            employment_start_date, base_salary, company_id, company_status, company_evidence,
+            staging_status, missing_fields, uncertain_fields, suspected_duplicate, duplicate_reason,
+            extracted_data, uploaded_by, uploaded_by_user_id,
+            intake_mode, target_profile_id, target_employee_code, proposed_changes, version
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6,
+            $7, $8, $9, $10, $11,
+            $12, $13, $14, $15, $16,
+            $17, $18, $19, $20, $21,
+            'pending_review', $22, $23, $24, $25,
+            $26, $27, $28,
+            $29, $30, $31, $32, 1
+          ) RETURNING *`,
+          [
+            safeBatchId,
+            validConvId,
+            combinedFileNames,
+            items[0].fileStoragePath || null,
+            totalSize,
+            items[0].mimeType || 'application/pdf',
+            mergedExtracted.full_name || 'Nhân viên mới',
+            finalCccdInfo.cleanCccd || null,
+            mergedExtracted.employee_id || null,
+            mergedExtracted.date_of_birth || null,
+            mergedExtracted.gender || null,
+            mergedExtracted.job_title || null,
+            mergedExtracted.department_staffing_plan || null,
+            mergedExtracted.email || null,
+            mergedExtracted.phone_number || null,
+            mergedExtracted.recruitment_decision_no || null,
+            mergedExtracted.employment_start_date || null,
+            mergedExtracted.base_salary || null,
+            finalCompanyId,
+            finalCompanyStatus,
+            finalCompanyEvidence,
+            validation.missing_fields || [],
+            validation.uncertain_fields || [],
+            !!validation.suspected_duplicate,
+            validation.duplicate_reason || null,
+            JSON.stringify(mergedExtracted),
+            verifiedUser.username,
+            verifiedUser.user_id,
+            candStatus === 'insufficient_data' ? 'insufficient_data' : (validation.intake_mode || 'new_profile'),
+            (validation.target_profile_id && !isNaN(parseInt(validation.target_profile_id, 10)) && !String(validation.target_profile_id).includes('-'))
+              ? parseInt(validation.target_profile_id, 10)
+              : null,
+            validation.target_employee_code || null,
+            JSON.stringify(validation.proposed_changes || {})
+          ]
+        );
+
+        const stagedRow = insertStaging.rows[0];
+        successfullyStagedRows.push(stagedRow);
+
+        candidateResults.push({
+          candidate_index: cIdx,
+          full_name: stagedRow.full_name,
+          citizen_id: stagedRow.citizen_id,
+          status: candStatus,
+          staging_id: stagedRow.id,
+          company_id: stagedRow.company_id,
+          validation: {
+            missing_fields: validation.missing_fields,
+            uncertain_fields: validation.uncertain_fields,
+            suspected_duplicate: validation.suspected_duplicate,
+            duplicate_reason: validation.duplicate_reason,
+            intake_mode: validation.intake_mode
+          }
+        });
+      } catch (candErr) {
+        console.error(`[Candidate ${cIdx}] Lỗi xử lý candidate:`, candErr.message);
+        failedCount++;
+        candidateResults.push({
+          candidate_index: cIdx,
+          full_name: grp.primaryExtracted?.full_name || 'Không xác định',
+          citizen_id: grp.cccd || null,
+          status: 'processing_error',
+          error: candErr.message
+        });
+      }
+    }
+
+    // 5. Batch Record
+    try {
+      await client.query(
+        `INSERT INTO hr_intake_batches (
+          id, company_id, uploaded_by, uploaded_by_user_id, total_files,
+          file_manifest, status, n8n_execution_id, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, 'completed', $7, NOW(), NOW())
+        ON CONFLICT (id) DO UPDATE SET updated_at = NOW()`,
+        [
+          safeBatchId,
+          verifiedUser.company_id || 'STL',
+          verifiedUser.username,
+          verifiedUser.user_id,
+          rawFiles.length || candidateGroups.length,
+          JSON.stringify(candidateResults),
+          idempotency_key || correlation_id || null
+        ]
+      );
+    } catch (batchErr) {
+      console.warn('Lỗi ghi hr_intake_batches:', batchErr.message);
+    }
+
+    await client.query('COMMIT');
+    client.release();
+
+    // 6. Resilient Audit Logging
+    await logAudit({
+      actor_user_id: verifiedUser.user_id,
+      actor_username: verifiedUser.username,
+      action: 'HR_INTAKE_PROCESS_STAGED_CANDIDATE',
+      status: 'SUCCESS',
+      ip_address: req.ip,
+      metadata: {
+        batch_id,
+        total_candidates: candidateGroups.length,
+        staged_count: stagedCount,
+        insufficient_count: insufficientCount,
+        duplicate_count: duplicateCount,
+        failed_count: failedCount,
+        correlation_id
+      }
+    });
+
+    const canApprove = await hasPermission(verifiedUser.role, 'hr.intake.approve');
+    let replyCard = '';
+    if (successfullyStagedRows.length === 1) {
+      replyCard = renderStagingPreview(successfullyStagedRows[0], canApprove);
+    } else if (successfullyStagedRows.length > 1) {
+      replyCard = renderBatchSummary(successfullyStagedRows, canApprove);
+    }
+
+    return res.json({
+      success: true,
+      batch_id,
+      total_candidates: candidateGroups.length,
+      staged_count: stagedCount,
+      insufficient_count: insufficientCount,
+      duplicate_count: duplicateCount,
+      failed_count: failedCount,
+      candidate_results: candidateResults,
+      reply_card: replyCard,
+      idempotency_replayed: false
+    });
   } catch (err) {
+    if (typeof client !== 'undefined' && client) {
+      await client.query('ROLLBACK').catch(() => {});
+      try { client.release(); } catch(e) {}
+    }
+    console.error('Lỗi process-staged-candidate internal:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -4333,91 +4978,84 @@ router.post('/internal/normalize-canonical-fields', verifyInternalAuth, async (r
       const fileName = f.fileName || f.file_name || 'document.pdf';
       let rawExtracted = f.rawExtracted || f.extracted || {};
       let text = f.text || '';
+      const ocrStatus = f.ocrStatus || (f.ocrError ? 'failed' : 'success');
+      const ocrError = f.ocrError || null;
 
-      const hasValidOcr = rawExtracted && rawExtracted.citizen_id && rawExtracted.full_name && rawExtracted.full_name !== 'Nhân viên mới';
-      const needsOcr = !hasValidOcr && (!text || !rawExtracted.citizen_id || !rawExtracted.full_name || rawExtracted.full_name === 'Nhân viên mới');
-
-      if (needsOcr && f.fileStoragePath) {
-        const baseName = path.basename(f.fileStoragePath);
-        const cleanBase = baseName.replace(/^[0-9a-fA-F-]+_/, '');
-        const candidates = [
-          path.resolve(__dirname, '..', f.fileStoragePath.replace(/^\/app\//, '')),
-          path.resolve(__dirname, '..', 'chat-files', f.fileStoragePath.replace(/^\/app\//, '')),
-          path.resolve(__dirname, '..', 'chat-files', 'staging', baseName),
-          path.resolve(__dirname, '..', 'uploads', 'staging', baseName),
-          path.resolve(__dirname, '..', 'uploads', 'staging', cleanBase)
-        ];
-
-        let foundPath = null;
-        for (const p of candidates) {
-          if (fs.existsSync(p) && fs.statSync(p).size > 100) {
-            foundPath = p;
-            break;
-          }
-        }
-
-        // If file not found or empty in chat-files, search uploads/staging
-        if (!foundPath) {
-          const uploadsStaging = path.resolve(__dirname, '..', 'uploads', 'staging');
-          if (fs.existsSync(uploadsStaging)) {
-            const filesInUploads = fs.readdirSync(uploadsStaging);
-            const match = filesInUploads.find(fn => fn.endsWith(cleanBase) || fn.includes(cleanBase));
-            if (match) {
-              const mp = path.join(uploadsStaging, match);
-              if (fs.statSync(mp).size > 100) foundPath = mp;
-            }
-          }
-        }
-
-        if (foundPath) {
-          try {
-            const ext = path.extname(foundPath).toLowerCase();
-            if (['.pdf', '.png', '.jpg', '.jpeg'].includes(ext)) {
-              const multiPageOcrEngine = require('../services/multiPageOcrEngine');
-              const ocrRes = await multiPageOcrEngine.processDocumentMultiPage(foundPath, { fileName });
-              if (ocrRes && ocrRes.extracted) {
-                rawExtracted = {
-                  ...rawExtracted,
-                  ...ocrRes.extracted,
-                  full_name: ocrRes.extracted.full_name || rawExtracted.full_name,
-                  citizen_id: ocrRes.extracted.citizen_id || rawExtracted.citizen_id
-                };
-                text = ocrRes.aggregatedText || text;
-              }
-            } else {
-              const buf = fs.readFileSync(foundPath);
-              const universalDataEngine = require('../services/universalDataEngine');
-              const parsed = await universalDataEngine.parseUniversalFile(buf, { fileName });
-              text = parsed.promptText || buf.toString('utf8');
-            }
-          } catch(e) {
-            console.warn('[Normalize-Canonical] Multi-Page OCR fallback warning:', e.message);
-          }
-        }
+      // Pure text parsing fallback if text is provided and rawExtracted lacks fields (no local OCR)
+      if (text && (!rawExtracted.full_name || !rawExtracted.citizen_id)) {
+        const fallbackExtracted = extractProfileFromText(text, fileName);
+        rawExtracted = {
+          ...fallbackExtracted,
+          ...rawExtracted,
+          full_name: (rawExtracted.full_name && rawExtracted.full_name !== 'Nhân viên mới')
+            ? rawExtracted.full_name
+            : (fallbackExtracted.full_name || null),
+          citizen_id: (rawExtracted.citizen_id && String(rawExtracted.citizen_id).replace(/\D/g, '').length >= 9)
+            ? String(rawExtracted.citizen_id).replace(/\D/g, '')
+            : (fallbackExtracted.citizen_id || null)
+        };
       }
-
-      const fallbackExtracted = extractProfileFromText(text || '', fileName);
-      rawExtracted = {
-        ...fallbackExtracted,
-        ...rawExtracted,
-        full_name: (rawExtracted.full_name && rawExtracted.full_name !== 'Nhân viên mới')
-          ? rawExtracted.full_name
-          : (fallbackExtracted.full_name || null),
-        citizen_id: (rawExtracted.citizen_id && String(rawExtracted.citizen_id).replace(/\D/g, '').length >= 9)
-          ? String(rawExtracted.citizen_id).replace(/\D/g, '')
-          : (fallbackExtracted.citizen_id || null)
-      };
 
       const docType = f.docType || classifyDocumentType(fileName, text);
 
-      // Clean & normalize fields
+      // Clean & normalize 53 canonical fields
       const cleanExtracted = {};
+      const provenance = f.provenance ? { ...f.provenance } : {};
+
       for (const rawKey of Object.keys(rawExtracted)) {
+        if (rawKey.startsWith('_')) continue;
         const canonicalKey = FIELD_ALIASES[rawKey] || rawKey;
-        cleanExtracted[canonicalKey] = normalizeFieldValue(canonicalKey, rawExtracted[rawKey]);
+        const normVal = normalizeFieldValue(canonicalKey, rawExtracted[rawKey]);
+        cleanExtracted[canonicalKey] = normVal;
+        if (normVal && !provenance[canonicalKey]) {
+          provenance[canonicalKey] = {
+            fileName,
+            docType,
+            originalValue: normVal
+          };
+        }
       }
 
+      // Standardize and validate CCCD
       const cccdInfo = standardizeAndValidateCccd(cleanExtracted.citizen_id);
+      if (cccdInfo.valid && cccdInfo.cleanCccd) {
+        cleanExtracted.citizen_id = cccdInfo.cleanCccd;
+      }
+
+      // Track missing, uncertain, unreadable fields
+      const missingFields = [];
+      const uncertainFields = Array.isArray(rawExtracted._uncertain_fields)
+        ? [...rawExtracted._uncertain_fields]
+        : (rawExtracted._uncertain_fields ? [String(rawExtracted._uncertain_fields)] : []);
+
+      const unreadableFields = Array.isArray(rawExtracted._unreadable_fields)
+        ? [...rawExtracted._unreadable_fields]
+        : (rawExtracted._unreadable_fields ? [String(rawExtracted._unreadable_fields)] : []);
+
+      const { isValidPersonName } = require('../services/vietnameseEncodingGuard');
+      const hasValidName = cleanExtracted.full_name &&
+        cleanExtracted.full_name !== 'Nhân viên mới' &&
+        cleanExtracted.full_name !== 'NHÂN VIÊN MỚI' &&
+        isValidPersonName(cleanExtracted.full_name);
+
+      if (!hasValidName) {
+        if (!cleanExtracted.full_name || cleanExtracted.full_name === 'Nhân viên mới' || cleanExtracted.full_name === 'NHÂN VIÊN MỚI') {
+          cleanExtracted.full_name = null;
+          missingFields.push('full_name');
+        } else {
+          uncertainFields.push('full_name');
+        }
+      }
+
+      if (!cccdInfo.valid || !cleanExtracted.citizen_id) {
+        missingFields.push('citizen_id');
+        uncertainFields.push('citizen_id');
+      }
+
+      if (ocrStatus === 'failed') {
+        unreadableFields.push('entire_document');
+      }
+
       const compDetection = detectCompany(cleanExtracted, text);
 
       singleFileResults[idx] = {
@@ -4429,7 +5067,14 @@ router.post('/internal/normalize-canonical-fields', verifyInternalAuth, async (r
         extracted: cleanExtracted,
         docType,
         cccdInfo,
-        compDetection
+        compDetection,
+        provenance,
+        missingFields,
+        uncertainFields,
+        unreadableFields,
+        ocrStatus,
+        ocrError,
+        manualCheckRequired: missingFields.length > 0 || ocrStatus === 'failed' || uncertainFields.length > 0
       };
     }
 
@@ -4548,6 +5193,12 @@ router.post('/internal/normalize-canonical-fields', verifyInternalAuth, async (r
       const finalCccdInfo = standardizeAndValidateCccd(mergedExtracted.citizen_id);
       const finalCompDetection = items.find(it => it.compDetection.company_id)?.compDetection || items[0].compDetection;
 
+      const groupMissing = Array.from(new Set(items.flatMap(it => it.missingFields || [])));
+      const groupUncertain = Array.from(new Set(items.flatMap(it => it.uncertainFields || [])));
+      const groupUnreadable = Array.from(new Set(items.flatMap(it => it.unreadableFields || [])));
+      const groupOcrFailed = items.some(it => it.ocrStatus === 'failed');
+      const manualCheckRequired = groupMissing.length > 0 || groupOcrFailed || Object.keys(conflicts).length > 0 || !finalCccdInfo.valid || !mergedExtracted.full_name;
+
       processedGroups.push({
         cccd: grp.cccd,
         combined_file_names: combinedFileNames,
@@ -4561,14 +5212,20 @@ router.post('/internal/normalize-canonical-fields', verifyInternalAuth, async (r
         doc_types: items.map(it => it.docType),
         final_cccd_info: finalCccdInfo,
         final_comp_detection: finalCompDetection,
-        raw_text: items.map(it => it.rawText).filter(Boolean).join('\n---\n')
+        raw_text: items.map(it => it.rawText).filter(Boolean).join('\n---\n'),
+        missing_fields: groupMissing,
+        uncertain_fields: groupUncertain,
+        unreadable_fields: groupUnreadable,
+        manual_check_required: manualCheckRequired,
+        ocr_status: groupOcrFailed ? 'failed' : 'success'
       });
     }
 
     return res.json({
       success: true,
       batch_id,
-      candidate_groups: processedGroups
+      candidate_groups: processedGroups,
+      manual_check_required: processedGroups.some(g => g.manual_check_required)
     });
   } catch (err) {
     console.error('Lỗi normalize-canonical-fields internal:', err);
@@ -4684,6 +5341,8 @@ router.post('/internal/persist-staging', verifyInternalAuth, async (req, res) =>
       return res.status(400).json({ success: false, error: 'Thiếu batch_id, user hoặc candidates hợp lệ.' });
     }
 
+    const safeBatchId = toValidUUID(batch_id) || require('crypto').randomUUID();
+
     let validConvId = toValidUUID(conversation_id);
     if (validConvId) {
       try {
@@ -4705,10 +5364,10 @@ router.post('/internal/persist-staging', verifyInternalAuth, async (req, res) =>
       );
       if (bRes.rows.length > 0) existingStagingRows = bRes.rows;
     }
-    if (existingStagingRows.length === 0 && batch_id) {
+    if (existingStagingRows.length === 0 && safeBatchId) {
       const sRes = await db.query(
         `SELECT * FROM hr_employee_staging WHERE batch_id = $1 ORDER BY created_at ASC, id ASC`,
-        [batch_id]
+        [safeBatchId]
       );
       if (sRes.rows.length > 0) existingStagingRows = sRes.rows;
     }
@@ -4742,7 +5401,7 @@ router.post('/internal/persist-staging', verifyInternalAuth, async (req, res) =>
         ) VALUES ($1, $2, $3, $4, $5, $6, 'completed', $7, NOW(), NOW())
         ON CONFLICT (id) DO UPDATE SET updated_at = NOW()`,
         [
-          batch_id,
+          safeBatchId,
           user.company_id || 'STL',
           user.username,
           user.user_id,
@@ -4785,7 +5444,7 @@ router.post('/internal/persist-staging', verifyInternalAuth, async (req, res) =>
           $29, $30, $31, $32, 1
         ) RETURNING *`,
         [
-          batch_id,
+          safeBatchId,
           validConvId,
           cand.combined_file_names || 'Tài liệu hồ sơ',
           cand.file_storage_path || null,
@@ -4866,43 +5525,27 @@ router.post('/internal/persist-staging', verifyInternalAuth, async (req, res) =>
   }
 });
 
-// 6. POST /api/hoso/intake/internal/extract-text-fallback
-router.post('/internal/extract-text-fallback', verifyInternalAuth, async (req, res) => {
-  try {
-    let { text, fileName, fileStoragePath } = req.body || {};
-    if (!text && fileStoragePath) {
-      const relPath = fileStoragePath.replace(/^\/app\//, '');
-      const candidates = [
-        path.resolve(__dirname, '..', relPath),
-        path.resolve(__dirname, '..', 'chat-files', relPath),
-        path.resolve(__dirname, '..', 'chat-files', 'staging', path.basename(fileStoragePath)),
-        path.resolve(__dirname, '..', 'uploads', 'staging', path.basename(fileStoragePath))
-      ];
-      for (const p of candidates) {
-        if (fs.existsSync(p)) {
-          try {
-            const buf = fs.readFileSync(p);
-            const universalDataEngine = require('../services/universalDataEngine');
-            const parsed = await universalDataEngine.parseUniversalFile(buf, { fileName });
-            text = parsed.promptText || buf.toString('utf8');
-            break;
-          } catch(e) {
-            text = fs.readFileSync(p, 'utf8');
-            break;
-          }
-        }
-      }
-    }
-    const fallbackExtracted = extractProfileFromText(text || '', fileName || '');
-    return res.json({ success: true, extracted: fallbackExtracted, textSnippet: (text || '').slice(0, 500) });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
+// 6. [DEPRECATED / REMOVED in Post-Phase 1.2]: POST /api/hoso/intake/internal/extract-text-fallback
+// Proved 0 callers across all workflows, frontend, and tests.
+router.post('/internal/extract-text-fallback', verifyInternalAuth, (req, res) => {
+  return res.status(410).json({
+    success: false,
+    error: '410 Gone: Endpoint /internal/extract-text-fallback đã bị loại bỏ. Toàn bộ trích xuất nội dung do n8n Gemini OCR và backend normalizer phụ trách.'
+  });
 });
 
 // 6b. POST /api/hoso/intake/internal/ocr-document (Multi-Page OCR & Canonical Extraction)
 router.post('/internal/ocr-document', verifyInternalAuth, async (req, res) => {
   try {
+    const enableOcrFallback = process.env.ENABLE_BACKEND_OCR_FALLBACK === 'true';
+    if (!enableOcrFallback) {
+      return res.status(403).json({
+        success: false,
+        fallback_disabled: true,
+        error: 'Backend OCR fallback endpoint is disabled. OCR orchestration is exclusively handled by n8n Gemini 3.1 Flash-Lite workflow.'
+      });
+    }
+
     const { fileStoragePath, fileName } = req.body || {};
     if (!fileStoragePath) {
       return res.status(400).json({ success: false, error: 'fileStoragePath is required' });

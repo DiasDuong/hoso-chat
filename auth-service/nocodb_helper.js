@@ -1,11 +1,11 @@
 const http = require('node:http');
-const { DatabaseSync } = require('node:sqlite');
 
-let db;
+let db = null;
 try {
-  db = new DatabaseSync('/usr/app/data/noco.db');
+  const sqlite3 = require('sqlite3');
+  db = new sqlite3.Database('/usr/app/data/noco.db');
 } catch (e) {
-  console.error('Failed to open SQLite database:', e);
+  // Not inside nocodb container or sqlite3 not installed
 }
 
 const COLUMNS = [
@@ -22,7 +22,7 @@ const COLUMNS = [
   'vessel_size_allowance', 'professional_allowance_t1', 'meal_allowance', 'other_allowances',
   'open_ended_contract', 'fixed_term_contract', 'seasonal_contract',
   'contract_start_date', 'contract_end_date', 'recruitment_decision_no',
-  'employment_start_date', 'official_labor_contract_sign_date', 'phone_number', 'email', 'file_name', 'uploaded_by'
+  'employment_start_date', 'official_labor_contract_sign_date', 'phone_number', 'email', 'file_name', 'uploaded_by', 'employment_status'
 ];
 
 const DATE_COLUMNS = new Set([
@@ -160,10 +160,8 @@ function upsertProfile(data) {
     if (c === 'citizen_id') return citizenId || prepareValue(c, data[c], data);
     if (c === 'employee_id') return empId || prepareValue(c, data[c], data);
     if (c === 'full_name') return fullName || prepareValue(c, data[c], data);
-    if (c === 'job_grade') {
-      if (data.action_type === 'SOFT_DELETE' || data.status === 'DELETED') return '[ĐÃ XÓA]';
-      if (data.action_type === 'RESIGNED' || data.status === 'RESIGNED') return '[NGHỈ VIỆC]';
-    }
+    if (c === 'job_grade') return prepareValue(c, data.job_grade, data);
+    if (c === 'employment_status') return data.employment_status || (data.status === 'RESIGNED' ? 'RESIGNED' : 'ACTIVE');
     return prepareValue(c, data[c], data);
   });
 

@@ -36,8 +36,8 @@ async function findRestoreCandidates(user = {}, queryCriteria = {}) {
   const params = [];
   let whereClauses = [];
 
-  // Base soft-delete condition: status = 'DELETED' or hr_employee_profiles.job_grade = '[ĐÃ XÓA]'
-  whereClauses.push(`(e.status = 'DELETED' OR p.job_grade = '[ĐÃ XÓA]')`);
+  // Base soft-delete condition: is_deleted = true or status = 'DELETED'
+  whereClauses.push(`(e.is_deleted = true OR p.is_deleted = true OR e.status = 'DELETED')`);
 
   // RBAC Tenant Isolation: HR only sees their own company
   if (user.role === 'HR' && user.company_id) {

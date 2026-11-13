@@ -47,6 +47,7 @@ services:
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-8973d464f5f1475b83d6ab88d222d824}
       NODE_FUNCTION_ALLOW_BUILTIN: crypto,fs
       N8N_SECURE_COOKIE: "false"
+      N8N_PAYLOAD_SIZE_MAX: "128"
       WEBHOOK_URL: http://localhost:5678/
     volumes:
       - hrbot_n8n_data:/home/node/.n8n
@@ -90,6 +91,9 @@ services:
     volumes:
       - ./auth-service:/app
       - ./files:/app/chat-files
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     working_dir: /app
     command: sh -c "which magick >/dev/null || apk add --no-cache imagemagick tesseract-ocr-data-osd; node server.js"
 
