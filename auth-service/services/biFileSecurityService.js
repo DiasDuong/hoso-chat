@@ -26,6 +26,23 @@ const DEFAULT_RETENTION_DAYS = 7;
 const DEFAULT_STORAGE_DIR = path.resolve(__dirname, '..', 'storage', 'bi_datasets');
 const STORAGE_DIR = process.env.BI_STORAGE_DIR ? path.resolve(process.env.BI_STORAGE_DIR) : DEFAULT_STORAGE_DIR;
 
+function assertSafeStorageDir(targetDir) {
+  const isTest = process.env.NODE_ENV === 'test' || process.env.ISOLATION_HARNESS === 'true';
+  if (!isTest) return;
+
+  const normalized = path.resolve(targetDir).toLowerCase().replace(/\\/g, '/');
+  const forbidden1 = 'd:/hoso-chat/storage';
+  const forbidden2 = 'd:/hoso-chat/auth-service/storage';
+
+  if (normalized.startsWith(forbidden1) || normalized.startsWith(forbidden2)) {
+    const err = new Error(`[FATAL STORAGE GUARD] Test execution attempted to access production storage directory: ${targetDir}`);
+    err.code = 'ERR_PRODUCTION_STORAGE_VIOLATION';
+    throw err;
+  }
+}
+
+assertSafeStorageDir(STORAGE_DIR);
+
 // Ensure storage directory exists
 try {
   if (!fs.existsSync(STORAGE_DIR)) {
@@ -366,6 +383,7 @@ module.exports = {
   verifyMagicBytes,
   verifyZipExpansionRatio,
   sanitizeFormulaInjection,
+  assertSafeStorageDir,
   FileSecurityError,
   STORAGE_DIR,
   MAX_FILE_SIZE_BYTES,

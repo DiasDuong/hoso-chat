@@ -13,7 +13,10 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { STORAGE_DIR } = require('./biFileSecurityService');
+const { STORAGE_DIR, assertSafeStorageDir } = require('./biFileSecurityService');
+if (typeof assertSafeStorageDir === 'function') {
+  assertSafeStorageDir(STORAGE_DIR);
+}
 const { logBiAuditEvent } = require('./biAuditLogger');
 
 const REGISTRY_FILE = path.join(STORAGE_DIR, 'datasets_registry.json');
@@ -26,6 +29,14 @@ let pendingWrites = 0;
 let persistQueue = Promise.resolve();
 let persistFailure = null;
 
+function readRegistryFile(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+  const raw = fs.readFileSync(filePath, 'utf8');
+  const data = JSON.parse(raw);
+  if (Array.isArray(data)) return data;
+  return null;
+}
+
 /**
  * Load registry from disk into memory
  */
@@ -35,19 +46,44 @@ function initializeRegistry(force = false) {
   if (isInitialized && stamp === registryStamp && !force) return;
   try {
     if (fs.existsSync(REGISTRY_FILE)) {
-      const raw = fs.readFileSync(REGISTRY_FILE, 'utf8');
-      const data = JSON.parse(raw);
-      if (Array.isArray(data)) {
-        registryCache = new Map(data.map((item) => [item.file_id, item]));
+      try {
+        const data = readRegistryFile(REGISTRY_FILE);
+        if (data !== null) {
+          registryCache = new Map(data.map((item) => [item.file_id, item]));
+        } else {
+          throw new Error('Registry content is not an array');
+        }
+      } catch (parseErr) {
+        console.warn('[BiDatasetRegistry] Main registry corrupted or invalid. Attempting backup recovery...', parseErr.message);
+        let recovered = false;
+        for (const bakSuffix of ['.bak1', '.bak2', '.bak3']) {
+          const bakPath = `${REGISTRY_FILE}${bakSuffix}`;
+          try {
+            const bakData = readRegistryFile(bakPath);
+            if (bakData !== null) {
+              console.log(`[BiDatasetRegistry] Successfully recovered registry from ${bakSuffix} (${bakData.length} entries)`);
+              registryCache = new Map(bakData.map((item) => [item.file_id, item]));
+              fs.copyFileSync(bakPath, REGISTRY_FILE);
+              recovered = true;
+              break;
+            }
+          } catch (_) {}
+        }
+        if (!recovered) {
+          throw parseErr;
+        }
       }
-    } else registryCache = new Map();
+    } else {
+      registryCache = new Map();
+    }
   } catch (e) {
     console.error('[BiDatasetRegistry] Error reading registry file:', e.message);
     const error = new Error('Không thể đọc registry BI. Vui lòng liên hệ quản trị viên.');
     error.code = 'REGISTRY_UNAVAILABLE'; error.status = 503;
     throw error;
   }
-  registryStamp = stamp;
+  const sAfter = fs.existsSync(REGISTRY_FILE) ? fs.statSync(REGISTRY_FILE) : null;
+  registryStamp = sAfter ? `${sAfter.mtimeMs}:${sAfter.ctimeMs}:${sAfter.size}` : null;
   isInitialized = true;
 }
 
@@ -55,16 +91,85 @@ function initializeRegistry(force = false) {
  * Atomically persist registry cache to disk
  */
 async function persistRegistry() {
-  const snapshot = JSON.stringify(Array.from(registryCache.values()), null, 2);
   pendingWrites++;
   const operation = persistQueue.catch(() => {}).then(async () => {
     let tempFile;
     try {
-    if (persistFailure) throw persistFailure;
-    tempFile = `${REGISTRY_FILE}.${Date.now()}.${crypto.randomBytes(4).toString('hex')}.tmp`;
-    await fs.promises.writeFile(tempFile, snapshot, { encoding: 'utf8', mode: 0o600 });
-    await fs.promises.rename(tempFile, REGISTRY_FILE);
-    const s = fs.statSync(REGISTRY_FILE); registryStamp = `${s.mtimeMs}:${s.ctimeMs}:${s.size}`;
+      if (persistFailure) throw persistFailure;
+
+      // S4: Concurrency Check - If disk file modified by another process, merge external entries
+      if (fs.existsSync(REGISTRY_FILE)) {
+        const s = fs.statSync(REGISTRY_FILE);
+        const currentDiskStamp = `${s.mtimeMs}:${s.ctimeMs}:${s.size}`;
+        if (registryStamp && currentDiskStamp !== registryStamp) {
+          try {
+            const diskData = readRegistryFile(REGISTRY_FILE);
+            if (Array.isArray(diskData)) {
+              for (const diskItem of diskData) {
+                if (!registryCache.has(diskItem.file_id)) {
+                  registryCache.set(diskItem.file_id, diskItem);
+                } else {
+                  const memItem = registryCache.get(diskItem.file_id);
+                  const memTime = Date.parse(memItem.updated_at || 0);
+                  const diskTime = Date.parse(diskItem.updated_at || 0);
+                  if (diskTime > memTime) {
+                    registryCache.set(diskItem.file_id, diskItem);
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('[BiDatasetRegistry] Disk stamp changed but read failed during merge:', e.message);
+          }
+        }
+      }
+
+      const snapshot = JSON.stringify(Array.from(registryCache.values()), null, 2);
+      tempFile = `${REGISTRY_FILE}.${Date.now()}.${crypto.randomBytes(4).toString('hex')}.tmp`;
+
+      // S4: Atomic file write with fsync
+      const fd = await fs.promises.open(tempFile, 'w', 0o600);
+      try {
+        await fd.writeFile(snapshot, 'utf8');
+        await fd.sync();
+      } finally {
+        await fd.close();
+      }
+
+      // S4: 3 Rotating Backups before replacing main registry
+      if (fs.existsSync(REGISTRY_FILE)) {
+        const bak1 = `${REGISTRY_FILE}.bak1`;
+        const bak2 = `${REGISTRY_FILE}.bak2`;
+        const bak3 = `${REGISTRY_FILE}.bak3`;
+        try {
+          if (fs.existsSync(bak2)) fs.copyFileSync(bak2, bak3);
+          if (fs.existsSync(bak1)) fs.copyFileSync(bak1, bak2);
+          fs.copyFileSync(REGISTRY_FILE, bak1);
+        } catch (bakErr) {
+          console.warn('[BiDatasetRegistry] Failed rotating backups:', bakErr.message);
+        }
+      }
+
+      // Atomic rename with Windows retry
+      let renamed = false;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await fs.promises.rename(tempFile, REGISTRY_FILE);
+          renamed = true;
+          break;
+        } catch (renameErr) {
+          if (attempt === 3) {
+            fs.copyFileSync(tempFile, REGISTRY_FILE);
+            await fs.promises.unlink(tempFile).catch(() => {});
+            renamed = true;
+          } else {
+            await new Promise(r => setTimeout(r, 20 * attempt));
+          }
+        }
+      }
+
+      const s = fs.statSync(REGISTRY_FILE);
+      registryStamp = `${s.mtimeMs}:${s.ctimeMs}:${s.size}`;
     } catch (e) {
       if (tempFile) await fs.promises.unlink(tempFile).catch(() => {});
       const error = new Error('Không thể lưu registry BI. Thay đổi chưa được xác nhận.');
@@ -463,8 +568,8 @@ function listDatasetsForUser(userContext, options = {}) {
   const all = Array.from(registryCache.keys()).map(getDataset);
 
   return all.filter((item) => {
-    // Exclude deleted or expired
-    if (item.processing_status === 'EXPIRED' || item.processing_status === 'DELETED') {
+    // Exclude deleted, expired, archived or missing data
+    if (item.processing_status === 'EXPIRED' || item.processing_status === 'DELETED' || item.processing_status === 'ARCHIVED' || item.processing_status === 'MISSING_DATA') {
       return false;
     }
     if (item.retention_expiry && (!Number.isFinite(Date.parse(item.retention_expiry)) || Date.parse(item.retention_expiry) <= Date.now())) return false;
@@ -596,17 +701,133 @@ async function cleanupExpiredDatasets() {
 }
 
 /**
- * Orphan & Incomplete Cleanup:
+ * Orphan & Incomplete Cleanup with S2 Quarantine & S3 Circuit Breaker:
  * 1. Clean up datasets stuck in 'PROCESSING' for > 15 minutes (stuck intake)
- * 2. Clean up orphan physical files in STORAGE_DIR that have no entry in datasets_registry.json
- * 3. Clean up registry entries whose physical data files are missing
+ * 2. Quarantine orphan physical files in STORAGE_DIR (.quarantine/<YYYY-MM-DD>/)
+ * 3. Purge expired quarantine files (TTL default 7 days)
+ * 4. Circuit breaker: abort if registry is empty while files exist, or orphan threshold exceeded
+ * 5. Mark broken registry entries as MISSING_DATA
  */
 async function cleanupOrphanAndIncompleteDatasets(maxStuckAgeMs = 15 * 60 * 1000) {
   initializeRegistry();
   const now = Date.now();
   let purgedIncomplete = 0;
-  let purgedOrphans = 0;
+  let quarantinedCount = 0;
+  let purgedExpiredQuarantine = 0;
   let purgedBroken = 0;
+
+  // S3: Circuit Breaker Pre-flight Checks
+  if (fs.existsSync(STORAGE_DIR)) {
+    const allDiskFiles = await fs.promises.readdir(STORAGE_DIR);
+    const datasetFilesOnDisk = allDiskFiles.filter(f => f.endsWith('.dataset.json'));
+
+    // Condition 1: Registry empty while files exist on disk -> ABORT to prevent catastrophic data loss
+    if (registryCache.size === 0 && datasetFilesOnDisk.length > 0) {
+      console.error('[CRITICAL_ALERT] Registry empty while dataset files exist on disk. Aborting cleanup to prevent data loss.');
+      return {
+        aborted: true,
+        reason: 'REGISTRY_EMPTY_DATA_FILES_EXIST',
+        purgedIncomplete: 0,
+        purgedOrphans: 0,
+        quarantined: 0,
+        purgedExpiredQuarantine: 0,
+        purgedBroken: 0,
+      };
+    }
+
+    // Identify orphan candidates (> 10 minutes old and not in registry)
+    const orphanCandidates = [];
+    for (const f of allDiskFiles) {
+      if (f === 'datasets_registry.json' || f === 'bi_audit.log' || f.endsWith('.tmp') || f.startsWith('.quarantine') || f.includes('.bak')) continue;
+      const fullPath = path.join(STORAGE_DIR, f);
+      try {
+        const stat = await fs.promises.stat(fullPath);
+        if (now - stat.mtimeMs > 10 * 60 * 1000) {
+          let fileIdCandidate = null;
+          if (f.endsWith('.dataset.json')) {
+            fileIdCandidate = f.replace('.dataset.json', '');
+          } else if (/^[0-9a-f-]{36}\.(?:xlsx|xls|csv|data)$/i.test(f)) {
+            fileIdCandidate = f.slice(0, f.lastIndexOf('.'));
+          }
+          if (fileIdCandidate && !registryCache.has(fileIdCandidate)) {
+            orphanCandidates.push({ file: f, path: fullPath, fileId: fileIdCandidate });
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Condition 2: Orphan count threshold exceeded -> ABORT
+    const orphanThreshold = parseInt(process.env.BI_MAX_ORPHANS_THRESHOLD, 10) || 50;
+    if (orphanCandidates.length > orphanThreshold) {
+      console.error(`[CRITICAL_ALERT] Orphan count threshold exceeded (${orphanCandidates.length} orphans > threshold ${orphanThreshold}). Aborting cleanup.`);
+      return {
+        aborted: true,
+        reason: 'ORPHAN_THRESHOLD_EXCEEDED',
+        orphanCount: orphanCandidates.length,
+        threshold: orphanThreshold,
+        purgedIncomplete: 0,
+        purgedOrphans: 0,
+        quarantined: 0,
+        purgedExpiredQuarantine: 0,
+        purgedBroken: 0,
+      };
+    }
+
+    // S2: Quarantine Mechanism (Move to .quarantine/<YYYY-MM-DD>/ instead of hard delete)
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const quarantineTodayDir = path.join(STORAGE_DIR, '.quarantine', todayStr);
+
+    for (const orphan of orphanCandidates) {
+      try {
+        await fs.promises.mkdir(quarantineTodayDir, { recursive: true });
+        const destPath = path.join(quarantineTodayDir, orphan.file);
+        await fs.promises.rename(orphan.path, destPath);
+        quarantinedCount++;
+
+        await logBiAuditEvent({
+          event: 'BI_DATASET_QUARANTINE',
+          fileId: orphan.fileId,
+          filename: orphan.file,
+          details: {
+            original_path: orphan.path,
+            quarantine_path: destPath,
+            quarantined_at: new Date().toISOString(),
+          },
+        });
+      } catch (qErr) {
+        console.warn(`[BiDatasetRegistry] Failed to quarantine orphan ${orphan.file}:`, qErr.message);
+      }
+    }
+
+    // S2: Purge Expired Quarantine Files (TTL default 7 days)
+    const quarantineBase = path.join(STORAGE_DIR, '.quarantine');
+    if (fs.existsSync(quarantineBase)) {
+      const ttlDays = parseInt(process.env.BI_QUARANTINE_TTL_DAYS, 10) || 7;
+      const ttlMs = ttlDays * 24 * 60 * 60 * 1000;
+      try {
+        const qDirs = await fs.promises.readdir(quarantineBase);
+        for (const qd of qDirs) {
+          const qdPath = path.join(quarantineBase, qd);
+          const qdStat = await fs.promises.stat(qdPath);
+          if (qdStat.isDirectory()) {
+            const qFiles = await fs.promises.readdir(qdPath);
+            for (const qf of qFiles) {
+              const qfPath = path.join(qdPath, qf);
+              const qfStat = await fs.promises.stat(qfPath);
+              if (now - qfStat.mtimeMs > ttlMs) {
+                await fs.promises.unlink(qfPath);
+                purgedExpiredQuarantine++;
+              }
+            }
+            const remaining = await fs.promises.readdir(qdPath);
+            if (remaining.length === 0) {
+              await fs.promises.rmdir(qdPath).catch(() => {});
+            }
+          }
+        }
+      } catch (_) {}
+    }
+  }
 
   // 1. Incomplete / stuck datasets
   for (const [fileId, dataset] of registryCache.entries()) {
@@ -628,35 +849,6 @@ async function cleanupOrphanAndIncompleteDatasets(maxStuckAgeMs = 15 * 60 * 1000
     }
   }
 
-  // 2. Orphan physical files on disk
-  if (fs.existsSync(STORAGE_DIR)) {
-    try {
-      const diskFiles = await fs.promises.readdir(STORAGE_DIR);
-      for (const f of diskFiles) {
-        if (f === 'datasets_registry.json' || f === 'bi_audit.log' || f.endsWith('.tmp')) continue;
-
-        const fullPath = path.join(STORAGE_DIR, f);
-        try {
-          const stat = await fs.promises.stat(fullPath);
-          // Only check files older than 10 minutes to avoid race conditions with live uploads
-          if (now - stat.mtimeMs > 10 * 60 * 1000) {
-            let fileIdCandidate = null;
-            if (f.endsWith('.dataset.json')) {
-              fileIdCandidate = f.replace('.dataset.json', '');
-            } else if (/^[0-9a-f-]{36}\.(?:xlsx|xls|csv|data)$/i.test(f)) {
-              fileIdCandidate = f.slice(0, f.lastIndexOf('.'));
-            }
-
-            if (fileIdCandidate && !registryCache.has(fileIdCandidate)) {
-              await fs.promises.unlink(fullPath);
-              purgedOrphans++;
-            }
-          }
-        } catch (_) {}
-      }
-    } catch (_) {}
-  }
-
   // 3. Broken registry entries (missing physical json file for READY datasets)
   for (const [fileId, dataset] of registryCache.entries()) {
     if (dataset.processing_status === 'READY') {
@@ -668,16 +860,24 @@ async function cleanupOrphanAndIncompleteDatasets(maxStuckAgeMs = 15 * 60 * 1000
     }
   }
 
-  if (purgedIncomplete > 0 || purgedOrphans > 0 || purgedBroken > 0) {
+  if (purgedIncomplete > 0 || quarantinedCount > 0 || purgedBroken > 0 || purgedExpiredQuarantine > 0) {
     await persistRegistry();
     console.log('[BiDatasetRegistry] Orphan cleanup completed:', {
       purgedIncomplete,
-      purgedOrphans,
+      quarantined: quarantinedCount,
+      purgedExpiredQuarantine,
       purgedBroken,
     });
   }
 
-  return { purgedIncomplete, purgedOrphans, purgedBroken };
+  return {
+    aborted: false,
+    purgedIncomplete,
+    purgedOrphans: quarantinedCount,
+    quarantined: quarantinedCount,
+    purgedExpiredQuarantine,
+    purgedBroken,
+  };
 }
 
 module.exports = {

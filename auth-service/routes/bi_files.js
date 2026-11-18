@@ -16,12 +16,15 @@
 
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
 const multer = require('multer');
 const { verifyToken } = require('../middleware/auth');
 const {
   validateAndStoreIntakeFile,
   FileSecurityError,
   MAX_FILE_SIZE_BYTES,
+  STORAGE_DIR,
 } = require('../services/biFileSecurityService');
 const {
   registerDataset,
@@ -154,7 +157,14 @@ router.get('/', verifyToken, async (req, res) => {
       company_id: req.query.company_id,
     });
 
-    const sanitizedList = list.map((d) => ({
+    // S6: Filter out any datasets whose backing physical file is missing or status is not READY
+    const readyList = list.filter((d) => {
+      if (d.processing_status !== 'READY') return false;
+      const physicalFile = path.join(STORAGE_DIR, `${d.file_id}.dataset.json`);
+      return fs.existsSync(physicalFile);
+    });
+
+    const sanitizedList = readyList.map((d) => ({
       file_id: d.file_id,
       original_filename: d.original_filename,
       file_type: d.file_type,
