@@ -13,6 +13,16 @@
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+<script src="/echarts.min.js"></script>
+<script src="/bi-dashboard.js"></script>
+<link rel="stylesheet" href="/bi-dashboard.css">
+<script>
+  if (typeof echarts === 'undefined') {
+    var cdnEcharts = document.createElement('script');
+    cdnEcharts.src = 'https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js';
+    document.head.appendChild(cdnEcharts);
+  }
+</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230284c7'/%3E%3Cpath d='M18 46L32 18l14 28H38l-6-13-6 13z' fill='white'/%3E%3C/svg%3E">
 
 <style>
@@ -3702,7 +3712,20 @@ body.is-home-view .home-view-wrap {
   display: none !important;
 }
 
+#publicAuthView,
 .public-auth-view {
+  display: none !important;
+}
+
+body.is-public-auth #publicAuthView,
+body.is-public-auth .public-auth-view {
+  display: flex !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 99999 !important;
   min-height: 100vh !important;
   height: 100vh !important;
   width: 100vw !important;
@@ -3711,7 +3734,6 @@ body.is-home-view .home-view-wrap {
   background: radial-gradient(circle at 50% 25%, #0f172a 0%, #090d16 100%) !important;
   color: #0f172a !important;
   font-family: 'Plus Jakarta Sans', 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif !important;
-  display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   padding: 24px !important;
@@ -3969,23 +3991,7 @@ body.is-public-auth .main-viewport {
   padding: 0 !important;
   margin: 0 !important;
 }
-body.is-public-auth .public-auth-view {
-  min-height: 100vh !important;
-  height: 100vh !important;
-  width: 100% !important;
-  padding: 0 !important;
-}
 
-.public-auth-view {
-  overflow-y: auto;
-  overflow-x: hidden;
-  background: #f8fafc !important;
-  color: #0f172a !important;
-  font-family: 'Plus Jakarta Sans', 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif !important;
-  display: flex;
-  flex-direction: column;
-  font-size: 14px;
-}
 
 /* 1. Header (Corporate Logistics Navbar) */
 .auth-landing-navbar {
@@ -5755,6 +5761,166 @@ body.is-home-view .home-view-wrap {
   }
 }
 
+/* ==========================================================================
+   SOTRANS HUB — P1.1 INTERACTIVE ECHARTS DASHBOARD STYLES
+   ========================================================================== */
+.bi-interactive-dashboard {
+  margin: 16px 0;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.07);
+  transition: box-shadow 0.2s ease;
+}
+.bi-interactive-dashboard:hover {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+}
+.bi-dash-header {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #ffffff;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.bi-dash-title {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  color: #f8fafc;
+}
+.bi-dash-badge {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.bi-dash-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+  padding: 14px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+.bi-kpi-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.2s ease;
+}
+.bi-kpi-card:hover {
+  border-color: #94a3b8;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+.bi-kpi-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  line-height: 1.3;
+}
+.bi-kpi-badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 12px;
+  font-weight: 700;
+  display: inline-block;
+  white-space: nowrap;
+}
+.bi-badge-available { background: #dcfce7; color: #15803d; }
+.bi-badge-conditional { background: #fef3c7; color: #b45309; }
+.bi-badge-blocked { background: #fee2e2; color: #b91c1c; }
+.bi-badge-unavailable { background: #f1f5f9; color: #64748b; }
+.bi-kpi-val {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 6px 0 2px;
+  line-height: 1.1;
+}
+.bi-kpi-sub {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #e2e8f0;
+  line-height: 1.35;
+}
+.bi-dash-viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+  padding: 14px;
+}
+.bi-chart-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+}
+.bi-chart-card.bi-col-12 {
+  grid-column: 1 / -1;
+}
+.bi-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.bi-chart-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+}
+.bi-chart-host {
+  width: 100%;
+  height: 280px;
+  min-height: 260px;
+  position: relative;
+}
+.bi-chart-skeleton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #94a3b8;
+  font-size: 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+}
+.bi-dash-table-wrap {
+  margin: 0 14px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+}
+.bi-dash-footer {
+  background: #f8fafc;
+  padding: 8px 16px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 </style>
 </head>
 <body>
@@ -6425,6 +6591,16 @@ body.is-home-view .home-view-wrap {
 
       <div class="input-area-wrap">
         <div class="chips-tray" id="chipsTray"></div>
+        <div id="activeDatasetBar" style="display:none; margin-bottom: 6px; padding: 6px 12px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; font-size: 12.5px; color: #1e40af; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>📊</span>
+            <span>Đang gắn bộ dữ liệu: <strong id="activeDatasetName">...</strong> (<span id="activeDatasetRows">0</span> dòng)</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" class="btn btn-sm" onclick="clearActiveBiDataset()" style="background: none; border: 1px solid #93c5fd; color: #1e40af; border-radius: 4px; padding: 2px 8px; font-size: 11.5px; cursor: pointer;">✖ Hủy gắn</button>
+            <button type="button" class="btn btn-sm" onclick="deleteActiveBiDataset()" style="background: none; border: 1px solid #fca5a5; color: #dc2626; border-radius: 4px; padding: 2px 8px; font-size: 11.5px; cursor: pointer;">🗑 Xóa tệp</button>
+          </div>
+        </div>
         <form class="input-box" id="chatForm">
           <input type="file" id="fileInput" multiple accept=".pdf,.docx,.doc,.txt,.csv,.xlsx,.xls,.json,.md,.png,.jpg,.jpeg,.webp" hidden>
           <button class="btn-att" id="btnAttach" type="button" title="Đính kèm tệp (PDF, Word, Excel, TXT, CSV, Ảnh CCCD...)">
@@ -6577,7 +6753,6 @@ body.is-home-view .home-view-wrap {
           <div class="auth-card-foot-sub">SOTRANS Logistics (STL) • Vietranstimex (VTX) • Sowatco (SWC)</div>
         </div>
       </div>
-    </div>
     </div>
   </main>
 </div>
@@ -8837,7 +9012,10 @@ function showPublicAuthView(openModal = false) {
   document.body.classList.add('is-public-auth');
 
   if ($('homeViewWrap')) $('homeViewWrap').style.display = 'none';
-  if ($('publicAuthView')) $('publicAuthView').style.display = 'flex';
+  if ($('publicAuthView')) {
+    $('publicAuthView').style.setProperty('display', 'flex', 'important');
+    $('publicAuthView').style.display = 'flex';
+  }
   if ($('chatViewWrap')) $('chatViewWrap').style.display = 'none';
   if ($('adminViewWrap')) $('adminViewWrap').style.display = 'none';
   if ($('myAgentsViewWrap')) $('myAgentsViewWrap').style.display = 'none';
@@ -8865,11 +9043,16 @@ function hidePublicAuthView() {
   document.body.classList.remove('is-public-auth');
   document.body.classList.remove('is-home-view');
   const pubView = $('publicAuthView');
-  if (pubView) pubView.style.display = 'none';
+  if (pubView) {
+    pubView.style.setProperty('display', 'none', 'important');
+    pubView.style.display = 'none';
+  }
   const sb = $('sidebar');
   if (sb) sb.style.display = '';
   const mainHdr = document.querySelector('.main-header');
   if (mainHdr) mainHdr.style.display = '';
+  const dlg = $('loginModal');
+  if (dlg && dlg.open) dlg.close();
 }
 
 function fillPublicLoginForm(u, p) {
@@ -11567,7 +11750,6 @@ function askAboutDoc(title) {
 async function sendMessage() {
   if (!isAuthenticated()) {
     showPublicAuthView();
-    openLoginModal('login');
     return;
   }
   const text = $('chatInput').value.trim();
@@ -11692,6 +11874,10 @@ async function dispatchToGeneralAI(text, files, targetConvId) {
     if (!isGuest && targetConvId && !targetConvId.startsWith('conv_')) {
       fd.append('conversation_id', targetConvId);
     }
+    if (window.activeBiDatasetId) {
+      fd.append('active_dataset_id', window.activeBiDatasetId);
+      if (window.activeBiDatasetSheet) fd.append('target_sheet', window.activeBiDatasetSheet);
+    }
     if (isGuest) {
       const prevTurns = guestChatMessages.slice(0, -1).map(m => ({
         role: m.role === 'assistant' ? 'model' : 'user',
@@ -11808,6 +11994,9 @@ async function dispatchToGeneralAI(text, files, targetConvId) {
         bubbleEl.innerHTML = parseMarkdown(replyText, false) + sourcesHtml;
         scrollChatToEnd();
       }
+
+      // Check and update active BI Dataset from response
+      checkAndBindBiDatasetFromReply(replyText);
     } else {
       // B. FALLBACK NON-STREAMING JSON
       const data = await res.json();
@@ -11822,6 +12011,8 @@ async function dispatchToGeneralAI(text, files, targetConvId) {
         renderMessageBubble('assistant', replyText, { model: 'gemini-flash-lite', sources });
         scrollChatToEnd();
       }
+
+      checkAndBindBiDatasetFromReply(replyText);
     }
 
     removePendingRequest(targetConvId);
@@ -11868,6 +12059,93 @@ async function dispatchToGeneralAI(text, files, targetConvId) {
     if (stopBtn) stopBtn.style.display = 'none';
     if (sendBtn) sendBtn.style.display = 'flex';
     updateChatInputState();
+  }
+}
+
+/* ========================================================
+   BI UPLOADED DATASET GOVERNANCE & ACTIVE STATE (PHASE 2.4)
+======================================================== */
+window.activeBiDatasetId = null;
+window.activeBiDatasetInfo = null;
+
+function setActiveBiDataset(dataset) {
+  window.activeBiDatasetSheet = null;
+  if (!dataset || !dataset.file_id) return;
+  window.activeBiDatasetId = dataset.file_id;
+  window.activeBiDatasetInfo = dataset;
+  const bar = $('activeDatasetBar');
+  const nameEl = $('activeDatasetName');
+  const rowsEl = $('activeDatasetRows');
+  if (bar && nameEl) {
+    nameEl.textContent = dataset.original_filename || 'Bảng tính';
+    if (rowsEl) rowsEl.textContent = dataset.row_count || dataset.profile?.row_count || '0';
+    bar.style.display = 'flex';
+  }
+}
+
+function clearActiveBiDataset() {
+  window.activeBiDatasetSheet = null;
+  window.activeBiDatasetId = null;
+  window.activeBiDatasetInfo = null;
+  const bar = $('activeDatasetBar');
+  if (bar) bar.style.display = 'none';
+}
+
+async function deleteActiveBiDataset() {
+  if (!window.activeBiDatasetId) return;
+  const filename = window.activeBiDatasetInfo?.original_filename || 'bộ dữ liệu này';
+  const confirmDelete = confirm(`Bạn có chắc chắn muốn xóa "${filename}" và toàn bộ tệp lưu trữ liên quan?`);
+  if (!confirmDelete) return;
+
+  try {
+    const res = await fetch(`/api/analytics/files/${window.activeBiDatasetId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`
+      }
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('Đã xóa bộ dữ liệu thành công.');
+      clearActiveBiDataset();
+    } else {
+      alert(`Không thể xóa bộ dữ liệu: ${data.error || 'Lỗi không xác định'}`);
+    }
+  } catch (err) {
+    alert(`Lỗi khi gọi API xóa: ${err.message}`);
+  }
+}
+
+function checkAndBindBiDatasetFromReply(text) {
+  if (!text) return;
+  // Match bi-file-report or bi-dataset-widget
+  const matchReport = text.match(/<!-- bi-file-report:\s*(\{[\s\S]*?\})\s*-->/);
+  if (matchReport) {
+    try {
+      const parsed = JSON.parse(matchReport[1]);
+      if (parsed && parsed.file_id) {
+        setActiveBiDataset({
+          file_id: parsed.file_id,
+          original_filename: parsed.original_filename,
+          row_count: parsed.total_rows || parsed.dataset_row_count || parsed.row_count || parsed.profile?.row_count || parsed.total_matching || parsed.returned_rows || 0
+        });
+        return;
+      }
+    } catch (_) {}
+  }
+
+  const matchWidget = text.match(/<!-- bi-dataset-widget:\s*(\{[\s\S]*?\})\s*-->/);
+  if (matchWidget) {
+    try {
+      const parsed = JSON.parse(matchWidget[1]);
+      if (parsed && parsed.file_id) {
+        setActiveBiDataset({
+          file_id: parsed.file_id,
+          original_filename: parsed.original_filename,
+          row_count: parsed.row_count || 0
+        });
+      }
+    } catch (_) {}
   }
 }
 
@@ -13252,10 +13530,810 @@ function renderMath(expr, isDisplay = false) {
   return renderMathFallback(trimmed, isDisplay);
 }
 
+function renderBIReportWidget(data) {
+  if (!data || !Array.isArray(data.results)) return '';
+
+  const compTitle = esc(data.title || 'Báo Cáo Quản Trị');
+  const period = esc(data.period || 'Toàn thời gian');
+  const genAt = esc(data.generated_at || '');
+
+  let cardsHtml = '';
+  for (const item of data.results) {
+    const kpiName = esc(item.name || item.kpi);
+    const kpiCode = esc(item.kpi);
+    let statusBadge = '';
+    let valHtml = '';
+    let subHtml = '';
+    let progressBarHtml = '';
+
+    if (item.status === 'AVAILABLE') {
+      statusBadge = '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#dcfce7;color:#15803d;">Khả dụng</span>';
+    } else if (item.status === 'PARTIALLY_AVAILABLE') {
+      statusBadge = '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#fef9c3;color:#854d0e;">Một phần</span>';
+    } else {
+      statusBadge = '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#f1f5f9;color:#64748b;">Chưa có dữ liệu</span>';
+    }
+
+    if (item.status === 'DATA_UNAVAILABLE') {
+      valHtml = '<div style="font-size:16px;font-weight:700;color:#94a3b8;margin:8px 0 4px;">Chưa hỗ trợ số liệu</div>';
+      subHtml = `<div style="font-size:11px;color:#64748b;line-height:1.4;">${esc(item.reason || 'Pipeline chưa ghi nhận vào CSDL')}</div>`;
+    } else if (item.data) {
+      if (item.kpi === 'DOC_TOTAL') {
+        const total = esc(Number(item.data.total_documents || 0).toLocaleString('vi-VN'));
+        const active = esc(Number(item.data.active_count || 0).toLocaleString('vi-VN'));
+        valHtml = `<div style="font-size:22px;font-weight:800;color:#0f172a;margin:6px 0 2px;">${total} <span style="font-size:12px;font-weight:500;color:#64748b;">văn bản</span></div>`;
+        subHtml = `<div style="font-size:11px;color:#15803d;font-weight:600;">✓ ${active} văn bản đang hiệu lực</div>`;
+      } else if (item.kpi === 'INTAKE_UPLOADS') {
+        const batches = esc(Number(item.data.total_batches || 0).toLocaleString('vi-VN'));
+        const files = esc(Number(item.data.total_files_uploaded || 0).toLocaleString('vi-VN'));
+        valHtml = `<div style="font-size:22px;font-weight:800;color:#0f172a;margin:6px 0 2px;">${batches} <span style="font-size:12px;font-weight:500;color:#64748b;">lô</span></div>`;
+        subHtml = `<div style="font-size:11px;color:#0284c7;font-weight:600;">📁 Tổng ${files} tệp hồ sơ</div>`;
+      } else if (item.kpi === 'INTAKE_SUCCESS') {
+        const rate = esc(String(item.data.conversion_rate_all_status ?? 0));
+        const convBatches = esc(String(item.data.converted_batches_all_status ?? 0));
+        const totalBatches = esc(String(item.data.total_batches ?? 0));
+        const completedBatches = esc(String(item.data.completed_batches ?? 0));
+        const sameComp = esc(String(item.data.same_company_staging_records ?? 0));
+        const crossComp = esc(String(item.data.cross_company_staging_records ?? 0));
+        valHtml = `<div style="font-size:22px;font-weight:800;color:#0f172a;margin:6px 0 2px;">${rate}%</div>`;
+        subHtml = `<div style="font-size:11px;color:#334155;"><strong>${convBatches}/${totalBatches}</strong> lô có staging (${completedBatches} hoàn tất)<br><span style="font-size:10px;color:#64748b;">Khớp đơn vị: ${sameComp} | Khác: ${crossComp} hồ sơ</span></div>`;
+        const pct = Math.min(100, Math.max(0, parseFloat(rate) || 0));
+        progressBarHtml = `<div style="height:6px;width:100%;background:#e2e8f0;border-radius:3px;overflow:hidden;margin-top:6px;"><div style="height:100%;width:${pct}%;background:#10b981;border-radius:3px;"></div></div>`;
+      } else if (item.kpi === 'DUPLICATE_RATE') {
+        const rate = esc(String(item.data.suspected_duplicate_rate ?? 0));
+        const susp = esc(String(item.data.suspected_cnt ?? 0));
+        valHtml = `<div style="font-size:22px;font-weight:800;color:#e11d48;margin:6px 0 2px;">${rate}%</div>`;
+        subHtml = `<div style="font-size:11px;color:#64748b;">${susp} hồ sơ nghi ngờ trùng CCCD</div>`;
+      } else if (item.kpi === 'APPROVAL_QUEUE') {
+        const pending = esc(Number(item.data.current_pending_queue || 0).toLocaleString('vi-VN'));
+        const approved = esc(Number(item.data.approval_activity || 0).toLocaleString('vi-VN'));
+        const rejected = esc(Number(item.data.rejection_activity || 0).toLocaleString('vi-VN'));
+        valHtml = `<div style="font-size:22px;font-weight:800;color:#d97706;margin:6px 0 2px;">${pending} <span style="font-size:12px;font-weight:500;color:#64748b;">chờ duyệt</span></div>`;
+        subHtml = `<div style="font-size:11px;color:#334155;">✓ Duyệt trong kỳ: <strong>${approved}</strong> &nbsp;|&nbsp; ✕ Từ chối: <strong>${rejected}</strong></div>`;
+      } else if (item.kpi === 'OCR_QUALITY') {
+        const qual = item.data.avg_doc_parse_quality !== null ? `${esc(String(item.data.avg_doc_parse_quality))}%` : 'Chưa có mẫu';
+        valHtml = `<div style="font-size:22px;font-weight:800;color:#0f172a;margin:6px 0 2px;">${qual}</div>`;
+        subHtml = `<div style="font-size:11px;color:#64748b;">Đo được: ${esc(String(item.data.measured_docs || 0))}/${esc(String(item.data.total_docs || 0))} văn bản (thiếu: ${esc(String(item.data.missing_docs || 0))})<br><span style="font-size:10px;color:#94a3b8;">OCR hồ sơ nhân sự: Chưa hỗ trợ</span></div>`;
+      } else if (item.kpi === 'ACTIVE_USERS') {
+        const users = esc(Number(item.data.total_active_users || 0).toLocaleString('vi-VN'));
+        const actions = esc(Number(item.data.total_actions || 0).toLocaleString('vi-VN'));
+        valHtml = `<div style="font-size:22px;font-weight:800;color:#0f172a;margin:6px 0 2px;">${users} <span style="font-size:12px;font-weight:500;color:#64748b;">active</span></div>`;
+        subHtml = `<div style="font-size:11px;color:#64748b;">${actions} phiên đăng nhập/làm mới</div>`;
+      } else if (item.kpi === 'RAG_ANSWERABLE') {
+        const rate = esc(String(item.data.answerability_rate ?? 0));
+        const ans = esc(String(item.data.answerable_count ?? 0));
+        const total = esc(String(item.data.eligible_rag_queries ?? 0));
+        const sim = item.data.avg_vector_similarity ? esc(String(item.data.avg_vector_similarity)) : '—';
+        valHtml = `<div style="font-size:22px;font-weight:800;color:#0284c7;margin:6px 0 2px;">${rate}%</div>`;
+        subHtml = `<div style="font-size:11px;color:#64748b;">${ans}/${total} câu đáp ứng | Sim TB: ${sim}<br><span style="font-size:10px;color:#94a3b8;">Độ trễ phản hồi (latency): Chưa hỗ trợ</span></div>`;
+        const pct = Math.min(100, Math.max(0, parseFloat(rate) || 0));
+        progressBarHtml = `<div style="height:6px;width:100%;background:#e2e8f0;border-radius:3px;overflow:hidden;margin-top:6px;"><div style="height:100%;width:${pct}%;background:#0284c7;border-radius:3px;"></div></div>`;
+      } else {
+        valHtml = `<div style="font-size:18px;font-weight:700;color:#0f172a;margin:6px 0 2px;">Đã trích xuất</div>`;
+        subHtml = `<div style="font-size:11px;color:#64748b;">Xem chi tiết ở bảng dữ liệu</div>`;
+      }
+    }
+
+    cardsHtml += `
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;display:flex;flex-direction:column;justify-content:space-between;">
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">
+            <span style="font-size:12px;font-weight:700;color:#334155;line-height:1.3;">${kpiName}</span>
+            ${statusBadge}
+          </div>
+          <div style="font-size:10px;font-family:monospace;color:#94a3b8;">${kpiCode}</div>
+          ${valHtml}
+          ${progressBarHtml}
+        </div>
+        ${subHtml ? `<div style="margin-top:8px;padding-top:6px;border-top:1px dashed #e2e8f0;">${subHtml}</div>` : ''}
+      </div>
+    `;
+  }
+
+  // Render Charts section for breakdown KPIs (pure SVG / CSS)
+  let chartsHtml = '';
+  for (const item of data.results) {
+    if (!item.data || !Array.isArray(item.data.items) || item.data.items.length === 0) continue;
+
+    if (item.kpi === 'DOC_STATUS') {
+      const colors = { active: '#10b981', expired: '#ef4444', draft: '#f59e0b', archived: '#64748b' };
+      let bars = '';
+      let legend = '';
+      for (const row of item.data.items) {
+        const st = String(row.document_status || '').toLowerCase();
+        const col = colors[st] || '#3b82f6';
+        const ratio = Math.max(0, parseFloat(row.ratio_percent) || 0);
+        const cnt = Number(row.total_count || 0).toLocaleString('vi-VN');
+        bars += `<div style="width:${ratio}%;background:${col};height:100%;transition:width 0.3s;" title="${esc(row.document_status)}: ${ratio}%"></div>`;
+        legend += `<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#475569;"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${col};"></span><span>${esc(row.document_status)}: <strong>${cnt}</strong> (${ratio}%)</span></div>`;
+      }
+      chartsHtml += `
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-top:12px;">
+          <div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:8px;">📊 Phân bổ Trạng thái Văn bản</div>
+          <div style="height:14px;width:100%;background:#e2e8f0;border-radius:7px;overflow:hidden;display:flex;margin-bottom:8px;">
+            ${bars}
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;">
+            ${legend}
+          </div>
+        </div>
+      `;
+    } else if (item.kpi === 'INTAKE_TRENDS') {
+      const items = item.data.items;
+      const maxFiles = Math.max(...items.map(r => Number(r.files_count || 0)), 1);
+      const svgW = 460;
+      const svgH = 130;
+      const padL = 30;
+      const padB = 22;
+      const padT = 15;
+      const barSlot = (svgW - padL - 10) / items.length;
+      const barW = Math.max(12, Math.min(32, barSlot * 0.6));
+
+      let svgBars = '';
+      items.forEach((r, idx) => {
+        const x = padL + idx * barSlot + (barSlot - barW) / 2;
+        const val = Number(r.files_count || 0);
+        const barH = ((svgH - padB - padT) * val) / maxFiles;
+        const y = svgH - padB - barH;
+        svgBars += `
+          <rect x="${x}" y="${y}" width="${barW}" height="${barH}" rx="3" fill="#005baa" opacity="0.88">
+            <title>${esc(r.period)}: ${val.toLocaleString('vi-VN')} tệp</title>
+          </rect>
+          <text x="${x + barW / 2}" y="${y - 4}" text-anchor="middle" font-size="9" font-weight="bold" fill="#0f172a">${val}</text>
+          <text x="${x + barW / 2}" y="${svgH - 6}" text-anchor="middle" font-size="9" fill="#64748b">${esc(r.period)}</text>
+        `;
+      });
+
+      chartsHtml += `
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-top:12px;">
+          <div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:8px;">📈 Xu hướng Số lượng Tệp Tiếp nhận theo Chu kỳ</div>
+          <div style="overflow-x:auto;">
+            <svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-width:${svgW}px;height:auto;display:block;">
+              <line x1="${padL}" y1="${svgH - padB}" x2="${svgW}" y2="${svgH - padB}" stroke="#cbd5e1" stroke-width="1"/>
+              ${svgBars}
+            </svg>
+          </div>
+        </div>
+      `;
+    } else if (item.kpi === 'INTAKE_BY_USER') {
+      const items = item.data.items.slice(0, 5);
+      const maxFiles = Math.max(...items.map(r => Number(r.total_files || 0)), 1);
+      let rows = '';
+      for (const row of items) {
+        const val = Number(row.total_files || 0);
+        const pct = Math.round((val / maxFiles) * 100);
+        rows += `
+          <div style="margin-bottom:6px;">
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;">
+              <span style="font-weight:600;color:#334155;">${esc(row.username)} <span style="font-size:10px;color:#94a3b8;">(${esc(row.company_id)})</span></span>
+              <span style="font-weight:700;color:#005baa;">${val.toLocaleString('vi-VN')} tệp (${esc(String(row.total_batches))} lô)</span>
+            </div>
+            <div style="height:6px;width:100%;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:#0284c7;border-radius:3px;"></div>
+            </div>
+          </div>
+        `;
+      }
+      chartsHtml += `
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-top:12px;">
+          <div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:8px;">👥 Khối lượng Tiếp nhận theo Cán bộ (Top 5)</div>
+          ${rows}
+        </div>
+      `;
+    } else if (item.kpi === 'DOC_BY_TYPE') {
+      const items = item.data.items.slice(0, 5);
+      const maxDocs = Math.max(...items.map(r => Number(r.doc_count || 0)), 1);
+      let rows = '';
+      for (const row of items) {
+        const val = Number(row.doc_count || 0);
+        const pct = Math.round((val / maxDocs) * 100);
+        rows += `
+          <div style="margin-bottom:6px;">
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;">
+              <span style="font-weight:600;color:#334155;">${esc(row.doc_type || 'Khác')} <span style="font-size:10px;color:#94a3b8;">(${esc(row.category || '')})</span></span>
+              <span style="font-weight:700;color:#f58220;">${val.toLocaleString('vi-VN')} văn bản</span>
+            </div>
+            <div style="height:6px;width:100%;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:#f58220;border-radius:3px;"></div>
+            </div>
+          </div>
+        `;
+      }
+      chartsHtml += `
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-top:12px;">
+          <div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:8px;">📁 Phân loại Văn bản theo Chuyên mục (Top 5)</div>
+          ${rows}
+        </div>
+      `;
+    }
+  }
+
+  return `
+    <div class="bi-dashboard-card" style="margin:16px 0;background:#ffffff;border:1px solid #cbd5e1;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(15,23,42,0.06);">
+      <div style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%);color:#ffffff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:18px;">📊</span>
+          <span style="font-weight:700;font-size:14px;letter-spacing:0.3px;">${compTitle}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="background:rgba(255,255,255,0.15);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;">📅 ${period}</span>
+          <span style="background:#0284c7;color:#fff;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;">BI v1.4</span>
+        </div>
+      </div>
+      <div style="padding:14px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:10px;">
+          ${cardsHtml}
+        </div>
+        ${chartsHtml}
+      </div>
+      <div style="background:#f8fafc;padding:8px 16px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+        <span>🔒 Dữ liệu bảo vệ Read-Only • Analytics Engine</span>
+        <span>🕒 Kết xuất lúc ${genAt}</span>
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================================
+// SOTRANS HUB — P1.1 INTERACTIVE ECHARTS DASHBOARD CORE RENDERER
+// ============================================================================
+
+window._biEchartInstances = window._biEchartInstances || new Map();
+window._biDashboardPayloadStore = window._biDashboardPayloadStore || new Map();
+
+/**
+ * Parse Dashboard Payload Contract v2 from raw text / Markdown comment
+ * @param {string} rawText
+ * @returns {Object|null}
+ */
+function parseBIDashboardPayload(rawText) {
+  if (!rawText || typeof rawText !== 'string') return null;
+  const match = rawText.match(/<!--\s*bi-dashboard-v2:\s*([\s\S]*?)\s*-->/);
+  if (!match) return null;
+  try {
+    const jsonStr = match[1].replace(/--\\u003e/g, '-->').replace(/\\u003c!--/g, '<!--');
+    return JSON.parse(jsonStr);
+  } catch (err) {
+    console.warn('[P1.1 Renderer] Failed to parse bi-dashboard-v2 JSON:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Validate Dashboard Payload before client-side rendering
+ * @param {Object} payload
+ * @returns {{ valid: boolean, errors: Array<string> }}
+ */
+function validateDashboardForRendering(payload) {
+  const errors = [];
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { valid: false, errors: ['Payload không phải object hợp lệ'] };
+  }
+  if (payload.version !== '2.0') {
+    errors.push(`Version "${payload.version}" không hợp lệ, yêu cầu 2.0`);
+  }
+  if (!payload.dashboard_id || typeof payload.dashboard_id !== 'string') {
+    errors.push('Thiếu dashboard_id');
+  }
+  if (!payload.source_type || !['INTERNAL_SYSTEM', 'FILE_DATASET'].includes(payload.source_type)) {
+    errors.push(`source_type "${payload.source_type}" không hợp lệ`);
+  }
+  if (!Array.isArray(payload.kpi_strip)) {
+    errors.push('kpi_strip phải là array');
+  }
+  if (!Array.isArray(payload.visualizations)) {
+    errors.push('visualizations phải là array');
+  }
+  if (!payload.data_store || typeof payload.data_store !== 'object') {
+    errors.push('data_store phải là object');
+  }
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Render Interactive BI Dashboard HTML Container
+ * @param {Object} payload - Validated Dashboard v2 payload
+ * @param {Object} options - { isStreaming: boolean }
+ * @returns {string} HTML markup
+ */
+function renderInteractiveBIDashboard(payload, options = {}) {
+  const validation = validateDashboardForRendering(payload);
+  if (!validation.valid) {
+    console.warn('[P1.1 Renderer] Validation failed for dashboard:', validation.errors);
+    return '';
+  }
+
+  const dashId = esc(payload.dashboard_id);
+  const title = esc(payload.title || 'Báo Cáo Phân Tích Dữ Liệu');
+  const subtitle = esc(payload.subtitle || '');
+  const isInternal = payload.source_type === 'INTERNAL_SYSTEM';
+  const sourceLabel = isInternal ? 'SOTRANS Hub Internal BI' : 'Tệp Dữ Liệu Tải Lên';
+  const sourceBadgeCol = isInternal ? '#0284c7' : '#10b981';
+  const genAt = payload.generated_at ? new Date(payload.generated_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+
+  // Save payload for canvas mounting
+  window._biDashboardPayloadStore.set(payload.dashboard_id, payload);
+
+  // 1. KPI Cards
+  let kpisHtml = '';
+  if (Array.isArray(payload.kpi_strip) && payload.kpi_strip.length > 0) {
+    for (const kpi of payload.kpi_strip) {
+      const kpiName = esc(kpi.title || kpi.kpi_code || 'Chỉ số');
+      const status = kpi.status || 'AVAILABLE';
+      let statusBadge = '';
+      let valHtml = '';
+      let subHtml = kpi.subtext ? esc(kpi.subtext) : '';
+
+      if (status === 'AVAILABLE') {
+        statusBadge = '<span class="bi-kpi-badge bi-badge-available">🟢 Khả dụng</span>';
+        const formattedVal = typeof kpi.primary_value === 'number'
+          ? (kpi.format === 'PERCENTAGE' ? `${kpi.primary_value}%` : kpi.primary_value.toLocaleString('vi-VN'))
+          : esc(String(kpi.primary_value ?? '—'));
+        const unitStr = kpi.unit ? ` <span style="font-size:12px;font-weight:600;color:#64748b;">${esc(kpi.unit)}</span>` : '';
+        valHtml = `<div class="bi-kpi-val">${formattedVal}${unitStr}</div>`;
+      } else if (status === 'CONDITIONAL') {
+        statusBadge = '<span class="bi-kpi-badge bi-badge-conditional">🟡 Có điều kiện</span>';
+        const formattedVal = typeof kpi.primary_value === 'number'
+          ? (kpi.format === 'PERCENTAGE' ? `${kpi.primary_value}%` : kpi.primary_value.toLocaleString('vi-VN'))
+          : esc(String(kpi.primary_value ?? '—'));
+        const unitStr = kpi.unit ? ` <span style="font-size:12px;font-weight:600;color:#64748b;">${esc(kpi.unit)}</span>` : '';
+        valHtml = `<div class="bi-kpi-val" style="color:#b45309;">${formattedVal}${unitStr}</div>`;
+      } else if (status === 'BLOCKED') {
+        statusBadge = '<span class="bi-kpi-badge bi-badge-blocked">🔴 Bị khóa</span>';
+        valHtml = `<div class="bi-kpi-val" style="font-size:16px;color:#b91c1c;">Chưa hỗ trợ</div>`;
+      } else {
+        statusBadge = '<span class="bi-kpi-badge bi-badge-unavailable">⚪ Thiếu dữ liệu</span>';
+        valHtml = `<div class="bi-kpi-val" style="font-size:16px;color:#64748b;">Chưa có số liệu</div>`;
+      }
+
+      kpisHtml += `
+        <div class="bi-kpi-card">
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">
+              <span class="bi-kpi-label">${kpiName}</span>
+              ${statusBadge}
+            </div>
+            ${valHtml}
+          </div>
+          ${subHtml ? `<div class="bi-kpi-sub">${subHtml}</div>` : ''}
+        </div>
+      `;
+    }
+  }
+
+  // 2. Visualizations Grid
+  let vizsHtml = '';
+  if (Array.isArray(payload.visualizations) && payload.visualizations.length > 0) {
+    for (const viz of payload.visualizations) {
+      const vizId = esc(viz.id);
+      const vizTitle = esc(viz.title || 'Biểu đồ');
+      const chartContainerId = `bi-chart-elem-${dashId}-${vizId}`;
+      const colSpan = viz.grid_col_span === 6 ? 'bi-col-6' : 'bi-col-12';
+
+      vizsHtml += `
+        <div class="bi-chart-card ${colSpan}">
+          <div class="bi-chart-header">
+            <span class="bi-chart-title">📈 ${vizTitle}</span>
+            <span style="font-size:10px;font-weight:700;color:#64748b;background:#e2e8f0;padding:2px 6px;border-radius:4px;">${esc(viz.chart_type)}</span>
+          </div>
+          <div id="${chartContainerId}" class="bi-chart-host" data-dash-id="${dashId}" data-viz-id="${vizId}">
+            ${options.isStreaming ? '<div class="bi-chart-skeleton">Đang tải dữ liệu biểu đồ...</div>' : ''}
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // 3. Data Tables
+  let tablesHtml = '';
+  if (Array.isArray(payload.data_tables) && payload.data_tables.length > 0) {
+    for (const tbl of payload.data_tables) {
+      const tblTitle = esc(tbl.title || 'Bảng Dữ Liệu');
+      const rows = payload.data_store && payload.data_store[tbl.data_ref] ? payload.data_store[tbl.data_ref].slice(0, 15) : [];
+      const columns = tbl.columns || (rows.length > 0 ? Object.keys(rows[0]).map(k => ({ key: k, label: k })) : []);
+
+      let thHtml = columns.map(c => `<th style="padding:8px 10px;border-bottom:2px solid #cbd5e1;font-size:11px;font-weight:700;color:#334155;text-align:${c.type === 'number' ? 'right' : 'left'}">${esc(c.label || c.key)}</th>`).join('');
+      let trsHtml = rows.map(r => {
+        const tds = columns.map(c => {
+          const v = r[c.key];
+          const formatted = typeof v === 'number' ? v.toLocaleString('vi-VN') : esc(String(v ?? ''));
+          return `<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;font-size:11px;color:#1e293b;text-align:${c.type === 'number' ? 'right' : 'left'}">${formatted}</td>`;
+        }).join('');
+        return `<tr>${tds}</tr>`;
+      }).join('');
+
+      tablesHtml += `
+        <div class="bi-dash-table-wrap">
+          <div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:8px;">📋 ${tblTitle}</div>
+          <div style="max-height:220px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;">
+            <table style="width:100%;border-collapse:collapse;background:#ffffff;">
+              <thead style="background:#f8fafc;position:sticky;top:0;"><tr>${thHtml}</tr></thead>
+              <tbody>${trsHtml}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  return `
+    <div class="bi-interactive-dashboard" id="bi-dash-${dashId}" data-dash-id="${dashId}" data-mounted="false">
+      <div class="bi-dash-header">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:20px;">⚡</span>
+          <div>
+            <div class="bi-dash-title">${title}</div>
+            ${subtitle ? `<div style="font-size:11px;color:#94a3b8;margin-top:2px;">${subtitle}</div>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="bi-dash-badge" style="background:${sourceBadgeCol};color:#fff;">${sourceLabel}</span>
+          <span class="bi-dash-badge">Interactive Dashboard v2.0</span>
+        </div>
+      </div>
+
+      ${window.HubBIDashboard ? window.HubBIDashboard.controls(payload) : ''}
+      ${kpisHtml ? `<div class="bi-dash-kpi-grid">${kpisHtml}</div>` : ''}
+      ${vizsHtml ? `<div class="bi-dash-viz-grid">${vizsHtml}</div>` : ''}
+      ${window.HubBIDashboard ? window.HubBIDashboard.tables(payload, payload.data_store || {}) : tablesHtml}
+
+      <div class="bi-dash-footer">
+        <span>🔒 Dữ liệu bảo vệ Read-Only • SOTRANS Analytics Core</span>
+        <span>🕒 Xuất lúc ${genAt}</span>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Render single Apache ECharts instance into target DOM element
+ */
+function renderEChartInstance(chartDom, vizConfig, dataStore) {
+  if (!chartDom || !window.echarts) return null;
+  const vizId = vizConfig.id;
+  let chartType = String(vizConfig.chart_type || 'BAR').toUpperCase();
+  const dataRef = vizConfig.data_ref;
+  const rows = (dataStore && dataStore[dataRef]) ? dataStore[dataRef] : [];
+
+  // Dispose existing instance on this DOM element if already initialized
+  const existingChart = echarts.getInstanceByDom(chartDom);
+  if (chartDom._biResizeObserver) chartDom._biResizeObserver.disconnect();
+  const registeredChart = window._biEchartInstances.get(chartDom.id);
+  if (registeredChart && registeredChart !== existingChart) {
+    const oldDom = registeredChart.getDom();
+    if (oldDom?._biResizeObserver) oldDom._biResizeObserver.disconnect();
+    registeredChart.dispose();
+  }
+  if (existingChart) {
+    existingChart.dispose();
+  }
+
+  if (rows.length === 0) {
+    window._biEchartInstances.delete(chartDom.id);
+    chartDom.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:12px;">Chưa có dữ liệu cho biểu đồ này</div>';
+    return null;
+  }
+
+  const chart = echarts.init(chartDom);
+  const palette = ['#0284c7', '#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'];
+
+  const mapping = vizConfig.mapping || {};
+  const catKey = mapping.category || mapping.x || mapping.dimension || Object.keys(rows[0])[0];
+  const valKey = mapping.value || mapping.y || mapping.metric || Object.keys(rows[0])[1];
+  const numericValue = value => value === null || value === undefined || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
+  const displayValue = value => numericValue(value) === null ? 'Chưa có số liệu' : Number(value).toLocaleString('vi-VN');
+  if (['PIE', 'DONUT', 'TREEMAP'].includes(chartType) && rows.some(row => numericValue(row[valKey]) < 0)) chartType = 'BAR';
+  chartDom.dataset.actualChartType = chartType;
+
+  let option = {};
+
+  if (chartType === 'PIE' || chartType === 'DONUT') {
+    const pieData = rows.map((r) => ({
+      name: String(r[catKey] || 'Khác'),
+      value: numericValue(r[valKey]),
+    }));
+    const isDonut = chartType === 'DONUT';
+
+    option = {
+      color: palette,
+      tooltip: {
+        trigger: 'item',
+        formatter: function (params) {
+          const name = esc(params.name);
+          const val = Number(params.value || 0).toLocaleString('vi-VN');
+          const pct = params.percent || 0;
+          return `<strong>${name}</strong><br/>Số lượng: ${val} (${pct}%)`;
+        },
+      },
+      legend: {
+        orient: 'horizontal',
+        bottom: 0,
+        type: 'scroll',
+        textStyle: { fontSize: 11, color: '#475569' },
+      },
+      series: [
+        {
+          type: 'pie',
+          radius: isDonut ? ['42%', '70%'] : '65%',
+          center: ['50%', '45%'],
+          avoidLabelOverlap: true,
+          itemStyle: {
+            borderRadius: 5,
+            borderColor: '#fff',
+            borderWidth: 2,
+          },
+          label: {
+            show: true,
+            formatter: '{b}: {d}%',
+            fontSize: 10,
+            color: '#334155',
+          },
+          emphasis: {
+            label: { show: true, fontSize: 12, fontWeight: 'bold' },
+          },
+          data: pieData,
+        },
+      ],
+    };
+  } else if (chartType === 'TREEMAP') {
+    option = { tooltip: { formatter: p => `${esc(p.name)}: ${displayValue(p.value)}` }, series: [{ type: 'treemap', roam: false, nodeClick: false, breadcrumb: { show: false }, data: rows.map(r => ({ name: String(r[catKey] || ''), value: numericValue(r[valKey]) })) }] };
+  } else if (chartType === 'LINE' || chartType === 'AREA') {
+    const categories = rows.map((r) => String(r[catKey] || ''));
+    const values = rows.map((r) => numericValue(r[valKey]));
+    const isArea = chartType === 'AREA';
+
+    option = {
+      color: palette,
+      tooltip: {
+        trigger: 'axis',
+        formatter: function (params) {
+          const item = params[0];
+          return `<strong>${esc(item.axisValue)}</strong><br/>${esc(item.seriesName)}: ${Number(item.value || 0).toLocaleString('vi-VN')}`;
+        },
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '12%',
+        top: '10%',
+        containLabel: true,
+      },
+      xAxis: {
+        type: 'category',
+        data: categories,
+        axisLabel: {
+          fontSize: 10,
+          color: '#64748b',
+          interval: 0,
+          rotate: categories.length > 6 ? 25 : 0,
+        },
+        axisLine: { lineStyle: { color: '#cbd5e1' } },
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: { fontSize: 10, color: '#64748b' },
+        splitLine: { lineStyle: { color: '#f1f5f9' } },
+      },
+      series: [
+        {
+          name: vizConfig.title || 'Số lượng',
+          type: 'line',
+          data: values,
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          itemStyle: { color: '#0284c7' },
+          lineStyle: { width: 3 },
+          areaStyle: isArea ? { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(2,132,199,0.35)' }, { offset: 1, color: 'rgba(2,132,199,0.02)' }]) } : null,
+        },
+      ],
+    };
+  } else if (chartType === 'STACKED_BAR') {
+    const categories = rows.map((r) => String(r[catKey] || ''));
+    const valFields = Array.isArray(valKey) ? valKey : [valKey];
+
+    option = {
+      color: palette,
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+      },
+      legend: {
+        bottom: 0,
+        textStyle: { fontSize: 10, color: '#475569' },
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '15%',
+        top: '10%',
+        containLabel: true,
+      },
+      xAxis: {
+        type: 'category',
+        data: categories,
+        axisLabel: { fontSize: 10, color: '#64748b' },
+      },
+      yAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: '#f1f5f9' } },
+      },
+      series: valFields.map((f, i) => ({
+        name: f,
+        type: 'bar',
+        stack: 'total',
+        data: rows.map(r => numericValue(r[f])),
+        itemStyle: { borderRadius: i === valFields.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0] },
+      })),
+    };
+  } else {
+    // Default: BAR chart
+    const categories = rows.map((r) => String(r[catKey] || ''));
+    const values = rows.map((r) => numericValue(r[valKey]));
+
+    option = {
+      color: palette,
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: function (params) {
+          const item = params[0];
+          return `<strong>${esc(item.axisValue)}</strong><br/>${esc(item.seriesName)}: ${displayValue(item.value)}`;
+        },
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '12%',
+        top: '10%',
+        containLabel: true,
+      },
+      xAxis: {
+        type: 'category',
+        data: categories,
+        axisLabel: {
+          fontSize: 10,
+          color: '#64748b',
+          interval: 0,
+          rotate: categories.length > 5 ? 20 : 0,
+        },
+        axisLine: { lineStyle: { color: '#cbd5e1' } },
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: { fontSize: 10, color: '#64748b' },
+        splitLine: { lineStyle: { color: '#f1f5f9' } },
+      },
+      series: [
+        {
+          name: vizConfig.title || 'Số lượng',
+          type: 'bar',
+          data: values,
+          itemStyle: {
+            borderRadius: [5, 5, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: '#0284c7' },
+              { offset: 1, color: '#2563eb' },
+            ]),
+          },
+        },
+      ],
+    };
+  }
+
+  chart.setOption(option);
+
+  const chartKey = chartDom.id;
+  window._biEchartInstances.set(chartKey, chart);
+
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => {
+      if (chart && !chart.isDisposed()) {
+        chart.resize();
+      }
+    });
+    ro.observe(chartDom);
+    chartDom._biResizeObserver = ro;
+  }
+
+  return chart;
+}
+
+/**
+ * Mount all unmounted BI dashboards inside given container or document body
+ */
+function mountBIDashboardsInElement(rootElement) {
+  if (!rootElement) return;
+  if (!window.echarts) {
+    rootElement._biMountAttempts = (rootElement._biMountAttempts || 0) + 1;
+    if (rootElement._biMountAttempts > 20) {
+      rootElement.querySelectorAll('.bi-chart-host').forEach(node => { node.textContent = 'Không tải được thư viện biểu đồ. Dữ liệu bảng vẫn khả dụng.'; });
+      return;
+    }
+    setTimeout(() => mountBIDashboardsInElement(rootElement), 150);
+    return;
+  }
+  const dashContainers = rootElement.querySelectorAll('.bi-interactive-dashboard[data-mounted="false"]');
+  if (dashContainers.length === 0) return;
+
+  dashContainers.forEach((dashRoot) => {
+    const dashId = dashRoot.getAttribute('data-dash-id');
+    const payload = window._biDashboardPayloadStore.get(dashId);
+    if (!payload) return;
+
+    const chartHosts = dashRoot.querySelectorAll('.bi-chart-host');
+    chartHosts.forEach((hostDom) => {
+      const vizId = hostDom.getAttribute('data-viz-id');
+      const viz = (payload.visualizations || []).find((v) => v.id === vizId);
+      if (viz) {
+        const prepared = window.HubBIDashboard ? window.HubBIDashboard.prepare(payload, viz, payload.data_store) : { viz, store: payload.data_store };
+        const label = hostDom.closest('.bi-chart-card')?.querySelector('.bi-chart-title'); if (label) label.textContent = `📈 ${prepared.viz.title}`;
+        const chart = renderEChartInstance(hostDom, prepared.viz, prepared.store);
+        if (window.HubBIDashboard) window.HubBIDashboard.bindChart(dashId, chart, viz);
+      }
+    });
+
+    dashRoot.setAttribute('data-mounted', 'true');
+  });
+}
+
+/**
+ * Dispose BI Dashboard and all its chart instances
+ */
+function disposeBIDashboard(dashId) {
+  if (!dashId) return;
+  const prefix = `bi-chart-elem-${dashId}-`;
+  for (const [key, chart] of window._biEchartInstances.entries()) {
+    if (key.startsWith(prefix)) {
+      try {
+        const dom = chart.getDom();
+        if (dom?._biResizeObserver) dom._biResizeObserver.disconnect();
+        chart.dispose();
+      } catch (_) {}
+      window._biEchartInstances.delete(key);
+    }
+  }
+  window._biDashboardPayloadStore.delete(dashId);
+}
+
+// Window resize listener
+window.addEventListener('resize', () => {
+  if (window._biEchartInstances) {
+    for (const chart of window._biEchartInstances.values()) {
+      if (chart && !chart.isDisposed()) {
+        chart.resize();
+      }
+    }
+  }
+});
+
 function parseMarkdown(md, isStreaming = false) {
   if (!md) return '';
 
   let raw = md;
+
+  // 1a. Trích xuất an toàn BI Dashboard Contract v2
+  const v2Payloads = [];
+  raw = raw.replace(/<!--\s*bi-dashboard-v2:\s*([\s\S]*?)\s*-->/g, (match, jsonRaw) => {
+    try {
+      const cleanJson = jsonRaw.replace(/--\\u003e/g, '-->').replace(/\\u003c!--/g, '<!--');
+      const parsed = JSON.parse(cleanJson);
+      const val = validateDashboardForRendering(parsed);
+      if (val.valid) {
+        v2Payloads.push(parsed);
+        const idx = v2Payloads.length - 1;
+        return `\n@@@BIDASHBLOCK_${idx}@@@\n`;
+      }
+    } catch (e) {
+      console.warn('[P1.1 Markdown] Error parsing bi-dashboard-v2:', e.message);
+    }
+    return '';
+  });
+
+  // Làm sạch các thẻ comment nội bộ để không bị escape thành text thô trên giao diện
+  raw = raw.replace(/<!--\s*bi-file-report:[\s\S]*?-->/g, '');
+  raw = raw.replace(/<!--\s*bi-dataset-widget:[\s\S]*?-->/g, '');
+  if (v2Payloads.length) raw = raw.replace(/<svg[\s\S]*?<\/svg>/gi, '');
 
   // Nếu đang streaming, tự động cân bằng các thẻ chưa đóng để hiển thị mượt mà không giật
   if (isStreaming) {
@@ -13277,6 +14355,19 @@ function parseMarkdown(md, isStreaming = false) {
   const codeBlocks = [];
   let s = raw.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
     const idx = codeBlocks.length;
+    if (lang === 'bi-report') {
+      if (v2Payloads.length > 0) {
+        // Ưu tiên Dashboard V2 ECharts, ẩn báo cáo tĩnh legacy để tránh trùng lặp
+        return '';
+      }
+      try {
+        const reportData = JSON.parse(code);
+        codeBlocks.push(renderBIReportWidget(reportData));
+        return `@@@CDBLOCK${idx}@@@`;
+      } catch (e) {
+        // Fallback to normal code block below
+      }
+    }
     const displayLang = lang || 'code';
     codeBlocks.push(`
       <div class="code-block">
@@ -13291,6 +14382,21 @@ function parseMarkdown(md, isStreaming = false) {
       </div>
     `);
     return `@@@CDBLOCK${idx}@@@`;
+  });
+
+  // 1b. Trích xuất an toàn Inline SVG (cho biểu đồ trực quan Phase 2.3)
+  const svgBlocks = [];
+  s = s.replace(/<svg[\s\S]*?<\/svg>/gi, (match) => {
+    if (/<script|on[a-z]+\s*=/i.test(match)) {
+      return ''; // Chặn kịch bản độc hại
+    }
+    if (v2Payloads.length > 0 && /viewBox=["']0 0 640 280["']/i.test(match)) {
+      // Ẩn SVG tĩnh trùng lặp khi đã dựng biểu đồ ECharts tương tác V2
+      return '';
+    }
+    const idx = svgBlocks.length;
+    svgBlocks.push(match);
+    return `@@@SVGBLK${idx}@@@`;
   });
 
   // 2. Trích xuất inline code (`code`)
@@ -13413,7 +14519,7 @@ function parseMarkdown(md, isStreaming = false) {
   }
 
   function isBlockLine(trimmed, idx) {
-    if (/^(?:#{1,4}\s+|&gt;|>|---|---|\*\*\*|___|@@@CDBLOCK|@@@MATHBLK)/.test(trimmed)) return true;
+    if (/^(?:#{1,4}\s+|&gt;|>|---|---|\*\*\*|___|@@@CDBLOCK|@@@MATHBLK|@@@SVGBLK)/.test(trimmed)) return true;
     if (trimmed.includes('|') && idx + 1 < lines.length && isTableSeparator(lines[idx + 1])) return true;
     return false;
   }
@@ -13441,6 +14547,20 @@ function parseMarkdown(md, isStreaming = false) {
 
     // Display math placeholder
     if (trimmed.startsWith('@@@MATHBLK') && trimmed.endsWith('@@@')) {
+      closeAllLists();
+      out.push(trimmed);
+      continue;
+    }
+
+    // SVG chart placeholder
+    if (trimmed.startsWith('@@@SVGBLK') && trimmed.endsWith('@@@')) {
+      closeAllLists();
+      out.push(trimmed);
+      continue;
+    }
+
+    // BI Dashboard placeholder
+    if (trimmed.startsWith('@@@BIDASHBLOCK_') && trimmed.endsWith('@@@')) {
       closeAllLists();
       out.push(trimmed);
       continue;
@@ -13637,10 +14757,23 @@ function parseMarkdown(md, isStreaming = false) {
 
   let html = out.join('');
 
-  // 8. Khôi phục Placeholders (Code, Math, Inline Code)
+  // 8. Khôi phục Placeholders (Code, Math, Inline Code, SVG, BI Dashboard)
   html = html.replace(/@@@CDBLOCK(\d+)@@@/g, (match, idx) => codeBlocks[idx] || '');
   html = html.replace(/@@@INLCODE(\d+)@@@/g, (match, idx) => inlineCodes[idx] || '');
   html = html.replace(/@@@MATHBLK(\d+)@@@/g, (match, idx) => mathBlocks[idx] || '');
+  html = html.replace(/@@@SVGBLK(\d+)@@@/g, (match, idx) => svgBlocks[idx] || '');
+  html = html.replace(/@@@BIDASHBLOCK_(\d+)@@@/g, (match, idx) => {
+    const p = v2Payloads[parseInt(idx, 10)];
+    return p ? renderInteractiveBIDashboard(p, { isStreaming }) : '';
+  });
+
+  if (v2Payloads.length > 0 && !isStreaming) {
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => mountBIDashboardsInElement(document.body));
+    } else {
+      setTimeout(() => mountBIDashboardsInElement(document.body), 30);
+    }
+  }
 
   return html;
 }
@@ -13653,6 +14786,7 @@ async function initChatWorkspaceOnStartup() {
     }
     return;
   }
+  hidePublicAuthView();
 
   // 0. Khôi phục các yêu cầu đang chờ phản hồi từ sessionStorage (nếu vừa F5)
   restorePendingRequests();

@@ -1,0 +1,7 @@
+.bi-controls,.bi-table-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;background:#f8fafc}
+.bi-controls label{display:flex;align-items:center;gap:5px;font-size:12px;color:#334155}
+.bi-controls select,.bi-controls input,.bi-controls button,.bi-table-actions input,.bi-table-actions button,.bi-dash-table-wrap th button{font:inherit;font-size:12px;border:1px solid #cbd5e1;border-radius:5px;background:white;padding:6px;color:#0f172a;max-width:220px}
+.bi-controls button,.bi-table-actions button{cursor:pointer}.bi-controls button:disabled,.bi-table-actions button:disabled{opacity:.5;cursor:default}
+.bi-control-status{padding:6px 14px;font-size:11px;color:#475569;border-bottom:1px solid #e2e8f0}
+.bi-dash-table-wrap{padding:12px 14px}.bi-dash-table-wrap table{width:100%;border-collapse:collapse}.bi-dash-table-wrap td,.bi-dash-table-wrap th{padding:6px 8px;font-size:12px;text-align:left;border-bottom:1px solid #e2e8f0}.bi-dash-table-wrap th{background:#f1f5f9;position:sticky;top:0}
+@media(max-width:600px){.bi-controls{align-items:stretch}.bi-controls label{flex-basis:100%}.bi-controls select,.bi-controls input{flex:1;max-width:none}.bi-dash-viz-grid{grid-template-columns:minmax(0,1fr)!important}.bi-controls button{min-height:36px}}
