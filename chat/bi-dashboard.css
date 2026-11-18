@@ -4,4 +4,16 @@
 .bi-controls button,.bi-table-actions button{cursor:pointer}.bi-controls button:disabled,.bi-table-actions button:disabled{opacity:.5;cursor:default}
 .bi-control-status{padding:6px 14px;font-size:11px;color:#475569;border-bottom:1px solid #e2e8f0}
 .bi-dash-table-wrap{padding:12px 14px}.bi-dash-table-wrap table{width:100%;border-collapse:collapse}.bi-dash-table-wrap td,.bi-dash-table-wrap th{padding:6px 8px;font-size:12px;text-align:left;border-bottom:1px solid #e2e8f0}.bi-dash-table-wrap th{background:#f1f5f9;position:sticky;top:0}
+.bi-visual-switcher{display:inline-flex;align-items:center;background:#f1f5f9;border-radius:6px;padding:2px;gap:2px}
+.bi-switch-btn{border:none;background:transparent;padding:3px 6px;font-size:12px;border-radius:4px;cursor:pointer;line-height:1;transition:background .15s ease}
+.bi-switch-btn:hover{background:#e2e8f0}
+.bi-switch-btn.active{background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,0.1);font-weight:700}
+.bi-active-filters-bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:8px 14px;background:#eff6ff;border-bottom:1px solid #dbeafe}
+.bi-active-label{font-size:11px;font-weight:700;color:#1e40af;margin-right:4px}
+.bi-chips-list{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.bi-filter-chip{display:inline-flex;align-items:center;gap:4px;background:#ffffff;border:1px solid #bfdbfe;border-radius:14px;padding:2px 8px;font-size:11px;color:#1e3a8a}
+.bi-filter-chip button{border:none;background:transparent;cursor:pointer;font-size:13px;line-height:1;color:#64748b;padding:0 2px}
+.bi-filter-chip button:hover{color:#dc2626}
+.bi-btn-clear-all{margin-left:auto;border:1px solid #fca5a5;background:#fff;color:#b91c1c;font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer}
+.bi-btn-clear-all:hover{background:#fee2e2}
 @media(max-width:600px){.bi-controls{align-items:stretch}.bi-controls label{flex-basis:100%}.bi-controls select,.bi-controls input{flex:1;max-width:none}.bi-dash-viz-grid{grid-template-columns:minmax(0,1fr)!important}.bi-controls button{min-height:36px}}

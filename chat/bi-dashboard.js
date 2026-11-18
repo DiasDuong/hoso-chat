@@ -34,7 +34,24 @@
     }
     const sheets = p.query_context?.sheets || [];
     if (sheets.length > 1) html += `<label>Sheet cho câu hỏi tiếp <select data-bi-sheet>${sheets.map(name => `<option${name === p.query_context.target_sheet ? ' selected' : ''}>${esc(name)}</option>`).join('')}</select></label>`;
-    return `<div class="bi-controls">${html}<button type="button" data-bi-action="reset">Bỏ lọc</button><button type="button" data-bi-action="xlsx"${p.export_token ? '' : ' disabled'}>Excel</button><button type="button" data-bi-action="pdf">PDF / In</button></div><div class="bi-control-status" role="status">${p.query_context?.file_id ? 'Bộ lọc dữ liệu được xác thực lại trên server.' : 'Lọc các nhóm kết quả đang hiển thị; KPI toàn phạm vi giữ nguyên.'}</div>`;
+
+    // Active filters bar
+    const activeFilterEntries = Object.entries(s.filters).filter(([k, v]) => Boolean(v));
+    const activeRangeEntries = Object.entries(s.ranges).filter(([k, r]) => Boolean(r && (r.from || r.to)));
+    let activeChipsHtml = '';
+    if (activeFilterEntries.length > 0 || activeRangeEntries.length > 0) {
+      const chips = [];
+      for (const [k, v] of activeFilterEntries) {
+        chips.push(`<span class="bi-filter-chip">${esc(k)}: <strong>${esc(v)}</strong> <button type="button" data-bi-remove-filter="${esc(k)}" title="Bỏ lọc ${esc(k)}">×</button></span>`);
+      }
+      for (const [k, r] of activeRangeEntries) {
+        const rangeText = `${r.from || '...'} → ${r.to || '...'}`;
+        chips.push(`<span class="bi-filter-chip">${esc(k)}: <strong>${esc(rangeText)}</strong> <button type="button" data-bi-remove-range="${esc(k)}" title="Bỏ khoảng ngày">×</button></span>`);
+      }
+      activeChipsHtml = `<div class="bi-active-filters-bar"><span class="bi-active-label">Bộ lọc:</span><div class="bi-chips-list">${chips.join('')}</div><button type="button" class="bi-btn-clear-all" data-bi-action="reset">Xóa tất cả</button></div>`;
+    }
+
+    return `<div class="bi-controls">${html}<button type="button" data-bi-action="reset">Bỏ lọc</button><button type="button" data-bi-action="xlsx"${p.export_token ? '' : ' disabled'}>Excel</button><button type="button" data-bi-action="pdf">PDF / In</button></div>${activeChipsHtml}<div class="bi-control-status" role="status">${p.query_context?.file_id ? 'Bộ lọc dữ liệu được xác thực lại trên server.' : 'Lọc các nhóm kết quả đang hiển thị; KPI toàn phạm vi giữ nguyên.'}</div>`;
   }
   function tables(p, store) {
     const s = stateFor(p);
@@ -51,7 +68,7 @@
       state.page = Math.min(state.page, totalPages - 1);
       const shown = rows.slice(state.page * 15, state.page * 15 + 15);
       const columns = table.columns || [];
-      return `<section class="bi-dash-table-wrap" data-bi-table="${esc(table.id)}"><strong>${esc(table.title)}</strong><div class="bi-table-actions"><input type="search" data-bi-search value="${esc(state.search)}" placeholder="Tìm trong bảng" aria-label="Tìm trong bảng"><button type="button" data-bi-action="prev"${state.page === 0 ? ' disabled' : ''}>Trước</button><span>${state.page + 1}/${totalPages} · ${rows.length} dòng</span><button type="button" data-bi-action="next"${state.page + 1 === totalPages ? ' disabled' : ''}>Sau</button></div><div style="overflow:auto;max-height:320px"><table><thead><tr>${columns.map(c => `<th><button type="button" data-bi-sort="${esc(c.key)}">${esc(c.label || c.key)}${state.sort === c.key ? (state.desc ? ' ▼' : ' ▲') : ''}</button></th>`).join('')}</tr></thead><tbody>${shown.map(row => `<tr>${columns.map(c => `<td>${typeof row[c.key] === 'number' ? row[c.key].toLocaleString('vi-VN') : esc(row[c.key])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`;
+      return `<section class="bi-dash-table-wrap" data-bi-table="${esc(table.id)}"><strong>${esc(table.title)}</strong><div class="bi-table-actions"><input type="search" data-bi-search value="${esc(state.search)}" placeholder="Tìm trong bảng" aria-label="Tìm trong bảng" title="Chỉ tìm trong bảng hiển thị; không thay đổi phạm vi xuất Excel"><span class="bi-search-hint">Tìm trong bảng không đổi dữ liệu xuất Excel. Dùng bộ lọc báo cáo để giới hạn dữ liệu xuất.</span><button type="button" data-bi-action="prev"${state.page === 0 ? ' disabled' : ''}>Trước</button><span>${state.page + 1}/${totalPages} · ${rows.length} dòng</span><button type="button" data-bi-action="next"${state.page + 1 === totalPages ? ' disabled' : ''}>Sau</button></div><div style="overflow:auto;max-height:320px"><table><thead><tr>${columns.map(c => `<th><button type="button" data-bi-sort="${esc(c.key)}">${esc(c.label || c.key)}${state.sort === c.key ? (state.desc ? ' ▼' : ' ▲') : ''}</button></th>`).join('')}</tr></thead><tbody>${shown.map(row => `<tr>${columns.map(c => `<td>${typeof row[c.key] === 'number' ? row[c.key].toLocaleString('vi-VN') : esc(row[c.key])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`;
     }).join('');
   }
   function bindChart(id, chart, viz) {
@@ -175,15 +192,73 @@
     refresh(p.dashboard_id).catch(error => { if (error.name !== 'AbortError') status(p.dashboard_id, error.message); });
   });
   document.addEventListener('click', event => {
-    const button = event.target.closest('[data-bi-action],[data-bi-sort]'); if (!button) return;
-    const root = button.closest('.bi-interactive-dashboard'); if (!root) return;
-    const p = payloadFor(root.dataset.dashId); if (!p) return;
-    const state = stateFor(p), action = button.dataset.biAction;
-    if (button.hasAttribute('data-bi-sort')) { const table = state.tables[button.closest('[data-bi-table]').dataset.biTable]; table.desc = table.sort === button.dataset.biSort ? !table.desc : false; table.sort = button.dataset.biSort; return draw(p.dashboard_id); }
-    if (action === 'reset') { state.filters = {}; state.ranges = {}; state.drill = {}; refresh(p.dashboard_id).catch(error => status(p.dashboard_id, error.message)); }
-    else if (action === 'xlsx') exportExcel(p.dashboard_id).catch(error => status(p.dashboard_id, error.message));
-    else if (action === 'pdf') printReport(p.dashboard_id);
-    else if (action === 'prev' || action === 'next') { const table = state.tables[button.closest('[data-bi-table]').dataset.biTable]; table.page = Math.max(0, table.page + (action === 'next' ? 1 : -1)); draw(p.dashboard_id); }
+    const root = event.target.closest('.bi-interactive-dashboard');
+    if (!root) return;
+    const p = payloadFor(root.dataset.dashId);
+    if (!p) return;
+    const state = stateFor(p);
+
+    // 1. Visual Switcher Handler (BAR, LINE, PIE)
+    const switchBtn = event.target.closest('[data-bi-switch]');
+    if (switchBtn) {
+      const vizCard = switchBtn.closest('.bi-chart-card');
+      const host = vizCard?.querySelector('.bi-chart-host');
+      const vizId = host?.dataset.vizId;
+      const newType = switchBtn.dataset.biSwitch;
+      const original = (p.visualizations || []).find(v => v.id === vizId);
+      if (original && host) {
+        original.chart_type = newType;
+        vizCard.querySelectorAll('[data-bi-switch]').forEach(btn => btn.classList.toggle('active', btn.dataset.biSwitch === newType));
+        const badge = vizCard.querySelector('.bi-chart-badge');
+        if (badge) badge.textContent = newType;
+        const s = stateFor(p), store = filteredStore(p, s);
+        const prepared = prepare(p, original, store);
+        bindChart(p.dashboard_id, window.renderEChartInstance(host, prepared.viz, prepared.store), original);
+        status(p.dashboard_id, `Đã chuyển biểu đồ sang dạng ${newType}.`);
+      }
+      return;
+    }
+
+    // 2. Remove Filter Chip Handler
+    const removeBtn = event.target.closest('[data-bi-remove-filter]');
+    if (removeBtn) {
+      const col = removeBtn.dataset.biRemoveFilter;
+      delete state.filters[col];
+      refresh(p.dashboard_id).catch(error => status(p.dashboard_id, error.message));
+      return;
+    }
+    const removeRangeBtn = event.target.closest('[data-bi-remove-range]');
+    if (removeRangeBtn) {
+      const col = removeRangeBtn.dataset.biRemoveRange;
+      delete state.ranges[col];
+      refresh(p.dashboard_id).catch(error => status(p.dashboard_id, error.message));
+      return;
+    }
+
+    // 3. Actions & Sorting Buttons
+    const button = event.target.closest('[data-bi-action],[data-bi-sort]');
+    if (!button) return;
+    const action = button.dataset.biAction;
+    if (button.hasAttribute('data-bi-sort')) {
+      const table = state.tables[button.closest('[data-bi-table]').dataset.biTable];
+      table.desc = table.sort === button.dataset.biSort ? !table.desc : false;
+      table.sort = button.dataset.biSort;
+      return draw(p.dashboard_id);
+    }
+    if (action === 'reset') {
+      state.filters = {};
+      state.ranges = {};
+      state.drill = {};
+      refresh(p.dashboard_id).catch(error => status(p.dashboard_id, error.message));
+    } else if (action === 'xlsx') {
+      exportExcel(p.dashboard_id).catch(error => status(p.dashboard_id, error.message));
+    } else if (action === 'pdf') {
+      printReport(p.dashboard_id);
+    } else if (action === 'prev' || action === 'next') {
+      const table = state.tables[button.closest('[data-bi-table]').dataset.biTable];
+      table.page = Math.max(0, table.page + (action === 'next' ? 1 : -1));
+      draw(p.dashboard_id);
+    }
   });
   window.HubBIDashboard = { controls, tables, bindChart, draw, prepare, filteredStore, stateFor, serverFilters, printReport };
   // Conversation changes remove DOM nodes: release charts, observers and state.
