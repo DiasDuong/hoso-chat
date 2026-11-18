@@ -540,15 +540,29 @@ async function runDailyRetentionJob() {
     if (resOutputs.purgedCount > 0) {
       console.log('[RETENTION CRON] Đã dọn dẹp tệp agent outputs hết hạn:', resOutputs.purgedCount);
     }
+
+    // Dọn dẹp bộ dữ liệu Uploaded File BI hết hạn (Chính sách 7 ngày) và tệp mồ côi (Phase 2.4)
+    try {
+      const { cleanupExpiredDatasets, cleanupOrphanAndIncompleteDatasets } = require('./biDatasetRegistry');
+      const biExpired = await cleanupExpiredDatasets();
+      const biOrphans = await cleanupOrphanAndIncompleteDatasets();
+      if (biExpired.purgedCount > 0 || biOrphans.purgedOrphans > 0 || biOrphans.purgedIncomplete > 0) {
+        console.log('[RETENTION CRON] Đã dọn dẹp dataset BI hết hạn và tệp mồ côi:', { biExpired, biOrphans });
+      }
+    } catch (biCleanErr) {
+      console.warn('[RETENTION CRON] Lỗi khi dọn dẹp dataset BI:', biCleanErr.message);
+    }
   } catch (err) {
     console.error('[RETENTION CRON ERROR]:', err.message);
   }
 }
 
 // Khởi chạy 1 lần sau khi khởi động máy chủ 15 giây (khi database và pool đã sẵn sàng)
-setTimeout(() => {
-  runDailyRetentionJob();
-}, 15000).unref();
+// Restarting the API must not implicitly purge data during a release.
+// The established daily schedule remains active; startup purging is opt-in.
+if (process.env.RETENTION_RUN_ON_STARTUP === 'true') {
+  setTimeout(() => { runDailyRetentionJob(); }, 15000).unref();
+}
 
 // Định kỳ quét dọn mỗi 24 giờ
 setInterval(() => {

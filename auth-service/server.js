@@ -16,6 +16,8 @@ const agentFilesRoutes = require('./routes/agent_files');
 const chatFilesRoutes = require('./routes/chat_files');
 const agentRoutes = require('./routes/agents');
 const oneDriveRoutes = require('./routes/onedrive');
+const analyticsRoutes = require('./routes/analytics');
+const biFilesRoutes = require('./routes/bi_files');
 const { router: intakeRoutes } = require('./routes/intake');
 require('./services/retentionService');
 const { startPeriodicReconciliation } = require('./services/qdrantSyncService');
@@ -38,7 +40,7 @@ app.use((req, res, next) => {
 });
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get(['/api/health', '/health'], (req, res) => {
   res.json({ status: 'ok', service: 'hr-auth-service', timestamp: new Date() });
 });
 
@@ -58,6 +60,10 @@ app.use('/api/chat-files', chatFilesRoutes);
 app.use('/api/agents/files', agentFilesRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/onedrive', oneDriveRoutes);
+app.use('/api/analytics/files', biFilesRoutes);
+app.use('/api/bi/files', biFilesRoutes);
+app.use('/api/analytics/export', require('./routes/bi_exports'));
+app.use('/api/analytics', analyticsRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {

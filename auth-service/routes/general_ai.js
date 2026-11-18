@@ -15,6 +15,16 @@ const { StringDecoder } = require('string_decoder');
 const { logMessageToChatLog } = require('../services/conversationLogger');
 const { analyzeQueryAndDecompose, buildStructuredQualityFramework, verifyAndRefineAnswer } = require('../services/answerQualityEnhancer');
 const { loadConversationContext, resolveUserReferences } = require('../services/conversationReferenceResolver');
+const { detectBIIntent, executeBIReporting, formatBIReportMarkdown, detectCompanyFromText } = require('../services/biReportingHelper');
+const wrenBi = require('../services/wrenBiService');
+const { validateAndStoreIntakeFile } = require('../services/biFileSecurityService');
+const { registerDataset, getDataset, updateDataset, canUserAccessDataset } = require('../services/biDatasetRegistry');
+const { processAndProfileDataset, queryIsolatedDataset, getDatasetForSheet } = require('../services/biSpreadsheetEngine');
+const { formatDatasetProfileMarkdown, formatAnalyticalResultMarkdown } = require('../services/biDatasetPresenter');
+const { planAnalyticalQuery, normalizeText } = require('../services/biQueryPlanner');
+const { validateQueryPlan } = require('../services/biQueryValidator');
+const { sanitizeBiData, sanitizeBiProfile } = require('../services/biPrivacy');
+const { logBiAuditEvent } = require('../services/biAuditLogger');
 
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -25,7 +35,7 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 20 * 1024 * 1024, // 20 MB
+    fileSize: 25 * 1024 * 1024, // 25 MiB, same as BI intake
     files: 5,
   },
   fileFilter: (req, file, cb) => {
@@ -574,12 +584,13 @@ function callGeminiStream(contents, systemInstruction, onChunk, signal, options 
 // POST /api/general/chat
 router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req, res) => {
   const userMessage = (req.body.message || '').trim().normalize('NFC');
-  let conversationId = req.body.conversation_id;
+  let conversationId = req.body.conversation_id || req.body.conversationId;
   const rawHistory = req.body.history;
   const uploadedFiles = req.files || [];
   const wantsStream = req.query.stream === 'true' || req.body.stream === 'true' || req.headers.accept === 'text/event-stream';
   const isRegenerate = req.body.regenerate === 'true' || req.query.regenerate === 'true';
   const targetMessageId = req.body.message_id || req.query.message_id;
+  let systemInstruction = getGeneralAISystemInstruction();
 
   if (!userMessage && uploadedFiles.length === 0) {
     return res.status(400).json({ success: false, error: 'Vui lòng nhập nội dung tin nhắn hoặc đính kèm tệp.' });
@@ -595,18 +606,628 @@ router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req
   }
 
   // Thu thập ngữ cảnh lịch sử cho ground search
+  if (conversationId && req.user) {
+    if (!/^[0-9a-f-]{36}$/i.test(conversationId)) return res.status(400).json({ success: false, code: 'INVALID_CONVERSATION', error: 'Mã hội thoại không hợp lệ.' });
+    try {
+      const own = await db.query("SELECT id FROM ai_conversations WHERE id = $1 AND (user_id = $2 OR user_id = $3) AND agent_id = 'general' AND status = 'ACTIVE'", [conversationId, req.user.user_id, req.user.username]);
+      if (!own.rows.length) return res.status(403).json({ success: false, code: 'CONVERSATION_FORBIDDEN', error: 'Bạn không có quyền truy cập hội thoại này.' });
+    } catch (_) { return res.status(503).json({ success: false, code: 'CONVERSATION_UNAVAILABLE', error: 'Không thể xác thực quyền hội thoại.' }); }
+  }
+  if (uploadedFiles.filter(f => /\.(xlsx|xls|csv)$/i.test(f.originalname || '')).length > 1) {
+    return res.status(400).json({ success: false, code: 'MULTIPLE_DATASETS_REQUIRE_SELECTION', error: 'Vui lòng tải một bảng tính mỗi lượt và chọn nguồn cần phân tích.' });
+  }
   let historyForContext = rawHistory;
-  if (!historyForContext && conversationId && req.user) {
+  // Saved conversations use server-owned history even when the UI sends history.
+  // In particular, semantic SQL/context must never be taken from client metadata.
+  if (conversationId && req.user) {
     try {
       const prevMsgs = await db.query(
-        `SELECT role, content FROM ai_messages WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 5`,
+        `SELECT role, content, metadata FROM ai_messages WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 5`,
         [conversationId]
       );
       historyForContext = prevMsgs.rows.reverse();
-    } catch (e) {}
+    } catch (e) { return res.status(503).json({ success: false, code: 'CONVERSATION_UNAVAILABLE', error: 'Không thể tải ngữ cảnh hội thoại đã xác thực.' }); }
   }
 
-  let systemInstruction = getGeneralAISystemInstruction();
+  // =========================================================================
+  // SPREADSHEET BI FILE INTAKE & AUTOMATIC PROFILING (PHASE 2.1 & 2.2)
+  // =========================================================================
+  const spreadsheetFile = uploadedFiles.find(f => /\.(xlsx|xls|csv)$/i.test(f.originalname || ''));
+  if (spreadsheetFile && req.user) {
+    try {
+      const { metadata, buffer } = await validateAndStoreIntakeFile(spreadsheetFile, req.user);
+      await registerDataset(
+        {
+          ...metadata,
+          processing_status: 'PROCESSING',
+          uploaded_by: String(req.user.user_id || req.user.userId || ''),
+          uploaded_by_username: String(req.user.username || ''),
+        },
+        req.user
+      );
+      const { dataProfile } = await processAndProfileDataset(metadata, buffer);
+      await updateDataset(metadata.file_id, { processing_status: 'READY', profile: dataProfile });
+
+      const cleanMsg = (userMessage || '').trim();
+      const isGeneralOverview = !cleanMsg ||
+        /^(phân tích|tổng quan|báo cáo|thống kê|file này có gì|xem cấu trúc|xem file)/i.test(cleanMsg) ||
+        /(cấu trúc|tổng quan|profile|xem trước)/i.test(cleanMsg);
+
+      let replyText = '';
+      let activeQueryPlan = null;
+
+      if (isGeneralOverview) {
+        replyText = formatDatasetProfileMarkdown(dataProfile);
+      } else {
+        // AI Query Planner -> Validator -> Execution Engine -> Presenter
+        const datasetObj = getDataset(metadata.file_id) || { ...metadata, profile: dataProfile, columns: dataProfile.columns };
+        const rawPlan = planAnalyticalQuery(cleanMsg, dataProfile);
+        if (rawPlan.clarification_needed) {
+          replyText = `> ℹ️ **Cần thêm thông tin để xử lý chính xác:**\n\n${rawPlan.clarification_question}`;
+        } else {
+          const validatedPlan = validateQueryPlan(rawPlan, datasetObj, req.user);
+          activeQueryPlan = validatedPlan;
+          const queryResult = await queryIsolatedDataset(metadata.file_id, validatedPlan);
+          await logBiAuditEvent({ event: 'DATASET_QUERY', fileId: metadata.file_id, userContext: req.user, details: { query_plan: validatedPlan, returned_rows: queryResult.returned_rows } });
+
+          // Optional AI Insight from Gemini
+          let aiInsight = '';
+          try {
+            const insightPrompt = `Dưới đây là kết quả phân tích số liệu thực tế từ tệp bảng tính ${metadata.original_filename}:
+Kế hoạch tính toán: ${JSON.stringify(validatedPlan)}
+Kết quả tổng hợp từ backend:
+${JSON.stringify(sanitizeBiData(queryResult.results.slice(0, 10)), null, 2)}
+Hãy viết 2-3 câu nhận xét điều hành ngắn gọn, nêu bật các điểm quan trọng nhất. Tuyệt đối không bịa số liệu ngoài dữ liệu trên.`;
+            const aiRes = await callGeminiSafe([{ role: 'user', parts: [{ text: insightPrompt }] }], 'Bạn là trợ lý phân tích dữ liệu điều hành SOTRANS.');
+            if (aiRes && aiRes.text && !aiRes.isFallback) {
+              aiInsight = aiRes.text.trim();
+            }
+          } catch (_) {}
+
+          replyText = formatAnalyticalResultMarkdown(validatedPlan, queryResult, datasetObj, aiInsight, req.user);
+        }
+      }
+
+      // Authenticated User: Persist in ai_conversations and ai_messages
+      let conv = null;
+      if (conversationId) {
+        try {
+          const checkConv = await db.query(
+            `SELECT id, title FROM ai_conversations
+             WHERE id = $1 AND (user_id = $2 OR user_id = $3) AND agent_id = 'general' AND status = 'ACTIVE'`,
+            [conversationId, req.user.user_id, req.user.username]
+          );
+          if (checkConv.rows.length > 0) {
+            conv = checkConv.rows[0];
+          }
+        } catch (_) {}
+      }
+
+      if (!conv) {
+        const initialTitle = `Phân tích: ${metadata.original_filename}`.slice(0, 40);
+        try {
+          const newConv = await db.query(
+            `INSERT INTO ai_conversations (user_id, agent_id, title)
+             VALUES ($1, 'general', $2)
+             RETURNING id, title`,
+            [req.user.user_id, initialTitle]
+          );
+          conv = newConv.rows[0];
+          conversationId = conv.id;
+        } catch (_) {}
+      }
+
+      // Persist User Message
+      if (!isRegenerate && conversationId) {
+        try {
+          const userMsgRes = await db.query(
+            `INSERT INTO ai_messages (conversation_id, role, content, metadata)
+             VALUES ($1, 'user', $2, $3)
+             RETURNING id, created_at`,
+            [
+              conversationId,
+              userMessage || `Tải lên tệp phân tích: ${metadata.original_filename}`,
+              JSON.stringify({ is_bi_file_upload: true, file_id: metadata.file_id, query_plan: activeQueryPlan }),
+            ]
+          );
+          if (userMsgRes.rows.length > 0) {
+            await logMessageToChatLog({
+              conversationId,
+              userId: req.user.user_id,
+              username: req.user.username,
+              companyId: req.user.company_id || 'SOTRANS',
+              agentId: 'general',
+              role: 'user',
+              content: userMessage || `Tải lên tệp phân tích: ${metadata.original_filename}`,
+              metadata: { is_bi_file_upload: true, file_id: metadata.file_id, query_plan: activeQueryPlan },
+              timestamp: userMsgRes.rows[0].created_at,
+            }).catch(() => {});
+          }
+        } catch (_) {}
+      }
+
+      // Persist Assistant Message
+      let botMsgId = null;
+      if (conversationId) {
+        try {
+          const botMsgRes = await db.query(
+            `INSERT INTO ai_messages (conversation_id, role, content, metadata)
+             VALUES ($1, 'assistant', $2, $3)
+             RETURNING id, created_at`,
+            [
+              conversationId,
+              replyText,
+              JSON.stringify({
+                model: 'bi-spreadsheet-engine',
+                is_bi_file_analysis: true,
+                file_id: metadata.file_id,
+                query_plan: activeQueryPlan,
+              }),
+            ]
+          );
+          if (botMsgRes.rows.length > 0) {
+            botMsgId = botMsgRes.rows[0].id;
+            await logMessageToChatLog({
+              conversationId,
+              userId: req.user.user_id,
+              username: req.user.username,
+              companyId: req.user.company_id || 'SOTRANS',
+              agentId: 'general',
+              role: 'assistant',
+              content: replyText,
+              metadata: {
+                model: 'bi-spreadsheet-engine',
+                is_bi_file_analysis: true,
+                file_id: metadata.file_id,
+                query_plan: activeQueryPlan,
+              },
+              timestamp: botMsgRes.rows[0].created_at,
+            }).catch(() => {});
+          }
+        } catch (_) {}
+      }
+
+      if (wantsStream) {
+        res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+        if (res.flushHeaders) res.flushHeaders();
+
+        res.write(`data: ${JSON.stringify({ type: 'start', conversation_id: conversationId, sources: [], files: [] })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'chunk', text: replyText })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', reply: replyText, sources: [], conversation_id: conversationId, message_id: botMsgId })}\n\n`);
+        return res.end();
+      }
+
+      return res.json({
+        success: true,
+        reply: replyText,
+        conversation_id: conversationId,
+        message_id: botMsgId,
+        title: conv ? conv.title : null,
+        files: [{ id: metadata.file_id, name: metadata.original_filename, type: metadata.file_type, size: metadata.file_size }],
+        sources: [],
+        dataset_profile: sanitizeBiProfile(dataProfile),
+        query_plan: activeQueryPlan,
+      });
+    } catch (intakeErr) {
+      return res.status(intakeErr.status || 400).json({ success: false, code: intakeErr.code || 'BI_INTAKE_FAILED', error: 'Không thể tiếp nhận bảng tính. Vui lòng kiểm tra định dạng, dung lượng và dữ liệu.' });
+    }
+  }
+
+  // =========================================================================
+  // FOLLOW-UP QUERY ON UPLOADED SPREADSHEET DATASET (PHASE 2.3)
+  // =========================================================================
+  if (uploadedFiles.length === 0 && userMessage && req.user) {
+    let activeDataset = null;
+    let previousQueryPlan = null;
+    const isUuid = conversationId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conversationId);
+    if (isUuid) {
+      try {
+        const lastFileMsg = await db.query(
+          `SELECT metadata FROM ai_messages
+           WHERE conversation_id = $1 AND (metadata->>'file_id' IS NOT NULL)
+           ORDER BY created_at DESC LIMIT 1`,
+          [conversationId]
+        );
+        if (lastFileMsg.rows.length > 0 && lastFileMsg.rows[0].metadata) {
+          const fileId = lastFileMsg.rows[0].metadata.file_id;
+          const ds = getDataset(fileId);
+          if (ds) {
+            // MANDATORY RE-AUTHENTICATION CHECK
+            const access = canUserAccessDataset(ds, req.user, 'query');
+            if (access.allowed) {
+              activeDataset = ds;
+              previousQueryPlan = lastFileMsg.rows[0].metadata.query_plan || null;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!activeDataset) {
+      const targetDatasetId = req.body.active_dataset_id || req.body.activeDatasetId || req.body.dataset_id || req.body.file_id || req.body.fileId;
+      if (targetDatasetId) {
+        const ds = getDataset(targetDatasetId);
+        if (ds) {
+          const access = canUserAccessDataset(ds, req.user, 'query');
+          if (access.allowed) {
+            activeDataset = ds;
+          } else {
+            return res.status(403).json({
+              success: false,
+              error: access.reason || 'Bạn không có quyền truy vấn bộ dữ liệu này.',
+              code: 'FORBIDDEN',
+            });
+          }
+        }
+      }
+    }
+
+    if (activeDataset) {
+      // Check if userMessage matches dataset analysis intent
+      const msgRaw = (userMessage || '').toLowerCase();
+      const msgNorm = normalizeText(userMessage);
+      const cleanNormNoSpace = msgNorm.replace(/[^a-z0-9]/g, '');
+      const datasetCols = activeDataset.profile?.columns || [];
+      const mentionsCol = datasetCols.some((c) => {
+        const colKey = (c.key || '').toLowerCase();
+        const colNameNorm = normalizeText(c.name || '');
+        const colNameNoSpace = colNameNorm.replace(/[^a-z0-9]/g, '');
+        return (
+          msgNorm.includes(colNameNorm) ||
+          msgRaw.includes((c.name || '').toLowerCase()) ||
+          cleanNormNoSpace.includes(colNameNoSpace) ||
+          cleanNormNoSpace.includes(colKey)
+        );
+      });
+      const mentionsFile = /(file|tep|bang tinh|excel|dataset|tai len|vua tai|dang gan|tren)/i.test(msgNorm);
+      const isAnalyticalFollowUp =
+        Boolean(req.body.active_dataset_id || req.body.activeDatasetId) ||
+        mentionsFile ||
+        mentionsCol ||
+        /(chi lay|loc|top \d+|bieu do|doanh so|doanh thu|luong|phong ban|so sanh|tang dan|giam dan|ty trong|tong|trung binh|ve|bieu|chart|table|bang|kpi|card|the|thong ke|phan tich|xem)/i.test(
+          msgNorm
+        );
+
+      // Only handle as system corporate query if user is specifically requesting enterprise platform operational metrics
+      // (and NOT referencing an uploaded file or file visual widgets like KPI Cards)
+      const isSystemKpi = !mentionsFile && !mentionsCol && /(toan tap doan|he thong sotrans hub|du lieu he thong|tong so van ban quy dinh|ho so tiep nhan ocr|chuyen doi staging|ton dong phe duyet|tai khoan hoat dong tren he thong|ty le dap ung rag)/i.test(msgNorm);
+
+      if (isAnalyticalFollowUp && !isSystemKpi) {
+        try {
+          activeDataset = await getDatasetForSheet(activeDataset, req.body.target_sheet || previousQueryPlan?.target_sheet);
+          const rawPlan = planAnalyticalQuery(userMessage, activeDataset.profile, { previousQueryPlan });
+          let replyText = '';
+          let validatedPlan = null;
+
+          if (rawPlan.clarification_needed) {
+            replyText = `> ℹ️ **Cần thêm thông tin để xử lý chính xác:**\n\n${rawPlan.clarification_question}`;
+          } else {
+            validatedPlan = validateQueryPlan(rawPlan, activeDataset, req.user);
+            const queryResult = await queryIsolatedDataset(activeDataset.file_id, validatedPlan);
+            await logBiAuditEvent({ event: 'DATASET_QUERY', fileId: activeDataset.file_id, userContext: req.user, details: { query_plan: validatedPlan, returned_rows: queryResult.returned_rows } });
+
+            let aiInsight = '';
+            try {
+              const insightPrompt = `Dưới đây là kết quả phân tích số liệu thực tế từ tệp bảng tính ${activeDataset.original_filename}:
+Kế hoạch: ${JSON.stringify(validatedPlan)}
+Dữ liệu:
+${JSON.stringify(sanitizeBiData(queryResult.results.slice(0, 10)), null, 2)}
+Hãy viết 2-3 câu nhận xét điều hành ngắn gọn, súc tích. Tuyệt đối không bịa số liệu.`;
+              const aiRes = await callGeminiSafe(
+                [{ role: 'user', parts: [{ text: insightPrompt }] }],
+                'Bạn là trợ lý phân tích dữ liệu điều hành SOTRANS.'
+              );
+              if (aiRes && aiRes.text && !aiRes.isFallback) {
+                aiInsight = aiRes.text.trim();
+              }
+            } catch (_) {}
+
+            replyText = formatAnalyticalResultMarkdown(validatedPlan, queryResult, activeDataset, aiInsight, req.user);
+          }
+
+          // Ensure valid conversation in database
+          try {
+            const convCheckUuid = conversationId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conversationId);
+            if (convCheckUuid) {
+              const checkC = await db.query("SELECT id FROM ai_conversations WHERE id = $1 AND (user_id = $2 OR user_id = $3) AND agent_id = 'general' AND status = 'ACTIVE'", [conversationId, req.user.user_id, req.user.username]);
+              if (checkC.rows.length === 0) {
+                await db.query(
+                  'INSERT INTO ai_conversations (id, user_id, agent_id, title) VALUES ($1, $2, $3, $4)',
+                  [conversationId, req.user.user_id, 'general', (userMessage || 'Phân tích bảng tính').slice(0, 40)]
+                );
+              }
+            } else {
+              const newC = await db.query(
+                'INSERT INTO ai_conversations (user_id, agent_id, title) VALUES ($1, $2, $3) RETURNING id',
+                [req.user.user_id, 'general', (userMessage || 'Phân tích bảng tính').slice(0, 40)]
+              );
+              conversationId = newC.rows[0].id;
+            }
+          } catch (_) {}
+
+          // Persist user and assistant message
+          if (!isRegenerate && conversationId) {
+            try {
+              await db.query(
+                `INSERT INTO ai_messages (conversation_id, role, content, metadata)
+                 VALUES ($1, 'user', $2, $3)`,
+                [
+                  conversationId,
+                  userMessage,
+                  JSON.stringify({
+                    is_bi_file_follow_up: true,
+                    file_id: activeDataset.file_id,
+                    query_plan: validatedPlan,
+                  }),
+                ]
+              );
+            } catch (_) {}
+          }
+
+          let botMsgId = null;
+          if (conversationId) {
+            try {
+              const bRes = await db.query(
+                `INSERT INTO ai_messages (conversation_id, role, content, metadata)
+                 VALUES ($1, 'assistant', $2, $3) RETURNING id, created_at`,
+                [
+                  conversationId,
+                  replyText,
+                  JSON.stringify({
+                    model: 'bi-spreadsheet-engine',
+                    is_bi_file_analysis: true,
+                    file_id: activeDataset.file_id,
+                    query_plan: validatedPlan,
+                  }),
+                ]
+              );
+              if (bRes.rows.length > 0) botMsgId = bRes.rows[0].id;
+            } catch (_) {}
+          }
+
+          // Extract bi-file-report payload for API callers
+          let biFileReportPayload = null;
+          const matchPayload = replyText.match(/<!-- bi-file-report:\s*(\{[\s\S]*?\})\s*-->/);
+          if (matchPayload) {
+            try {
+              biFileReportPayload = JSON.parse(matchPayload[1]);
+            } catch (_) {}
+          }
+
+          if (wantsStream) {
+            res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache, no-transform');
+            res.setHeader('Connection', 'keep-alive');
+            res.setHeader('X-Accel-Buffering', 'no');
+            if (res.flushHeaders) res.flushHeaders();
+
+            res.write(`data: ${JSON.stringify({ type: 'start', conversation_id: conversationId, sources: [], files: [] })}\n\n`);
+            res.write(`data: ${JSON.stringify({ type: 'chunk', text: replyText })}\n\n`);
+            res.write(`data: ${JSON.stringify({ type: 'done', reply: replyText, sources: [], conversation_id: conversationId, message_id: botMsgId, bi_file_report: biFileReportPayload })}\n\n`);
+            return res.end();
+          }
+
+          return res.json({
+            success: true,
+            reply: replyText,
+            conversation_id: conversationId,
+            message_id: botMsgId,
+            files: [],
+            sources: [],
+            query_plan: validatedPlan,
+            bi_file_report: biFileReportPayload,
+          });
+        } catch (queryErr) {
+          return res.status(queryErr.status || 400).json({ success: false, code: queryErr.code || 'BI_QUERY_FAILED', error: 'Không thể phân tích dataset. Vui lòng kiểm tra quyền, sheet hoặc bộ lọc.' });
+        }
+      }
+    }
+  }
+
+  // =========================================================================
+  // BI INTENT ROUTING & REPORTING GROUNDING (PHASE 1.3)
+  // =========================================================================
+  if (uploadedFiles.length === 0 && userMessage) {
+    const historyText = Array.isArray(historyForContext)
+      ? historyForContext.map(h => `${h.role}: ${h.content}`).join('\n')
+      : (typeof historyForContext === 'string' ? historyForContext : '');
+
+    const mentionsFile = /(?:từ\s+file|dựa\s+vào\s+file|trong\s+file|bảng\s+tính|file\s+excel|file\s+mới\s+tải|file\s+trên|file\s+đang\s+gắn)/i.test(userMessage);
+    const hasActiveFile = Boolean(req.body.active_dataset_id || req.body.activeDatasetId);
+
+    // Only route to system corporate BI if NOT specifically referring to an uploaded file or file visual widgets
+    const biIntent = (!mentionsFile && !hasActiveFile) ? detectBIIntent(userMessage, historyText, req.user) : { isBIQuery: false, intent: 'NORMAL_CHAT', kpiCodes: [] };
+    const previousBiContext = Array.isArray(historyForContext) ? [...historyForContext].reverse().find(h => h.role === 'assistant' && h.metadata?.bi_context)?.metadata.bi_context : null;
+    const useWren = (!mentionsFile && !hasActiveFile) ? wrenBi.shouldHandle(userMessage, biIntent, previousBiContext) : false;
+
+    if ((biIntent && biIntent.isBIQuery) || useWren) {
+      let replyText = '';
+      let biContext = null;
+
+      if (useWren) {
+        try {
+          const report = await wrenBi.runReport({
+            message: userMessage, user: req.user,
+            companyId: detectCompanyFromText(userMessage) || previousBiContext?.company_id,
+            previousContext: previousBiContext,
+            generate: async prompt => {
+              const answer = await callGeminiSafe([{ role: 'user', parts: [{ text: prompt }] }], 'Bạn lập kế hoạch phân tích dữ liệu SOTRANS. Chỉ trả JSON, không tự trả số liệu.');
+              if (!answer?.text || answer.isFallback) throw Object.assign(new Error('Không thể lập kế hoạch BI lúc này.'), { code: 'WREN_PLANNING_UNAVAILABLE' });
+              return answer.text;
+            },
+          });
+          replyText = report.reply; biContext = report.context;
+        } catch (error) {
+          replyText = error.code === 'WREN_SCOPE_REQUIRED' ? 'Bạn muốn phân tích đơn vị STL, VTX, SWC hay ALL?' : 'Không thể thực hiện báo cáo nâng cao trong phạm vi này. Vui lòng kiểm tra quyền hoặc mô tả rõ nguồn/chỉ số cần phân tích.';
+        }
+      } else if (biIntent.intent === 'AMBIGUOUS_BI_QUERY') {
+        replyText = biIntent.clarificationQuestion;
+      } else {
+        const biExec = await executeBIReporting(biIntent, req.user);
+        if (!biExec.success) {
+          replyText = `⚠️ **Thông báo hệ thống:** ${biExec.error}`;
+        } else {
+          replyText = formatBIReportMarkdown(biExec, req.user);
+          // Optional: Brief executive AI insight from Gemini
+          try {
+            const summaryPayload = biExec.results.map(r => ({ kpi: r.kpi, status: r.status, data: r.data }));
+            const insightPrompt = `Dưới đây là các chỉ số báo cáo BI SOTRANS Hub đã được trích xuất chính thức:
+${JSON.stringify(sanitizeBiData(summaryPayload), null, 2)}
+Hãy viết 2-3 câu nhận xét điều hành ngắn gọn (executive summary) chỉ ra điểm đáng chú ý nhất từ số liệu trên. Tuyệt đối không bịa số liệu hoặc bịa nguyên nhân ngoài dữ liệu.`;
+            const aiInsight = await callGeminiSafe([{ role: 'user', parts: [{ text: insightPrompt }] }], 'Bạn là trợ lý điều hành phân tích số liệu BI.');
+            if (aiInsight && aiInsight.text && !aiInsight.isFallback) {
+              replyText += `\n\n### 💡 Phân Tích & Nhận Xét Điều Hành (AI Insight)\n${aiInsight.text.trim()}\n`;
+            }
+          } catch (_) {}
+        }
+      }
+
+      // Return BI response (Streaming or JSON) with conversation persistence
+      if (!req.user) {
+        if (wantsStream) {
+          res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache, no-transform');
+          res.setHeader('Connection', 'keep-alive');
+          res.setHeader('X-Accel-Buffering', 'no');
+          if (res.flushHeaders) res.flushHeaders();
+
+          res.write(`data: ${JSON.stringify({ type: 'start', conversation_id: null, sources: [], files: [] })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: 'chunk', text: replyText })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: 'done', reply: replyText, sources: [], conversation_id: null, is_ephemeral: true })}\n\n`);
+          return res.end();
+        }
+
+        return res.json({
+          success: true,
+          reply: replyText,
+          conversation_id: null,
+          message_id: null,
+          title: null,
+          files: [],
+          sources: [],
+          is_ephemeral: true,
+        });
+      }
+
+      // Authenticated User: Persist in ai_conversations and ai_messages
+      let conv = null;
+      if (conversationId) {
+        try {
+          const checkConv = await db.query(
+            `SELECT id, title FROM ai_conversations
+             WHERE id = $1 AND (user_id = $2 OR user_id = $3) AND agent_id = 'general' AND status = 'ACTIVE'`,
+            [conversationId, req.user.user_id, req.user.username]
+          );
+          if (checkConv.rows.length > 0) {
+            conv = checkConv.rows[0];
+          }
+        } catch (_) {}
+      }
+
+      if (!conv) {
+        const initialTitle = userMessage.slice(0, 40) || 'Báo cáo BI';
+        try {
+          const newConv = await db.query(
+            `INSERT INTO ai_conversations (user_id, agent_id, title)
+             VALUES ($1, 'general', $2)
+             RETURNING id, title`,
+            [req.user.user_id, initialTitle]
+          );
+          conv = newConv.rows[0];
+          conversationId = conv.id;
+        } catch (_) {}
+      }
+
+      // Persist User Message
+      if (!isRegenerate && conversationId) {
+        try {
+          const userMsgRes = await db.query(
+            `INSERT INTO ai_messages (conversation_id, role, content, metadata)
+             VALUES ($1, 'user', $2, $3)
+             RETURNING id, created_at`,
+            [conversationId, userMessage, JSON.stringify({ is_bi_query: true })]
+          );
+          if (userMsgRes.rows.length > 0) {
+            await logMessageToChatLog({
+              conversationId,
+              userId: req.user.user_id,
+              username: req.user.username,
+              companyId: req.user.company_id || 'SOTRANS',
+              agentId: 'general',
+              role: 'user',
+              content: userMessage,
+              metadata: { is_bi_query: true },
+              timestamp: userMsgRes.rows[0].created_at,
+            }).catch(() => {});
+          }
+        } catch (_) {}
+      }
+
+      // Persist Assistant Message
+      let botMsgId = null;
+      if (conversationId) {
+        try {
+          const botMsgRes = await db.query(
+            `INSERT INTO ai_messages (conversation_id, role, content, metadata)
+             VALUES ($1, 'assistant', $2, $3)
+             RETURNING id, created_at`,
+            [conversationId, replyText, JSON.stringify({ model: useWren ? 'wren-bi-engine' : 'bi-reporting-engine', is_bi_report: true, bi_context: biContext })]
+          );
+          if (botMsgRes.rows.length > 0) {
+            botMsgId = botMsgRes.rows[0].id;
+            await logMessageToChatLog({
+              conversationId,
+              userId: req.user.user_id,
+              username: req.user.username,
+              companyId: req.user.company_id || 'SOTRANS',
+              agentId: 'general',
+              role: 'assistant',
+              content: replyText,
+              metadata: { model: useWren ? 'wren-bi-engine' : 'bi-reporting-engine', is_bi_report: true },
+              timestamp: botMsgRes.rows[0].created_at,
+            }).catch(() => {});
+          }
+          await db.query(`UPDATE ai_conversations SET updated_at = NOW() WHERE id = $1`, [conversationId]).catch(() => {});
+        } catch (_) {}
+      }
+
+      if (wantsStream) {
+        res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+        if (res.flushHeaders) res.flushHeaders();
+
+        res.write(`data: ${JSON.stringify({ type: 'start', conversation_id: conversationId, sources: [], files: [] })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'chunk', text: replyText })}\n\n`);
+        res.write(`data: ${JSON.stringify({
+          type: 'done',
+          reply: replyText,
+          conversation_id: conversationId,
+          message_id: botMsgId,
+          sources: [],
+          title: conv?.title || 'Báo cáo BI'
+        })}\n\n`);
+        return res.end();
+      }
+
+      return res.json({
+        success: true,
+        reply: replyText,
+        conversation_id: conversationId,
+        message_id: botMsgId,
+        title: conv?.title || 'Báo cáo BI',
+        files: [],
+        sources: [],
+        is_ephemeral: false,
+      });
+    }
+  }
+
+  if (!systemInstruction) systemInstruction = getGeneralAISystemInstruction();
   const taskAnalysis = analyzeQueryAndDecompose(userMessage, historyForContext, { name: 'General AI' });
   systemInstruction += '\n\n' + buildStructuredQualityFramework('General AI', taskAnalysis);
 
@@ -751,7 +1372,7 @@ router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req
     let conv = null;
     if (conversationId) {
       const checkConv = await db.query(
-        `SELECT id, title FROM ai_conversations 
+        `SELECT id, title FROM ai_conversations
          WHERE id = $1 AND (user_id = $2 OR user_id = $3) AND agent_id = 'general' AND status = 'ACTIVE'`,
         [conversationId, req.user.user_id, req.user.username]
       );
