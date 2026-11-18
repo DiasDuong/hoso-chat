@@ -31,9 +31,17 @@ backup_*.dump
 uploads/
 files/
 files-staging/
+storage/
 auth-service/uploads/
 auth-service/storage/
+auth-service/exports/
 auth-service/data/
+*.dataset.json
+
+# Staging probe scripts with credentials
+scripts/list_staging_users.js
+scripts/check_operational_pool.js
+scripts/probe_staging_users.js
 
 # Sensitive business & personnel data
 Hoso_Nhansu.xlsx
