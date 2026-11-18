@@ -24,6 +24,8 @@ const TIMEOUT_MS = parseInt(process.env.BI_QUERY_TIMEOUT_MS, 10) || 3000;
 
 const ALLOWED_FUNCTIONS = Object.freeze([
   'COUNT',
+  'COUNT_ROWS',
+  'COUNT_NON_NULL',
   'SUM',
   'AVG',
   'MIN',
@@ -213,7 +215,7 @@ function validateQueryPlan(queryPlan, dataset, userContext) {
 
   // 4. Validate Aggregations
   const aggregations = queryPlan.aggregations || [];
-  if (!Array.isArray(aggregations) || aggregations.length === 0) {
+  if ((!Array.isArray(aggregations) || aggregations.length === 0) && queryPlan.intent !== 'FILTER') {
     // If no aggregations defined, default to COUNT
     aggregations.push({
       column: columns[0].key,
@@ -254,6 +256,16 @@ function validateQueryPlan(queryPlan, dataset, userContext) {
         `Hàm tổng hợp "${func}" không được hỗ trợ. Chỉ cho phép: ${ALLOWED_FUNCTIONS.join(', ')}.`,
         'UNSUPPORTED_FUNCTION'
       );
+    }
+
+    if (colKey === '*' && ['COUNT', 'COUNT_ROWS'].includes(func)) {
+      validatedAggs.push({
+        column: '*',
+        func: 'COUNT',
+        alias: alias || 'count_rows',
+      });
+      definedAliases.add(alias || 'count_rows');
+      continue;
     }
 
     const colMeta = colMap.get(colKey);
@@ -353,12 +365,17 @@ function validateQueryPlan(queryPlan, dataset, userContext) {
 
     // Must be either an existing column or a defined alias
     if (!colMap.has(orderCol) && !definedAliases.has(orderCol)) {
-      // Fallback to first aggregation alias
-      orderBy.column = validatedAggs[0].alias;
+      // Fallback to first aggregation alias or first column
+      orderBy.column = validatedAggs[0]?.alias || columns[0].key;
     }
     orderBy.dir = orderDir === 'ASC' ? 'ASC' : 'DESC';
-  } else {
+  } else if (validatedGroupBy.some(g => typeof g === 'object' && g.date_trunc)) {
+    const dateG = validatedGroupBy.find(g => typeof g === 'object' && g.date_trunc);
+    orderBy = { column: dateG.column, dir: 'ASC' };
+  } else if (validatedAggs.length > 0) {
     orderBy = { column: validatedAggs[0].alias, dir: 'DESC' };
+  } else {
+    orderBy = null;
   }
 
   let limit = queryPlan.limit ? parseInt(queryPlan.limit, 10) : 50;
@@ -376,18 +393,20 @@ function validateQueryPlan(queryPlan, dataset, userContext) {
   }
 
   return {
-    intent: queryPlan.intent || 'AGGREGATION',
     file_id: dataset.file_id,
     target_sheet: queryPlan.target_sheet || dataset.profile?.active_sheet || 'Sheet1',
+    intent: queryPlan.intent || 'AGGREGATION',
     groupBy: validatedGroupBy,
     aggregations: validatedAggs,
     filters: validatedFilters,
     computations: validatedComputations,
     period_comparison: queryPlan.period_comparison || null,
+    having: queryPlan.having || null,
     orderBy,
     limit,
     chart_preference: chartPreference,
     has_pie_and_bar: Boolean(queryPlan.has_pie_and_bar),
+    percentage_basis: queryPlan.percentage_basis || null,
     max_groups: MAX_GROUPS,
     timeout_ms: TIMEOUT_MS,
   };

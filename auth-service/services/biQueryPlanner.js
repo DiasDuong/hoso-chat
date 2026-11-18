@@ -451,6 +451,35 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
     };
   }
 
+  // Check for Duplicate Keys query (e.g. "Kiểm tra dữ liệu trùng", "Kiểm tra trùng lặp")
+  const isDuplicateIntent =
+    hasWordOrPhrase(promptNorm, 'du lieu trung') ||
+    hasWordOrPhrase(promptNorm, 'trung lap') ||
+    hasWordOrPhrase(promptNorm, 'kiem tra trung') ||
+    hasWordOrPhrase(promptNorm, 'kiem tra du lieu trung') ||
+    hasWordOrPhrase(promptNorm, 'check trung') ||
+    hasWordOrPhrase(promptNorm, 'trung ma');
+
+  if (isDuplicateIntent) {
+    const idCol = colProfile.identifiers[0] || columns.find(c => c.key.includes('ma_') || c.key.includes('id')) || columns[0];
+    const idKey = idCol ? idCol.key : 'id';
+    return {
+      intent: 'DUPLICATES',
+      target_sheet: datasetProfile?.active_sheet || 'Sheet1',
+      groupBy: [idKey],
+      aggregations: [{ column: idKey, func: 'COUNT', alias: `count_${idKey}` }],
+      filters: [],
+      computations: [],
+      period_comparison: null,
+      having: { column: `count_${idKey}`, op: 'gt', value: 1 },
+      orderBy: { column: `count_${idKey}`, dir: 'DESC' },
+      limit: 50,
+      chart_preference: 'NONE',
+      clarification_needed: false,
+      clarification_question: null,
+    };
+  }
+
   // 2. Identify Intent & Aggregation Target
   let func = 'SUM';
   let targetMetricCol = null;
@@ -537,7 +566,19 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
     ((hasWordOrPhrase(promptNorm, 'ty trong') || hasWordOrPhrase(promptNorm, 'ty le') || hasWordOrPhrase(promptNorm, 'co cau') || hasWordOrPhrase(promptNorm, 'phan bo')) && hasEntityMention && !hasWordOrPhrase(promptNorm, 'doanh so') && !hasWordOrPhrase(promptNorm, 'doanh thu')) ||
     (hasEntityMention && isCategoricalBreakdownWithoutMeasure);
 
-  if (isCountEntityIntent) {
+  const isRowCountIntent =
+    hasWordOrPhrase(promptNorm, 'so dong du lieu') ||
+    hasWordOrPhrase(promptNorm, 'so dong') ||
+    hasWordOrPhrase(promptNorm, 'dem so dong') ||
+    hasWordOrPhrase(promptNorm, 'dem dong') ||
+    hasWordOrPhrase(promptNorm, 'so record') ||
+    hasWordOrPhrase(promptNorm, 'tong so dong') ||
+    hasWordOrPhrase(promptNorm, 'dong du lieu');
+
+  if (isRowCountIntent) {
+    func = 'COUNT';
+    targetMetricCol = { key: '*', name: 'Dòng', type: 'ROW_COUNT' };
+  } else if (isCountEntityIntent) {
     func = 'DISTINCT_COUNT';
 
     if (isNhanVienEntity) {
@@ -708,9 +749,14 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
     }
   }
 
-  const alias = `${func.toLowerCase()}_${targetMetricCol.key}`;
+  const alias =
+    targetMetricCol?.key === '*'
+      ? 'count_rows'
+      : func === 'COUNT'
+      ? `count_${targetMetricCol?.key || 'all'}`
+      : `${func.toLowerCase()}_${targetMetricCol?.key || 'all'}`;
   let aggregations = [{
-    column: targetMetricCol.key,
+    column: targetMetricCol ? targetMetricCol.key : columns[0].key,
     func,
     alias,
   }];
@@ -860,8 +906,16 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
     }
   }
 
+  const isFindTopRecord =
+    (hasWordOrPhrase(promptNorm, 'tim nhan vien') ||
+     hasWordOrPhrase(promptNorm, 'ai co') ||
+     hasWordOrPhrase(promptNorm, 'nhan vien nao co') ||
+     hasWordOrPhrase(promptNorm, 'nguoi co')) &&
+    (hasWordOrPhrase(promptNorm, 'cao nhat') || hasWordOrPhrase(promptNorm, 'thap nhat') || hasWordOrPhrase(promptNorm, 'lon nhat') || hasWordOrPhrase(promptNorm, 'nho nhat'));
+
   // C. Special Check for Individual Employee Ranking (e.g. "Top 5 nhân viên theo số lô xử lý")
   if (
+    !isFindTopRecord &&
     groupBy.length === 0 &&
     (hasWordOrPhrase(promptNorm, 'nhan vien') || hasWordOrPhrase(promptNorm, 'can bo') || hasWordOrPhrase(promptNorm, 'nguoi tao')) &&
     (hasWordOrPhrase(promptNorm, 'top') || hasWordOrPhrase(promptNorm, 'cao nhat') || hasWordOrPhrase(promptNorm, 'thap nhat')) &&
@@ -904,73 +958,99 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
   // 4. Identify Filters
   const filters = [];
 
+  const isFilterOnlyIntent =
+    (promptNorm.startsWith('loc') ||
+     hasWordOrPhrase(promptNorm, 'loc danh sach') ||
+     hasWordOrPhrase(promptNorm, 'loc nhan vien') ||
+     hasWordOrPhrase(promptNorm, 'chi lay') ||
+     hasWordOrPhrase(promptNorm, 'chi xem') ||
+     hasWordOrPhrase(promptNorm, 'lay danh sach')) &&
+    !hasWordOrPhrase(promptNorm, 'tong') &&
+    !hasWordOrPhrase(promptNorm, 'trung binh') &&
+    !hasWordOrPhrase(promptNorm, 'dem') &&
+    !hasWordOrPhrase(promptNorm, 'so luong') &&
+    !hasWordOrPhrase(promptNorm, 'ty trong') &&
+    !hasWordOrPhrase(promptNorm, 'ty le') &&
+    !hasWordOrPhrase(promptNorm, 'thong ke') &&
+    !hasWordOrPhrase(promptNorm, 'so sanh');
+
   // Check if user is asking to analyze/compare all departments
   const isComparingAllDepartments =
-    /(?:6|cac|tat ca|moi|tung|toan bo)\s+phong\s+ban/i.test(promptNorm) ||
-    hasWordOrPhrase(promptNorm, '6 phong ban') ||
-    hasWordOrPhrase(promptNorm, 'cac phong ban') ||
-    hasWordOrPhrase(promptNorm, 'tung phong ban') ||
-    hasWordOrPhrase(promptNorm, 'theo phong ban') ||
-    hasWordOrPhrase(promptNorm, 'moi phong ban') ||
-    hasWordOrPhrase(promptNorm, 'cac bo phan') ||
-    hasWordOrPhrase(promptNorm, 'tung bo phan');
+    !isFilterOnlyIntent &&
+    (/(?:6|cac|tat ca|moi|tung|toan bo)\s+phong\s+ban/i.test(promptNorm) ||
+     hasWordOrPhrase(promptNorm, '6 phong ban') ||
+     hasWordOrPhrase(promptNorm, 'cac phong ban') ||
+     hasWordOrPhrase(promptNorm, 'tung phong ban') ||
+     hasWordOrPhrase(promptNorm, 'theo phong ban') ||
+     hasWordOrPhrase(promptNorm, 'moi phong ban') ||
+     hasWordOrPhrase(promptNorm, 'cac bo phan') ||
+     hasWordOrPhrase(promptNorm, 'tung bo phan'));
 
   // Categorical value filter e.g. "chỉ lấy phòng Kinh Doanh" or "so sánh phòng Kinh Doanh và phòng Logistics"
   for (const col of colProfile.dimensions) {
     if (isComparingAllDepartments && (col.key === 'phong_ban' || normalizeText(col.name).includes('phong ban'))) {
       continue; // NEVER filter down to a single department when analyzing all/6 departments!
     }
-    if (col.top_values) {
-      for (const tv of col.top_values) {
-        const valNorm = normalizeText(tv.value);
-        if (valNorm.length > 2 && hasWordOrPhrase(promptNorm, valNorm)) {
-          // SPECIAL GUARD: "nhân sự" is both a department name and a general domain word (HR).
-          // Only treat "nhân sự" as a department filter if explicitly specified as a department:
-          // e.g. "phòng nhân sự", "thuộc phòng nhân sự", "chỉ lấy nhân sự", "riêng nhân sự"
-          if (valNorm === 'nhan su') {
-            if (
-              hasWordOrPhrase(promptNorm, 'co cau nhan su') ||
-              hasWordOrPhrase(promptNorm, 'quy mo nhan su') ||
-              hasWordOrPhrase(promptNorm, 'ty trong nhan su') ||
-              hasWordOrPhrase(promptNorm, 'quan tri nhan su') ||
-              hasWordOrPhrase(promptNorm, 'du lieu nhan su') ||
-              hasWordOrPhrase(promptNorm, 'nhan su cua') ||
-              /(?:co\s+cau|quy\s+mo|ty\s+trong|quan\s+tri|du\s+lieu)\s+nhan\s+su/i.test(promptNorm)
-            ) {
-              continue; // Do NOT falsely filter out all other departments!
-            }
-            const isExplicitDept =
-              /(?:phong|bo phan|khoa|to|chi lay|thuoc|rieng)\s+nhan\s+su\b/i.test(promptNorm) ||
-              /nhan\s+su\s+va\s+(?:van tai|ke toan|kinh doanh|kho van|cskh)/i.test(promptNorm);
-            if (!isExplicitDept) {
-              continue; // Do NOT falsely filter out all other departments!
-            }
-          }
 
-          // Filter keyword must be directly associated with the dimension or value
-          const hasFilterPrefix =
-            new RegExp(`(?:chi lay|loc|thuoc|rieng|phong|bo phan)\\s+(?:cac\\s+)?${valNorm}`, 'i').test(promptNorm) ||
-            new RegExp(`so sanh\\s+(?:giua\\s+)?${valNorm}\\s+(?:va|voi)`, 'i').test(promptNorm) ||
-            new RegExp(`(?:va|voi)\\s+${valNorm}\\b`, 'i').test(promptNorm);
+    let candidateValues = (col.top_values || []).map(v => v.value);
+    if (col.key === 'phong_ban' || normalizeText(col.name).includes('phong ban')) {
+      const extraDepts = ['Kho Vận', 'Kho Van', 'Vận Tải', 'Van Tai', 'Kế Toán', 'Ke Toan', 'Nhân Sự', 'Nhan Su', 'Kinh Doanh', 'Logistics', 'Chăm Sóc Khách Hàng', 'CSKH', 'Công Nghệ Thông Tin (IT)', 'IT'];
+      for (const ed of extraDepts) {
+        if (!candidateValues.some(cv => normalizeText(cv) === normalizeText(ed))) {
+          candidateValues.push(ed);
+        }
+      }
+    }
 
-          if (hasFilterPrefix) {
-            filters.push({
-              column: col.key,
-              op: 'eq',
-              value: tv.value,
-            });
-            // If comparing values of this dimension and groupBy is empty, add this dimension to groupBy!
-            if (groupBy.length === 0 && (hasWordOrPhrase(promptNorm, 'so sanh') || hasWordOrPhrase(promptNorm, 'giua'))) {
-              groupBy.push(col.key);
-            }
+    for (const val of candidateValues) {
+      const valNorm = normalizeText(val);
+      if (valNorm.length > 2 && hasWordOrPhrase(promptNorm, valNorm)) {
+        // SPECIAL GUARD: "nhân sự" is both a department name and a general domain word (HR).
+        if (valNorm === 'nhan su') {
+          if (
+            hasWordOrPhrase(promptNorm, 'co cau nhan su') ||
+            hasWordOrPhrase(promptNorm, 'quy mo nhan su') ||
+            hasWordOrPhrase(promptNorm, 'ty trong nhan su') ||
+            hasWordOrPhrase(promptNorm, 'quan tri nhan su') ||
+            hasWordOrPhrase(promptNorm, 'du lieu nhan su') ||
+            hasWordOrPhrase(promptNorm, 'nhan su cua') ||
+            /(?:co\s+cau|quy\s+mo|ty\s+trong|quan\s+tri|du\s+lieu)\s+nhan\s+su/i.test(promptNorm)
+          ) {
+            continue;
           }
+          const isExplicitDept =
+            /(?:phong\s+ban|phong|bo\s+phan|khoa|to|chi\s+lay|thuoc|rieng)\s+nhan\s+su\b/i.test(promptNorm) ||
+            /nhan\s+su\s+va\s+(?:van tai|ke toan|kinh doanh|kho van|cskh)/i.test(promptNorm);
+          if (!isExplicitDept) {
+            continue;
+          }
+        }
+
+        // Filter keyword must be directly associated with the dimension or value
+        const hasFilterPrefix =
+          isFilterOnlyIntent ||
+          new RegExp(`(?:chi lay|chi xem|xem|loc|thuoc|rieng|phong|bo phan|theo)\\s+(?:so\\s+lieu\\s+|du\\s+lieu\\s+)?(?:cac\\s+|phong\\s+ban\\s+|phong\\s+|bo\\s+phan\\s+)?${valNorm}`, 'i').test(promptNorm) ||
+          new RegExp(`so sanh\\s+(?:giua\\s+)?${valNorm}\\s+(?:va|voi)`, 'i').test(promptNorm) ||
+          new RegExp(`(?:va|voi)\\s+${valNorm}\\b`, 'i').test(promptNorm);
+
+        if (hasFilterPrefix) {
+          filters.push({
+            column: col.key,
+            op: 'eq',
+            value: val,
+          });
+          // If comparing values of this dimension and groupBy is empty, add this dimension to groupBy!
+          if (groupBy.length === 0 && (hasWordOrPhrase(promptNorm, 'so sanh') || hasWordOrPhrase(promptNorm, 'giua'))) {
+            groupBy.push(col.key);
+          }
+          break;
         }
       }
     }
   }
 
   // If comparing two entities and groupBy is still empty, add the filtered dimension to groupBy
-  if (groupBy.length === 0 && filters.length > 0) {
+  if (!isFilterOnlyIntent && groupBy.length === 0 && filters.length > 0) {
     const firstFilterCol = filters[0].column;
     if (!groupBy.includes(firstFilterCol)) {
       groupBy.push(firstFilterCol);
@@ -1054,13 +1134,20 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
 
   // 6. Identify Sorting & Limits
   let orderBy = { column: aggregations[0]?.alias || alias, dir: 'DESC' };
-  if (hasWordOrPhrase(promptNorm, 'tang dan') || hasWordOrPhrase(promptNorm, 'thap nhat') || hasWordOrPhrase(promptNorm, 'it nhat')) {
+  if (dateTrunc && !hasWordOrPhrase(promptNorm, 'giam dan') && !hasWordOrPhrase(promptNorm, 'top')) {
+    const dateColKey = typeof groupBy[0] === 'object' ? groupBy[0].column : groupBy[0];
+    orderBy = { column: dateColKey, dir: 'ASC' };
+  } else if (hasWordOrPhrase(promptNorm, 'tang dan') || hasWordOrPhrase(promptNorm, 'thap nhat') || hasWordOrPhrase(promptNorm, 'it nhat')) {
     orderBy = { column: aggregations[0]?.alias || alias, dir: 'ASC' };
   }
 
   let limit = 20; // Default limit
   const topMatch = promptNorm.match(/top\s*(\d+)/i);
-  if (topMatch) {
+  if (isFindTopRecord) {
+    limit = 1;
+    const salCol = colProfile.measures.find((c) => normalizeText(c.key).includes('luong') || normalizeText(c.key).includes('salary')) || targetMetricCol;
+    orderBy = { column: salCol ? salCol.key : 'luong_co_ban', dir: hasWordOrPhrase(promptNorm, 'thap nhat') ? 'ASC' : 'DESC' };
+  } else if (topMatch) {
     limit = parseInt(topMatch[1], 10);
   } else if (hasWordOrPhrase(promptNorm, 'cao nhat') && !hasWordOrPhrase(promptNorm, 'theo') && !isComparingAllDepartments) {
     limit = 5;
@@ -1093,10 +1180,19 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
 
   // 8. Intent Classification
   let intent = 'AGGREGATION';
-  if (dateTrunc) {
+  if (isFilterOnlyIntent) {
+    intent = 'FILTER';
+    groupBy.length = 0;
+    aggregations.length = 0;
+    chartPreference = 'NONE';
+    limit = 500;
+  } else if (dateTrunc) {
     intent = 'TREND';
-  } else if (topMatch || hasWordOrPhrase(promptNorm, 'cao nhat') || hasWordOrPhrase(promptNorm, 'thap nhat')) {
+  } else if (isFindTopRecord || topMatch || hasWordOrPhrase(promptNorm, 'cao nhat') || hasWordOrPhrase(promptNorm, 'thap nhat')) {
     intent = 'RANKING';
+    if (isFindTopRecord) {
+      groupBy.length = 0;
+    }
   } else if (computations.some((c) => c.type === 'PERCENTAGE') || chartPreference === 'PIE') {
     intent = 'DISTRIBUTION';
   } else if (periodComparison) {
@@ -1173,6 +1269,21 @@ function planFollowUpQuery(prompt, previousPlan, datasetProfile) {
   const topMatch = promptNorm.match(/top\s*(\d+)/i);
   if (topMatch) {
     clonedPlan.limit = parseInt(topMatch[1], 10);
+    clonedPlan.intent = 'RANKING';
+    isFollowUp = true;
+  }
+
+  // Period comparison follow-up: "So sánh với tháng trước"
+  if (hasWordOrPhrase(promptNorm, 'thang truoc') || hasWordOrPhrase(promptNorm, 'ky truoc') || hasWordOrPhrase(promptNorm, 'so sanh voi thang truoc')) {
+    clonedPlan.period_comparison = {
+      period: 'MONTH_OVER_MONTH',
+    };
+    isFollowUp = true;
+  }
+
+  // Show data table follow-up: "Thêm bảng dữ liệu chi tiết"
+  if (hasWordOrPhrase(promptNorm, 'bang du lieu') || hasWordOrPhrase(promptNorm, 'chi tiet') || hasWordOrPhrase(promptNorm, 'them bang')) {
+    clonedPlan.show_data_table = true;
     isFollowUp = true;
   }
 

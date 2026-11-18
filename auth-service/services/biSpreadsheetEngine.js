@@ -645,8 +645,29 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
       for (const filter of querySpec.filters) {
         const { column, op, value } = filter;
         const cell = row[column];
-        const dateTyped = ['DATE', 'DATETIME'].includes(columns.find(c => c.key === column)?.type);
-        const comparable = v => dateTyped ? Date.parse(parseDateValue(v) || v) : parseNumericValue(v);
+        const colDef = columns.find(c => c.key === column);
+        const isDateCol = ['DATE', 'DATETIME'].includes(colDef?.type) || /(ngay|date|time|thang|month)/i.test(column || '');
+        const comparable = v => {
+          if (isDateCol) {
+            const pd = parseDateValue(v);
+            if (pd) {
+              const ts = Date.parse(pd);
+              if (!isNaN(ts)) return ts;
+            }
+            if (typeof v === 'string' && /^\d{4}-\d{2}$/.test(v.trim())) {
+              const ts = Date.parse(`${v.trim()}-01`);
+              if (!isNaN(ts)) return ts;
+            }
+          }
+          const num = parseNumericValue(v);
+          if (num !== null && Number.isFinite(num)) return num;
+          const pdFallback = parseDateValue(v);
+          if (pdFallback) {
+            const ts = Date.parse(pdFallback);
+            if (!isNaN(ts)) return ts;
+          }
+          return null;
+        };
         if (op === 'eq' && String(cell).toLowerCase() !== String(value).toLowerCase()) return false;
         if (op === 'neq' && String(cell).toLowerCase() === String(value).toLowerCase()) return false;
         if (op === 'contains' && !String(cell).toLowerCase().includes(String(value).toLowerCase())) return false;
@@ -688,7 +709,7 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
   const groupBy = querySpec.groupBy || [];
   const aggregations = querySpec.aggregations || [];
 
-  if (groupBy.length > 0 || aggregations.length > 0) {
+  if (groupBy.length > 0 || (aggregations.length > 0 && querySpec.intent !== 'RANKING' && querySpec.intent !== 'FILTER')) {
     const groups = new Map();
 
     for (const row of rows) {
@@ -738,9 +759,15 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
         const targetAlias = alias || `${func.toLowerCase()}_${column}`;
         const upperFunc = String(func).toUpperCase();
 
-        if (upperFunc === 'COUNT') {
-          outRow[targetAlias] = groupRows.length;
-        } else if (upperFunc === 'DISTINCT_COUNT') {
+        if (upperFunc === 'COUNT' || upperFunc === 'COUNT_ROWS') {
+          if (!column || column === '*' || upperFunc === 'COUNT_ROWS') {
+            outRow[targetAlias] = groupRows.length;
+          } else {
+            outRow[targetAlias] = groupRows.filter((r) => r[column] !== null && r[column] !== undefined && r[column] !== '').length;
+          }
+        } else if (upperFunc === 'COUNT_NON_NULL') {
+          outRow[targetAlias] = groupRows.filter((r) => r[column] !== null && r[column] !== undefined && r[column] !== '').length;
+        } else if (upperFunc === 'DISTINCT_COUNT' || upperFunc === 'COUNT_DISTINCT') {
           const distinctSet = new Set(
             groupRows.map((r) => r[column]).filter((v) => v !== null && v !== undefined && v !== '')
           );
@@ -773,6 +800,22 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
     resultRows = [...rows];
   }
 
+  // Filter groups if having clause specified (e.g. DUPLICATES check)
+  if (querySpec.having && querySpec.having.column) {
+    const { column, op, value } = querySpec.having;
+    const targetComp = parseNumericValue(value) ?? value;
+    resultRows = resultRows.filter((r) => {
+      const cellVal = parseNumericValue(r[column]) ?? r[column];
+      if (op === 'gt') return cellVal > targetComp;
+      if (op === 'gte') return cellVal >= targetComp;
+      if (op === 'lt') return cellVal < targetComp;
+      if (op === 'lte') return cellVal <= targetComp;
+      if (op === 'eq') return cellVal === targetComp;
+      if (op === 'neq') return cellVal !== targetComp;
+      return true;
+    });
+  }
+
   // Compute whole-filter summaries before grouping limits; AVG/MEDIAN/DISTINCT
   // cannot be recovered by adding or averaging the group aggregates.
   const summary = {};
@@ -780,15 +823,36 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
     const alias = agg.alias || `${agg.func.toLowerCase()}_${agg.column}`;
     const values = rows.map(r => parseNumericValue(r[agg.column])).filter(n => n !== null);
     const func = String(agg.func).toUpperCase();
-    if (func === 'COUNT') summary[alias] = rows.length;
-    else if (func === 'DISTINCT_COUNT') summary[alias] = new Set(rows.map(r => r[agg.column]).filter(v => v !== null && v !== undefined && v !== '')).size;
-    else if (!values.length) summary[alias] = null;
-    else if (func === 'SUM') summary[alias] = values.reduce((a, b) => a + b, 0);
-    else if (func === 'AVG') summary[alias] = values.reduce((a, b) => a + b, 0) / values.length;
-    else if (func === 'MIN') summary[alias] = Math.min(...values);
-    else if (func === 'MAX') summary[alias] = Math.max(...values);
-    else if (func === 'MEDIAN') { values.sort((a, b) => a - b); const mid = Math.floor(values.length / 2); summary[alias] = values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2; }
+    if (func === 'COUNT' || func === 'COUNT_ROWS') {
+      if (!agg.column || agg.column === '*' || func === 'COUNT_ROWS') {
+        summary[alias] = rows.length;
+      } else {
+        summary[alias] = rows.filter(r => r[agg.column] !== null && r[agg.column] !== undefined && r[agg.column] !== '').length;
+      }
+    } else if (func === 'COUNT_NON_NULL') {
+      summary[alias] = rows.filter(r => r[agg.column] !== null && r[agg.column] !== undefined && r[agg.column] !== '').length;
+    } else if (func === 'DISTINCT_COUNT' || func === 'COUNT_DISTINCT') {
+      summary[alias] = new Set(rows.map(r => r[agg.column]).filter(v => v !== null && v !== undefined && v !== '')).size;
+    } else if (!values.length) {
+      summary[alias] = null;
+    } else if (func === 'SUM') {
+      summary[alias] = values.reduce((a, b) => a + b, 0);
+    } else if (func === 'AVG') {
+      summary[alias] = values.reduce((a, b) => a + b, 0) / values.length;
+    } else if (func === 'MIN') {
+      summary[alias] = Math.min(...values);
+    } else if (func === 'MAX') {
+      summary[alias] = Math.max(...values);
+    } else if (func === 'MEDIAN') {
+      values.sort((a, b) => a - b);
+      const mid = Math.floor(values.length / 2);
+      summary[alias] = values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
+    }
     if (typeof summary[alias] === 'number') summary[alias] = Number(summary[alias].toFixed(2));
+  }
+
+  if (querySpec.intent === 'DUPLICATES') {
+    summary.duplicate_groups = resultRows.length;
   }
 
   const timeGroup = groupBy.find(g => typeof g === 'object' && g.date_trunc);
@@ -806,9 +870,18 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
 
       if (type === 'PERCENTAGE') {
         const totalSum = resultRows.reduce((acc, r) => acc + (parseNumericValue(r[source_alias]) || 0), 0);
+        let denominator = totalSum;
+        if (querySpec.percentage_basis === 'TOTAL_POPULATION' && totalMatching > 0) {
+          denominator = totalMatching;
+        } else if (querySpec.percentage_basis === 'GLOBAL_UNIQUE_COUNT' && summary[source_alias] > 0) {
+          denominator = summary[source_alias];
+        } else {
+          // Standard distribution share: sum of group values guarantees slices sum to 100%
+          denominator = totalSum > 0 ? totalSum : (summary[source_alias] || totalMatching);
+        }
         for (const row of resultRows) {
           const val = parseNumericValue(row[source_alias]);
-          row[target_alias] = val !== null && totalSum !== 0 ? Number(((val / totalSum) * 100).toFixed(2)) : null;
+          row[target_alias] = val !== null && denominator !== 0 ? Number(((val / denominator) * 100).toFixed(2)) : null;
         }
       } else if (type === 'GROWTH_RATE') {
         const dimensions = groupBy.map(g => typeof g === 'string' ? g : g.column).filter(k => k !== dateColumn);
@@ -883,6 +956,119 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
   const endHeap = process.memoryUsage().heapUsed;
   const memoryDeltaKb = Math.max(0, Math.round((endHeap - startHeap) / 1024));
 
+  // 6b. Generate Multi-Visual Engine Aggregations on matching rows (Guarantees multi-visual on all routes)
+  const deptCol = columns.find(c => /(phong|dept|bo_phan)/i.test(c.key));
+  const branchCol = columns.find(c => /(chi_nhanh|branch|cong_ty)/i.test(c.key));
+  const dateCol = columns.find(c => ['DATE', 'DATETIME'].includes(c.type) || /(ngay|date|time|thang|month)/i.test(c.key));
+  const empIdCol = columns.find(c => /(ma_nhan_vien|nhan_vien|emp|id)/i.test(c.key));
+  const salaryCol = columns.find(c => /(luong|salary|thu_nhap)/i.test(c.key));
+
+  let distinctHeadcount = null;
+  if (empIdCol) {
+    const distinctSet = new Set();
+    for (const r of rows) {
+      const v = r[empIdCol.key];
+      if (v !== null && v !== undefined && String(v).trim() !== '') {
+        distinctSet.add(String(v).trim());
+      }
+    }
+    distinctHeadcount = distinctSet.size;
+  }
+
+  let totalSalary = null;
+  let avgSalary = null;
+  if (salaryCol) {
+    let sum = 0;
+    let count = 0;
+    for (const r of rows) {
+      const n = parseNumericValue(r[salaryCol.key]);
+      if (n !== null && Number.isFinite(n)) {
+        sum += n;
+        count++;
+      }
+    }
+    if (count > 0) {
+      totalSalary = sum;
+      avgSalary = Math.round(sum / count);
+    }
+  }
+
+  // Department breakdown
+  let deptRows = [];
+  if (deptCol) {
+    const dMap = new Map();
+    for (const r of rows) {
+      const d = String(r[deptCol.key] || 'Khác').trim() || 'Khác';
+      if (!dMap.has(d)) dMap.set(d, { [deptCol.key]: d, count_rows: 0, distinct_ids: new Set() });
+      const item = dMap.get(d);
+      item.count_rows++;
+      if (empIdCol && r[empIdCol.key]) item.distinct_ids.add(String(r[empIdCol.key]).trim());
+    }
+    deptRows = Array.from(dMap.values())
+      .map(item => ({
+        [deptCol.key]: item[deptCol.key],
+        distinct_count_ma_nhan_vien: empIdCol ? item.distinct_ids.size : item.count_rows,
+        count_rows: item.count_rows,
+      }))
+      .sort((a, b) => b.distinct_count_ma_nhan_vien - a.distinct_count_ma_nhan_vien)
+      .slice(0, 20);
+  }
+
+  // Branch share
+  let branchRows = [];
+  if (branchCol) {
+    const bMap = new Map();
+    for (const r of rows) {
+      const b = String(r[branchCol.key] || 'Khác').trim() || 'Khác';
+      if (!bMap.has(b)) bMap.set(b, { [branchCol.key]: b, count_rows: 0, distinct_ids: new Set() });
+      const item = bMap.get(b);
+      item.count_rows++;
+      if (empIdCol && r[empIdCol.key]) item.distinct_ids.add(String(r[empIdCol.key]).trim());
+    }
+    const totalCount = rows.length;
+    branchRows = Array.from(bMap.values()).map(item => {
+      const count = empIdCol ? item.distinct_ids.size : item.count_rows;
+      return {
+        [branchCol.key]: item[branchCol.key],
+        distinct_count_ma_nhan_vien: count,
+        count_rows: item.count_rows,
+        ty_trong_pct: totalCount > 0 ? Number(((item.count_rows / totalCount) * 100).toFixed(2)) : 0,
+        ty_le_phan_tram: totalCount > 0 ? Number(((item.count_rows / totalCount) * 100).toFixed(2)) : 0,
+      };
+    }).sort((a, b) => b.count_rows - a.count_rows);
+  }
+
+  // Monthly trend
+  let trendRows = [];
+  if (dateCol) {
+    const tMap = new Map();
+    for (const r of rows) {
+      const t = truncateDate(r[dateCol.key], 'month') || 'Khác';
+      if (!tMap.has(t)) tMap.set(t, { thoi_gian: t, count_rows: 0, sum_salary: 0, distinct_ids: new Set() });
+      const item = tMap.get(t);
+      item.count_rows++;
+      if (empIdCol && r[empIdCol.key]) item.distinct_ids.add(String(r[empIdCol.key]).trim());
+      if (salaryCol) {
+        const sal = parseNumericValue(r[salaryCol.key]);
+        if (sal !== null && Number.isFinite(sal)) item.sum_salary += sal;
+      }
+    }
+    trendRows = Array.from(tMap.values())
+      .filter(item => item.thoi_gian !== 'Khác')
+      .map(item => ({
+        thoi_gian: item.thoi_gian,
+        count_rows: item.count_rows,
+        distinct_count_ma_nhan_vien: empIdCol ? item.distinct_ids.size : item.count_rows,
+        tong_luong: item.sum_salary,
+      }))
+      .sort((a, b) => String(a.thoi_gian).localeCompare(String(b.thoi_gian)));
+  }
+
+  summary.total_matching = totalMatching;
+  summary.distinct_headcount = distinctHeadcount;
+  summary.total_salary = totalSalary;
+  summary.avg_salary = avgSalary;
+
   return {
     file_id: dataset.file_id,
     rows_scanned: dataset.rows ? dataset.rows.length : 0,
@@ -892,6 +1078,12 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
     summary,
     total_groups: resultRows.length,
     period_comparison: periodComparisonResult,
+    multi_visual: {
+      dept_breakdown: deptRows,
+      branch_share: branchRows,
+      monthly_trend: trendRows,
+      detail_rows: rows.slice(0, 50),
+    },
     execution_stats: {
       execution_time_ms: executionTimeMs,
       memory_delta_kb: memoryDeltaKb,
