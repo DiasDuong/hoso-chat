@@ -29,9 +29,9 @@ const { chromium } = require('../auth-service/node_modules/playwright-core');
 const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
+const express = require('express');
 
 const BROWSER_PATH = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
-const APP_URL = 'http://127.0.0.1:8082/chat/';
 
 let passCount = 0;
 let failCount = 0;
@@ -56,6 +56,15 @@ async function runTestSuite() {
   console.log('Target: Live Browser Verification of parseMarkdown & ECharts');
   console.log('Engine: Headless Microsoft Edge (Playwright-Core)');
   console.log('================================================================\n');
+
+  const app = express();
+  app.use('/chat', express.static(path.join(__dirname, '..', 'chat')));
+  app.use(express.static(path.join(__dirname, '..', 'chat')));
+  const server = await new Promise((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  const port = server.address().port;
+  const APP_URL = `http://127.0.0.1:${port}/chat/`;
 
   const browser = await chromium.launch({
     executablePath: BROWSER_PATH,
@@ -803,6 +812,7 @@ async function runTestSuite() {
   console.log(`\n[INFO] Browser screenshot saved to: ${screenshotPath}`);
 
   await browser.close();
+  server.close();
 
   // ============================================================================
   // SUMMARY

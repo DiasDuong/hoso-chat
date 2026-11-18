@@ -24,7 +24,7 @@ async function runTest() {
   console.log('TEST: MULTI-METRIC COMPOSITE BI REPORT (SOTRANS HR 6 DEPARTMENTS)');
   console.log('================================================================');
 
-  const datasetPath = path.join(__dirname, '../auth-service/storage/bi_datasets/6cd5b781-abce-4bc1-a9a4-730b247e51b9.dataset.json');
+  const datasetPath = path.join(__dirname, 'fixtures/multi_metric_synthetic.dataset.json');
   const ds = JSON.parse(fs.readFileSync(datasetPath, 'utf8'));
 
   const prompt = `Hãy tạo báo cáo BI phân tích cơ cấu nhân sự của 6 phòng ban.
