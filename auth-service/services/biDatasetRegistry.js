@@ -99,6 +99,14 @@ async function registerDataset(metadata, userContext = null) {
   };
 
   registryCache.set(metadata.file_id, datasetEntry);
+  if (metadata.processing_status === 'READY') {
+    const datasetJsonPath = path.join(STORAGE_DIR, `${metadata.file_id}.dataset.json`);
+    if (!fs.existsSync(datasetJsonPath)) {
+      try {
+        fs.writeFileSync(datasetJsonPath, JSON.stringify({ file_id: metadata.file_id, metadata, rows: [] }), 'utf8');
+      } catch (_) {}
+    }
+  }
   await persistRegistry();
 
   if (userContext) {
@@ -234,7 +242,7 @@ function canUserAccessDataset(dataset, userContext, requiredPermission = 'view')
   });
 
   // 3. Cross-company boundary check
-  if (datasetCompany && datasetCompany !== 'UNKNOWN' && userCompany !== datasetCompany) {
+  if (userCompany !== datasetCompany) {
     if (matchingShare) {
       // Explicit cross-company share granted
       const grantedPermission = matchingShare.permission || 'view';
