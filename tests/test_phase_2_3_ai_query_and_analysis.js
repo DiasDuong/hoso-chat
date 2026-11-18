@@ -360,7 +360,12 @@ async function runSuite() {
       USER_HR_STL
     );
     const { dataProfile: injProfile } = await processAndProfileDataset(injMeta, injBuf);
-    const injDataset = await registerDataset({ ...injMeta, profile: injProfile, columns: injProfile.columns });
+    const injDataset = await registerDataset({
+      ...injMeta,
+      processing_status: 'READY',
+      profile: injProfile,
+      columns: injProfile.columns,
+    });
 
     const plan = planAnalyticalQuery('Tổng điểm theo Tên', injProfile);
     const validated = validateQueryPlan(plan, injDataset, USER_HR_STL);

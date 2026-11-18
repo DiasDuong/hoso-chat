@@ -25,7 +25,7 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
   );
   const hasRealRows = (Array.isArray(dataset?.rows) && dataset.rows.length > 0) || hasEngineMultiVisual;
   const datasetRows = dataset?.rows || [];
-  const columns = dataset?.columns || [];
+  const columns = dataset?.columns || dataset?.profile?.columns || [];
   const rows = sanitizeBiData(result.results || []).slice(0, 500);
   const groups = (queryPlan.groupBy || []).map(g => typeof g === 'string' ? g : g.column);
   const aggregations = queryPlan.aggregations || [];

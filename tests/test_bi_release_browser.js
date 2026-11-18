@@ -30,8 +30,8 @@ const { buildDatasetDashboard } = require('../auth-service/services/biReportBuil
   let browser, server;
   const checks = [];
   try {
-    const rows = [['Department', 'Day', 'Amount']];
-    for (let dept = 0; dept < 4; dept++) for (let month = 1; month <= 8; month++) rows.push([String.fromCharCode(65 + dept), `2026-${String(month).padStart(2, '0')}-01`, (dept + 1) * 10 + month]);
+    const rows = [['Department', 'Branch', 'Day', 'Amount']];
+    for (let dept = 0; dept < 4; dept++) for (let month = 1; month <= 8; month++) rows.push([String.fromCharCode(65 + dept), dept % 2 === 0 ? 'Branch-A' : 'Branch-B', `2026-${String(month).padStart(2, '0')}-01`, (dept + 1) * 10 + month]);
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(rows), 'Metrics');
     const metadata = { file_id: 'browser-fixture', file_extension: '.xlsx', original_filename: 'Synthetic BI.xlsx', company_id: 'STL', uploaded_by: user.user_id, processing_status: 'PROCESSING' };
@@ -71,14 +71,14 @@ const { buildDatasetDashboard } = require('../auth-service/services/biReportBuil
     const dashboard = () => page.locator('#fixture-dashboard .bi-interactive-dashboard');
     await page.waitForFunction(() => document.querySelectorAll('#fixture-dashboard canvas').length >= 3);
     assert.equal(await dashboard().locator('.bi-chart-host').count(), 3); checks.push('Three actual ECharts canvases and four KPI cards');
-    assert.match(await dashboard().locator('.bi-table-actions').innerText(), /1\/3.*32/);
-    await dashboard().locator('[data-bi-action="next"]').click();
-    assert.match(await dashboard().locator('.bi-table-actions').innerText(), /2\/3/); checks.push('Table pagination');
-    await dashboard().locator('[data-bi-sort="total"]').click();
-    await dashboard().locator('[data-bi-search]').fill('2026-08');
-    await dashboard().locator('[data-bi-search]').dispatchEvent('change');
-    assert.match(await dashboard().locator('.bi-table-actions').innerText(), /4 dòng/); checks.push('Table sort and search');
-    await dashboard().locator('[data-bi-search]').fill(''); await dashboard().locator('[data-bi-search]').dispatchEvent('change');
+    assert.match(await dashboard().locator('.bi-table-actions').first().innerText(), /1\/3.*32/);
+    await dashboard().locator('[data-bi-action="next"]').first().click();
+    assert.match(await dashboard().locator('.bi-table-actions').first().innerText(), /2\/3/); checks.push('Table pagination');
+    await dashboard().locator('[data-bi-sort="total"]').first().click();
+    await dashboard().locator('[data-bi-search]').first().fill('2026-08');
+    await dashboard().locator('[data-bi-search]').first().dispatchEvent('change');
+    assert.match(await dashboard().locator('.bi-table-actions').first().innerText(), /4 dòng/); checks.push('Table sort and search');
+    await dashboard().locator('[data-bi-search]').first().fill(''); await dashboard().locator('[data-bi-search]').first().dispatchEvent('change');
     const oldId = await dashboard().getAttribute('data-dash-id');
     await dashboard().locator('[data-bi-dimension="department"]').selectOption('A');
     await page.waitForFunction(id => document.querySelector('#fixture-dashboard .bi-interactive-dashboard')?.dataset.dashId !== id, oldId);
@@ -97,7 +97,7 @@ const { buildDatasetDashboard } = require('../auth-service/services/biReportBuil
       const p = structuredClone(window._biDashboardPayloadStore.get(document.querySelector('#fixture-dashboard .bi-interactive-dashboard').dataset.dashId)); p.title = 'tampered';
       return (await fetch('/api/analytics/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload: p }) })).status;
     }); assert.equal(invalid, 403); checks.push('Tampered export rejected');
-    old = await dashboard().getAttribute('data-dash-id'); await dashboard().locator('[data-bi-action="reset"]').click();
+    old = await dashboard().getAttribute('data-dash-id'); await dashboard().locator('[data-bi-action="reset"]').first().click();
     await page.waitForFunction(id => document.querySelector('#fixture-dashboard .bi-interactive-dashboard')?.dataset.dashId !== id, old);
     assert.equal(await page.evaluate(() => window._biDashboardPayloadStore.get(document.querySelector('#fixture-dashboard .bi-interactive-dashboard').dataset.dashId).kpi_strip[0].primary_value), 944);
     // Dispatch ECharts' actual event bus; exercises shared filter and drill handler.
@@ -112,7 +112,7 @@ const { buildDatasetDashboard } = require('../auth-service/services/biReportBuil
     fs.mkdirSync(path.join(root, 'reports'), { recursive: true });
     await dashboard().screenshot({ path: path.join(root, 'reports/BI_WREN_RELEASE_BROWSER.png') });
     await page.evaluate(() => { window.__printed = false; const nativeOpen = document.createElement.bind(document); document.createElement = function(name, ...args) { const el = nativeOpen(name, ...args); if (name === 'iframe') setTimeout(() => { el.contentWindow.print = () => { window.__printed = true; }; }, 0); return el; }; });
-    await dashboard().locator('[data-bi-action="pdf"]').click();
+    await dashboard().locator('[data-bi-action="pdf"]').first().click();
     await page.waitForFunction(() => window.__printed); checks.push('PDF print document with chart images');
     console.log(JSON.stringify({ passed: checks.length, checks, fixture: true }, null, 2));
     fs.writeFileSync(path.join(root, 'reports/BI_WREN_RELEASE_BROWSER.json'), JSON.stringify({ passed: checks.length, checks, fixture: true }, null, 2));
