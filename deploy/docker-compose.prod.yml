@@ -1,0 +1,191 @@
+name: sotrans-hub-production
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. PRIMARY POSTGRESQL DATABASE (Operational + BI Read-Only Pools)
+  # Strictly internal; ZERO published ports; ZERO outbound internet access
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: sotrans-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PG_DATABASE:-hrbot}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - sotrans_prod_pg_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    networks:
+      - hrbot_db_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ADMIN_USER:-postgres} -d ${PG_DATABASE:-hrbot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1536M
+        reservations:
+          memory: 512M
+
+  # ----------------------------------------------------------------------------
+  # 2. QDRANT VECTOR DATABASE (Document Chunks & Embeddings)
+  # Strictly internal; ZERO published ports; ZERO outbound internet access
+  # ----------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:v1.9.0
+    container_name: sotrans-qdrant-prod
+    restart: unless-stopped
+    volumes:
+      - sotrans_prod_qdrant_data:/qdrant/storage
+    networks:
+      - hrbot_db_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/readyz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1024M
+
+  # ----------------------------------------------------------------------------
+  # 3. N8N WORKFLOW AUTOMATION ENGINE
+  # Internal DB access + outbound internet for external webhooks/integrations
+  # ----------------------------------------------------------------------------
+  n8n:
+    image: n8nio/n8n:1.45.1
+    container_name: sotrans-n8n-prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      GENERIC_TIMEZONE: Asia/Ho_Chi_Minh
+      TZ: Asia/Ho_Chi_Minh
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_SECURE_COOKIE: "true"
+      N8N_PAYLOAD_SIZE_MAX: "128"
+      WEBHOOK_URL: https://${PUBLIC_DOMAIN:-hub.sotrans.com.vn}/
+    volumes:
+      - sotrans_prod_n8n_data:/home/node/.n8n
+      - sotrans_prod_files:/home/node/.n8n-files
+    networks:
+      - hrbot_db_net
+      - hrbot_app_net
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1536M
+
+  # ----------------------------------------------------------------------------
+  # 4. SOTRANS CORE AUTH & GENERAL AI BACKEND
+  # Hosts: Auth, RAG, Analytics Engine (Phase 1.4), Uploaded File BI (Phase 2)
+  # Has internal DB access + outbound internet for Gemini & OneDrive APIs
+  # ----------------------------------------------------------------------------
+  auth:
+    build:
+      context: ../auth-service
+      dockerfile: Dockerfile
+    image: sotrans-hub-auth:production
+    container_name: sotrans-auth-prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    env_file:
+      - ${ENV_FILE:-.env.production}
+    volumes:
+      - sotrans_prod_files:/app/chat-files
+      - sotrans_prod_bi_storage:/app/storage
+    networks:
+      - hrbot_db_net
+      - hrbot_app_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1536M
+        reservations:
+          memory: 512M
+
+  # ----------------------------------------------------------------------------
+  # 5. PRODUCTION REVERSE PROXY & GATEWAY (NGINX)
+  # The ONLY service exposing public ports 80 and 443 to the internet
+  # ----------------------------------------------------------------------------
+  gateway:
+    image: nginx:1.25-alpine
+    container_name: sotrans-gateway-prod
+    restart: unless-stopped
+    depends_on:
+      auth:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/production.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../chat:/usr/share/nginx/chat:ro
+      - sotrans_prod_files:/usr/share/nginx/chat-files:ro
+      - /etc/letsencrypt:/etc/nginx/ssl:ro
+      - certbot_challenge:/var/www/certbot:ro
+    networks:
+      - hrbot_app_net
+      - hrbot_public_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:80/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+
+networks:
+  # Tier 1: Strictly isolated database network (NO OUTBOUND INTERNET ACCESS)
+  hrbot_db_net:
+    name: sotrans_hub_db_net
+    driver: bridge
+    internal: true
+
+  # Tier 2: Application bridge network (Has outbound internet access for LLM/External APIs)
+  hrbot_app_net:
+    name: sotrans_hub_app_net
+    driver: bridge
+
+  # Tier 3: Edge ingress network (Only Nginx Gateway is attached)
+  hrbot_public_net:
+    name: sotrans_hub_public_net
+    driver: bridge
+
+volumes:
+  sotrans_prod_pg_data:
+    name: sotrans_hub_prod_pg_data
+  sotrans_prod_qdrant_data:
+    name: sotrans_hub_prod_qdrant_data
+  sotrans_prod_n8n_data:
+    name: sotrans_hub_prod_n8n_data
+  sotrans_prod_files:
+    name: sotrans_hub_prod_files
+  sotrans_prod_bi_storage:
+    name: sotrans_hub_prod_bi_storage
+  certbot_challenge:
+    name: sotrans_hub_certbot_challenge

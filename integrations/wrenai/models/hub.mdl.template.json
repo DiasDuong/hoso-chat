@@ -1,0 +1,48 @@
+{
+  "catalog": "sotrans",
+  "schema": "public",
+  "dataSource": "postgres",
+  "models": [
+    {
+      "name": "hub_documents",
+      "refSql": "SELECT doc_version_id, doc_type, category, status::text AS status, effective_date, expiry_date, parse_quality FROM public.documents WHERE deleted_at IS NULL AND ('__COMPANY__' = 'ALL' OR ARRAY_POSITION(branch_scope, 'all') IS NOT NULL OR ARRAY_POSITION(branch_scope, '__BRANCH__') IS NOT NULL)",
+      "columns": [
+        {"name": "doc_version_id", "type": "varchar"},
+        {"name": "doc_type", "type": "varchar"},
+        {"name": "category", "type": "varchar"},
+        {"name": "status", "type": "varchar"},
+        {"name": "effective_date", "type": "date"},
+        {"name": "expiry_date", "type": "date"},
+        {"name": "parse_quality", "type": "double"}
+      ],
+      "properties": {"description": "Non-deleted document rows visible to the authorized company, including group-wide documents. Use COUNT(DISTINCT doc_version_id), not COUNT(*), for the canonical document total. No unique primary key is asserted."}
+    },
+    {
+      "name": "hub_intake_batches",
+      "refSql": "SELECT id, company_id, status::text AS status, total_files, created_at FROM public.hr_intake_batches WHERE ('__COMPANY__' = 'ALL' OR company_id = '__COMPANY__')",
+      "columns": [
+        {"name": "id", "type": "varchar"},
+        {"name": "company_id", "type": "varchar"},
+        {"name": "status", "type": "varchar"},
+        {"name": "total_files", "type": "bigint"},
+        {"name": "created_at", "type": "timestamp"}
+      ],
+      "properties": {"description": "One intake batch. Sum total_files for uploaded file volume. A completed batch is not proof of successful staging conversion. Failure rate and processing duration are not supported by this model."}
+    },
+    {
+      "name": "hub_staged_records",
+      "refSql": "SELECT id, batch_id, company_id, staging_status::text AS staging_status, suspected_duplicate, created_at FROM public.hr_employee_staging WHERE ('__COMPANY__' = 'ALL' OR company_id = '__COMPANY__')",
+      "columns": [
+        {"name": "id", "type": "varchar"},
+        {"name": "batch_id", "type": "varchar"},
+        {"name": "company_id", "type": "varchar"},
+        {"name": "staging_status", "type": "varchar"},
+        {"name": "suspected_duplicate", "type": "boolean"},
+        {"name": "created_at", "type": "timestamp"}
+      ],
+      "properties": {"description": "One staged HR record, scoped by the record's company. Not an employee master/headcount table. A suspected duplicate is a flag, not a confirmed duplicate. This model exposes no employee name, citizen ID, email, phone or salary."}
+    }
+  ],
+  "relationships": [],
+  "views": []
+}

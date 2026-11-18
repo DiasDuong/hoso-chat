@@ -1,0 +1,312 @@
+{
+  "source_root": "D:\\WrenAI-main",
+  "source_revision": null,
+  "revision_note": "User-supplied ZIP checkout; no .git metadata. File hashes identify this snapshot.",
+  "extracted_at": "2026-11-16T04:41:44.275416+00:00",
+  "upstream_url": "https://github.com/Canner/WrenAI",
+  "versions": {
+    "core/wren-core-py": "0.8.2",
+    "core/wren": "0.18.0",
+    "core/wren-core-wasm": "0.5.0",
+    "sdk/wren-langchain": "0.2.3",
+    "sdk/wren-pydantic": "0.3.1",
+    "core/wren-core-base/manifest-macro": "0.5.1",
+    "core/wren-core-base": "0.5.1",
+    "core/wren-core": "0.5.1",
+    "core/wren-context-loader": "0.1.0"
+  },
+  "runtime_scope": [
+    "postgres planning",
+    "postgres connector reference",
+    "duckdb connector reference"
+  ],
+  "files": [
+    {
+      "source": "core/wren/src/wren/__init__.py",
+      "destination": "upstream/runtime/wren/__init__.py",
+      "sha256": "ba1e4b3b8b6267da701735ba5fe61e476d8750e279e917fec795a481d661192f",
+      "bytes": 515,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/engine.py",
+      "destination": "upstream/runtime/wren/engine.py",
+      "sha256": "23a4ce1624547afdd2a209337cc40f4c0214709dc2aacd52d0bcdc6bb659f0b7",
+      "bytes": 11256,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/config.py",
+      "destination": "upstream/runtime/wren/config.py",
+      "sha256": "aac3aee4a3288b95abfa6cd6b2d43b583d598ef5d93f78f85b0ec12da2309dd1",
+      "bytes": 3555,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/policy.py",
+      "destination": "upstream/runtime/wren/policy.py",
+      "sha256": "3399b51fe79b5fde1e27594114c8474a7e0419e35f7f04d7d1d4d54f34851e9f",
+      "bytes": 24201,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/read_only.py",
+      "destination": "upstream/runtime/wren/read_only.py",
+      "sha256": "b168a049f0f03937cf6f46c5d8e697fc1dd8a543bf3a0424550cbe8450f24e6c",
+      "bytes": 9926,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/connector/__init__.py",
+      "destination": "upstream/runtime/wren/connector/__init__.py",
+      "sha256": "c5ea91f94d5e908e06536f6a444669e525e5b8612ac0c8319224a140249737df",
+      "bytes": 139,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/connector/base.py",
+      "destination": "upstream/runtime/wren/connector/base.py",
+      "sha256": "44a10b1255c55994f5fa37f6e1cfe5ae467d7b5a43149c979e1cf9a1a199b17a",
+      "bytes": 4600,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/connector/factory.py",
+      "destination": "upstream/runtime/wren/connector/factory.py",
+      "sha256": "cfe115b5d5e271f91b0852019c6026fc134ab000f91e76af21bb38a976babb4c",
+      "bytes": 2943,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/connector/postgres.py",
+      "destination": "upstream/runtime/wren/connector/postgres.py",
+      "sha256": "feff3a56f2b025e485a402de1bf98eeae6eababbbf529801a3466e42223c06f2",
+      "bytes": 13740,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/connector/duckdb.py",
+      "destination": "upstream/runtime/wren/connector/duckdb.py",
+      "sha256": "8fed0a3d48f83dffdbeb88059117fdb296d6e21081fa64ec4fd02c76c5f46b70",
+      "bytes": 7985,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/mdl/__init__.py",
+      "destination": "upstream/runtime/wren/mdl/__init__.py",
+      "sha256": "30983397d88deae52dfd1c9dc0aec169a3680467a4992a404998b1c4f970b6c4",
+      "bytes": 1470,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/mdl/cte_rewriter.py",
+      "destination": "upstream/runtime/wren/mdl/cte_rewriter.py",
+      "sha256": "311d99fe0145e5bf5461de39515c260b2a9c94057671693f701506ba323f4d47",
+      "bytes": 62225,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/mdl/wren_dialect.py",
+      "destination": "upstream/runtime/wren/mdl/wren_dialect.py",
+      "sha256": "96e0834c1d6a5ecdcc66580abe8d710f4431f835ba0e5f1d42534ca77f9b6f27",
+      "bytes": 901,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/mdl/clickhouse_compat.py",
+      "destination": "upstream/runtime/wren/mdl/clickhouse_compat.py",
+      "sha256": "f19fdfee800177cc80b2728eceab03d6e9650dd78b58e74e17088bf3bbe4011b",
+      "bytes": 11702,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/model/__init__.py",
+      "destination": "upstream/runtime/wren/model/__init__.py",
+      "sha256": "7ac0a6b076f0c3a41cf4c939cf4cb1a41a27b06667e2154e7db535277806a85a",
+      "bytes": 12140,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/model/data_source.py",
+      "destination": "upstream/runtime/wren/model/data_source.py",
+      "sha256": "6af6279b298b26cc3fa649578ebba928fe71eab7aaff43213c96db3c2fd3b335",
+      "bytes": 8486,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/model/error.py",
+      "destination": "upstream/runtime/wren/model/error.py",
+      "sha256": "52f2e2d2588998d9d639e01c9f63c96197cf984cced0a94d72f9538a552793fe",
+      "bytes": 2389,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/pyproject.toml",
+      "destination": "upstream/reference/core/wren/pyproject.toml",
+      "sha256": "f7cc829a150521b0b6fe4ed3494e801dd1d69e9d40467bd8443096b073d1f6ab",
+      "bytes": 4039,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/uv.lock",
+      "destination": "upstream/reference/core/wren/uv.lock",
+      "sha256": "c73404ffaee434485ec7f601620e3cb4139be64f265335efdc4facd6d64418e2",
+      "bytes": 695165,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren-mdl/mdl.schema.json",
+      "destination": "upstream/reference/core/wren-mdl/mdl.schema.json",
+      "sha256": "8109f34e80a06ec384cd5b86d41f46f9c541e12a7c77d60f5e983d6c0667ee6e",
+      "bytes": 20104,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": ".release-please-manifest.json",
+      "destination": "upstream/reference/.release-please-manifest.json",
+      "sha256": "e1a148b8e428fbd47474371f7e5c9e7feed0412d3f6af5f626c66936e3fefb43",
+      "bytes": 310,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "docs/core/reference/architecture.md",
+      "destination": "upstream/reference/docs/core/reference/architecture.md",
+      "sha256": "e9a2c404071c6f96329835ee0295bd7f7338908b56e1de613e71d25acbde4993",
+      "bytes": 10602,
+      "license": "CC-BY-4.0"
+    },
+    {
+      "source": "docs/core/reference/mdl.md",
+      "destination": "upstream/reference/docs/core/reference/mdl.md",
+      "sha256": "f3256d95b95727c92ce24ebe9f39a35913bf737286143c8121dce2d9372c1b86",
+      "bytes": 17049,
+      "license": "CC-BY-4.0"
+    },
+    {
+      "source": "docs/core/concepts/what_is_mdl.md",
+      "destination": "upstream/reference/docs/core/concepts/what_is_mdl.md",
+      "sha256": "106e9579aa111ed11b42d092634e4f6ef2b7180a17bc15f04505194e902d50be",
+      "bytes": 6988,
+      "license": "CC-BY-4.0"
+    },
+    {
+      "source": "docs/core/concepts/oss_vs_commercial.md",
+      "destination": "upstream/reference/docs/core/concepts/oss_vs_commercial.md",
+      "sha256": "b63a885e30cc0596efaf344d51c1cdb68e794a5492ae05b08c64485a1c6447fd",
+      "bytes": 2531,
+      "license": "CC-BY-4.0"
+    },
+    {
+      "source": "docs/core/guides/model.md",
+      "destination": "upstream/reference/docs/core/guides/model.md",
+      "sha256": "9d1f79a2512023e56c08dbe584a921b24c2bec4fd7303686113723fcb9643580",
+      "bytes": 3667,
+      "license": "CC-BY-4.0"
+    },
+    {
+      "source": "docs/core/guides/connect.md",
+      "destination": "upstream/reference/docs/core/guides/connect.md",
+      "sha256": "99e21a969ab53cd7113502f6af5e38ac7c09a7e126caf1c5c07dd63afe9ed306",
+      "bytes": 2974,
+      "license": "CC-BY-4.0"
+    },
+    {
+      "source": "core/wren/src/wren/skills_content/usage/SKILL.md",
+      "destination": "upstream/reference/core/wren/src/wren/skills_content/usage/SKILL.md",
+      "sha256": "b763aafe6a2add344b081b6e706071b3e07c166c3fcb9ea5f23945e6251088d2",
+      "bytes": 16676,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/skills_content/usage/references/wren-sql.md",
+      "destination": "upstream/reference/core/wren/src/wren/skills_content/usage/references/wren-sql.md",
+      "sha256": "588757c0fd0e9edd75079a2d156228ad407e8d5ad2651831b8b94fa5eacbe335",
+      "bytes": 6760,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/src/wren/skills_content/generate-mdl/SKILL.md",
+      "destination": "upstream/reference/core/wren/src/wren/skills_content/generate-mdl/SKILL.md",
+      "sha256": "088ef6c83c2413cfe0070d78d7f03e9555f433d63a89310617fa8834d33e3795",
+      "bytes": 12575,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "examples/v5-jaffle/wren_project.yml",
+      "destination": "upstream/reference/examples/v5-jaffle/wren_project.yml",
+      "sha256": "388ee26abc4bd7f3c901c8a33a6ced77c051f9df4316b8c52d1b3d4999c9462d",
+      "bytes": 87,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "examples/v5-jaffle/models/orders/metadata.yml",
+      "destination": "upstream/reference/examples/v5-jaffle/models/orders/metadata.yml",
+      "sha256": "77d4764a044cafd0cb2e90e910cb48e93d3e9675332f61edb89bd93f0da900fd",
+      "bytes": 458,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "examples/v5-jaffle/relationships.yml",
+      "destination": "upstream/reference/examples/v5-jaffle/relationships.yml",
+      "sha256": "c241bc679c2769299f5695dc4edcc48df0414c329fb5d15fb2da7da949aa12a8",
+      "bytes": 162,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "examples/v5-jaffle/cubes/order_metrics/metadata.yml",
+      "destination": "upstream/reference/examples/v5-jaffle/cubes/order_metrics/metadata.yml",
+      "sha256": "223c6122f0b044619255e421f41a3dbb62fdf1b8b971741a1902c57865a7772a",
+      "bytes": 344,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "examples/v5-jaffle/knowledge/rules/business-rules.md",
+      "destination": "upstream/reference/examples/v5-jaffle/knowledge/rules/business-rules.md",
+      "sha256": "63b4c43e90bfc79438f2299df789fad90838b81f2db70df1dc26b45af542317f",
+      "bytes": 112,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/tests/unit/test_engine.py",
+      "destination": "upstream/reference/core/wren/tests/unit/test_engine.py",
+      "sha256": "cac1efc94c1a5e9a8e0e852121111e3731528868bf6c943765a10b70467f849f",
+      "bytes": 7398,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/tests/unit/test_policy.py",
+      "destination": "upstream/reference/core/wren/tests/unit/test_policy.py",
+      "sha256": "ae2bf426447a08f3005b98324cccae12eeeeb2d4904544dbdaa3b2e0cd9a5ec9",
+      "bytes": 30739,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "core/wren/tests/unit/test_read_only.py",
+      "destination": "upstream/reference/core/wren/tests/unit/test_read_only.py",
+      "sha256": "1585f9240a2625043585e4ccd82fdc8b90009608623ca9a0719255fc01f6aabc",
+      "bytes": 9538,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "LICENSE",
+      "destination": "upstream/licenses/LICENSE",
+      "sha256": "25ce726569e5c568a00f46133a3f7515a216c6c435f8aa8531ede1924b0d6309",
+      "bytes": 2214,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "LICENSE-APACHE-2.0",
+      "destination": "upstream/licenses/LICENSE-APACHE-2.0",
+      "sha256": "3da122eeaedca9b81aa873d2cb090c66eeaa1594e776efab631fbf0d1cebfeed",
+      "bytes": 11342,
+      "license": "Apache-2.0"
+    },
+    {
+      "source": "LICENSE-CC-BY-4.0",
+      "destination": "upstream/licenses/LICENSE-CC-BY-4.0",
+      "sha256": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
+      "bytes": 18657,
+      "license": "Apache-2.0"
+    }
+  ]
+}

@@ -82,8 +82,13 @@ services:
       PG_HOST: postgres
       PG_PORT: 5432
       PG_DATABASE: hrbot
-      PG_USER: hrbot
-      PG_PASSWORD: hrchatbot
+      PG_USER: ${APP_PG_USER:-hr_app_user}
+      PG_PASSWORD: ${APP_PG_PASSWORD:-123456}
+      PG_RO_USER: ${PG_RO_USER:-bi_readonly}
+      PG_RO_PASSWORD: ${PG_RO_PASSWORD:-123456}
+      FEATURE_BI_REPORTING: "true"
+      BI_REPORTING_ENABLED: "true"
+      FEATURE_UPLOADED_FILE_BI: "true"
       PORT: 3000
       JWT_SECRET: ${JWT_SECRET:-super_secret_jwt_key_hrbot_change_me}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}

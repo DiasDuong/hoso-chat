@@ -1,0 +1,7 @@
+# Direct versions from the user's core/wren/uv.lock. This is not a full transitive lock.
+wren-core-py==0.8.2
+sqlglot==29.0.1
+pyarrow==23.0.1
+pydantic==2.12.5
+loguru==0.7.3
+jsonschema==4.26.0

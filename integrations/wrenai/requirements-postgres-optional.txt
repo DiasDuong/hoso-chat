@@ -1,0 +1,3 @@
+# Direct executor dependencies; the separate plan_worker remains plan-only.
+-r requirements-plan.txt
+psycopg[binary]==3.3.3

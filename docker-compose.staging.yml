@@ -52,6 +52,12 @@ services:
       PG_DATABASE: sotrans_staging
       PG_USER: staging_admin
       PG_PASSWORD: Staging_Secure_Pass_2026_!@#$
+      PG_RO_HOST: postgres-staging
+      PG_RO_PORT: 5432
+      PG_RO_DATABASE: sotrans_staging
+      PG_RO_USER: staging_readonly
+      PG_RO_PASSWORD: ${STAGING_READONLY_PASSWORD}
+      BI_REPORTING_ENABLED: "true"
       PORT: 3000
       NODE_ENV: staging
       JWT_SECRET: staging_secret_jwt_key_hrbot_2026_!@#$

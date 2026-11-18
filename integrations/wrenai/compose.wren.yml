@@ -1,0 +1,31 @@
+# Explicit opt-in sidecar only; does not modify/recreate the existing Hub containers.
+services:
+  wren-bi:
+    build: .
+    image: sotrans-wren-bi:0.18.0-hub1
+    restart: unless-stopped
+    env_file: .env.runtime
+    environment:
+      WREN_SERVICE_HOST: 0.0.0.0
+      WREN_SERVICE_PORT: '8091'
+    ports:
+      - '127.0.0.1:8091:8091'
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 64
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks: [hub]
+networks:
+  hub:
+    external: true
+    name: hrbot_net
