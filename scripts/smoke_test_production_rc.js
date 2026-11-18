@@ -3,16 +3,16 @@ const crypto = require('crypto');
 const jwt = require('../auth-service/node_modules/jsonwebtoken');
 const { Client } = require('../auth-service/node_modules/pg');
 
-const JWT_SECRET = 'super_secret_jwt_key_hrbot_2026_!@#$';
-const BASE_URL = 'http://127.0.0.1:3000';
-const QDRANT_URL = 'http://127.0.0.1:6333';
+const JWT_SECRET = process.env.JWT_SECRET || '';
+const BASE_URL = process.env.APP_BASE_URL || 'http://127.0.0.1:3000';
+const QDRANT_URL = process.env.QDRANT_URL || 'http://127.0.0.1:6333';
 
 const pgConfig = {
-  host: '127.0.0.1',
-  port: 5432,
-  database: 'hrbot',
-  user: 'hrbot',
-  password: 'hrchatbot'
+  host: process.env.PG_HOST || '127.0.0.1',
+  port: parseInt(process.env.PG_PORT || '5432', 10),
+  database: process.env.PG_DATABASE || 'hrbot',
+  user: process.env.PG_USER || 'hrbot',
+  password: process.env.PG_PASSWORD || ''
 };
 
 const adminUser = {

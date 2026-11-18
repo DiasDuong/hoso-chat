@@ -31,12 +31,13 @@ backup_*.dump
 uploads/
 files/
 files-staging/
-storage/
+/storage/
 auth-service/uploads/
-auth-service/storage/
-auth-service/exports/
+/auth-service/storage/
+/auth-service/exports/
 auth-service/data/
 *.dataset.json
+!/tests/fixtures/**
 
 # Staging probe scripts with credentials
 scripts/list_staging_users.js
