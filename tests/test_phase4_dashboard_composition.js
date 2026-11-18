@@ -1,4 +1,5 @@
 'use strict';
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret_phase4_verification_123456';
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
