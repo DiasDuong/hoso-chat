@@ -609,8 +609,13 @@ router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req
   if (conversationId && req.user) {
     if (!/^[0-9a-f-]{36}$/i.test(conversationId)) return res.status(400).json({ success: false, code: 'INVALID_CONVERSATION', error: 'Mã hội thoại không hợp lệ.' });
     try {
-      const own = await db.query("SELECT id FROM ai_conversations WHERE id = $1 AND (user_id = $2 OR user_id = $3) AND agent_id = 'general' AND status = 'ACTIVE'", [conversationId, req.user.user_id, req.user.username]);
-      if (!own.rows.length) return res.status(403).json({ success: false, code: 'CONVERSATION_FORBIDDEN', error: 'Bạn không có quyền truy cập hội thoại này.' });
+      const existing = await db.query("SELECT id, user_id FROM ai_conversations WHERE id = $1", [conversationId]);
+      if (existing.rows.length > 0) {
+        const owner = existing.rows[0].user_id;
+        if (owner !== req.user.user_id && owner !== req.user.username) {
+          return res.status(403).json({ success: false, code: 'CONVERSATION_FORBIDDEN', error: 'Bạn không có quyền truy cập hội thoại này.' });
+        }
+      }
     } catch (_) { return res.status(503).json({ success: false, code: 'CONVERSATION_UNAVAILABLE', error: 'Không thể xác thực quyền hội thoại.' }); }
   }
   if (uploadedFiles.filter(f => /\.(xlsx|xls|csv)$/i.test(f.originalname || '')).length > 1) {

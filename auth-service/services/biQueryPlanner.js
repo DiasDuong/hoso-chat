@@ -201,7 +201,7 @@ function parseThresholdValue(text) {
 
   // Clean out referential phrases like "file trên", "ở trên", "bảng trên" before parsing
   const cleanNorm = norm
-    .replace(/(?:file|tep|o|nhu|bang|danh sach|du lieu)\s+tren\b/g, '')
+    .replace(/\b(?:file|tep|o|nhu|bang|danh sach|du lieu)\s+tren\b/g, '')
     .replace(/\btren\s+day\b/g, '');
 
   // Must be in comparison context: e.g. "tren 10 trieu", "lon hon 50", "tu 20tr", "> 50"
@@ -1062,7 +1062,7 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
   const hasNumericMetric = targetMetricCol && (targetMetricCol.type === 'INTEGER' || targetMetricCol.type === 'FLOAT');
   if (hasNumericMetric) {
     const cleanNormThreshold = promptNorm
-      .replace(/(?:file|tep|o|nhu|bang|danh sach|du lieu)\s+tren\b/g, '')
+      .replace(/\b(?:file|tep|o|nhu|bang|danh sach|du lieu)\s+tren\b/g, '')
       .replace(/\btren\s+day\b/g, '');
 
     const hasGte = /(?:tren|lon hon|cao hon)\s+\d+/i.test(cleanNormThreshold) || cleanNormThreshold.includes('>');
