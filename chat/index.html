@@ -14333,7 +14333,14 @@ function parseMarkdown(md, isStreaming = false) {
   // Làm sạch các thẻ comment nội bộ để không bị escape thành text thô trên giao diện
   raw = raw.replace(/<!--\s*bi-file-report:[\s\S]*?-->/g, '');
   raw = raw.replace(/<!--\s*bi-dataset-widget:[\s\S]*?-->/g, '');
-  if (v2Payloads.length) raw = raw.replace(/<svg[\s\S]*?<\/svg>/gi, '');
+  if (v2Payloads.length) {
+    raw = raw.replace(/<svg[\s\S]*?<\/svg>/gi, '');
+    raw = raw.replace(/###\s*📊\s*Biểu Đồ Trực Quan\s*/gi, '');
+    const hasV2Tables = v2Payloads.some(p => p.data_tables && Object.keys(p.data_tables).length > 0);
+    if (hasV2Tables) {
+      raw = raw.replace(/###\s*📋\s*Bảng Số Liệu Chi Tiết[\s\S]*?(?=\n###|\n@@@BIDASHBLOCK|\n<!--|$)/gi, '');
+    }
+  }
 
   // Nếu đang streaming, tự động cân bằng các thẻ chưa đóng để hiển thị mượt mà không giật
   if (isStreaming) {

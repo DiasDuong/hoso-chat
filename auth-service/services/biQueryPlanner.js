@@ -294,48 +294,52 @@ function detectMultipleMetrics(promptNorm, colProfile, columns) {
     });
   }
 
-  // 3. Average Salary (Lương trung bình)
+  // 3 & 4. Salary Metrics (Lương trung bình & Tổng quỹ lương)
   const isAvgSalaryMention =
     hasWordOrPhrase(promptNorm, 'luong trung binh') ||
     hasWordOrPhrase(promptNorm, 'thu nhap trung binh') ||
     hasWordOrPhrase(promptNorm, 'binh quan luong') ||
     hasWordOrPhrase(promptNorm, 'luong tb');
 
-  if (isAvgSalaryMention) {
-    const salCol = colProfile.measures.find((c) => {
-      const k = normalizeText(c.key);
-      const n = normalizeText(c.name);
-      return k.includes('luong') || k.includes('salary') || k.includes('thu_nhap') || n.includes('luong');
-    });
-    if (salCol) {
-      metrics.push({
-        column: salCol.key,
-        func: 'AVG',
-        alias: `avg_${salCol.key}`,
-      });
-    }
-  }
-
-  // 4. Total Salary (Tổng quỹ lương)
   const isSumSalaryMention =
     hasWordOrPhrase(promptNorm, 'tong quy luong') ||
     hasWordOrPhrase(promptNorm, 'chi phi luong') ||
     hasWordOrPhrase(promptNorm, 'quy luong') ||
     hasWordOrPhrase(promptNorm, 'tong tien luong') ||
-    (hasWordOrPhrase(promptNorm, 'tong luong') && !isAvgSalaryMention);
+    hasWordOrPhrase(promptNorm, 'tong luong co ban') ||
+    hasWordOrPhrase(promptNorm, 'tong luong') ||
+    hasWordOrPhrase(promptNorm, 'tong thu nhap');
 
-  if (isSumSalaryMention) {
-    const salCol = colProfile.measures.find((c) => {
-      const k = normalizeText(c.key);
-      const n = normalizeText(c.name);
-      return k.includes('luong') || k.includes('salary') || k.includes('thu_nhap') || n.includes('luong');
-    });
-    if (salCol) {
-      metrics.push({
-        column: salCol.key,
-        func: 'SUM',
-        alias: `sum_${salCol.key}`,
-      });
+  const salCol = colProfile.measures.find((c) => {
+    const k = normalizeText(c.key);
+    const n = normalizeText(c.name);
+    return k.includes('luong') || k.includes('salary') || k.includes('thu_nhap') || n.includes('luong');
+  });
+
+  if (salCol) {
+    if (isAvgSalaryMention && isSumSalaryMention) {
+      const idxAvg = Math.min(
+        promptNorm.indexOf('luong trung binh') !== -1 ? promptNorm.indexOf('luong trung binh') : Infinity,
+        promptNorm.indexOf('thu nhap trung binh') !== -1 ? promptNorm.indexOf('thu nhap trung binh') : Infinity,
+        promptNorm.indexOf('binh quan luong') !== -1 ? promptNorm.indexOf('binh quan luong') : Infinity
+      );
+      const idxSum = Math.min(
+        promptNorm.indexOf('tong luong') !== -1 ? promptNorm.indexOf('tong luong') : Infinity,
+        promptNorm.indexOf('tong quy luong') !== -1 ? promptNorm.indexOf('tong quy luong') : Infinity,
+        promptNorm.indexOf('chi phi luong') !== -1 ? promptNorm.indexOf('chi phi luong') : Infinity,
+        promptNorm.indexOf('tong tien luong') !== -1 ? promptNorm.indexOf('tong tien luong') : Infinity
+      );
+      if (idxSum < idxAvg) {
+        metrics.push({ column: salCol.key, func: 'SUM', alias: `sum_${salCol.key}` });
+        metrics.push({ column: salCol.key, func: 'AVG', alias: `avg_${salCol.key}` });
+      } else {
+        metrics.push({ column: salCol.key, func: 'AVG', alias: `avg_${salCol.key}` });
+        metrics.push({ column: salCol.key, func: 'SUM', alias: `sum_${salCol.key}` });
+      }
+    } else if (isAvgSalaryMention) {
+      metrics.push({ column: salCol.key, func: 'AVG', alias: `avg_${salCol.key}` });
+    } else if (isSumSalaryMention) {
+      metrics.push({ column: salCol.key, func: 'SUM', alias: `sum_${salCol.key}` });
     }
   }
 
@@ -362,8 +366,22 @@ function detectMultipleMetrics(promptNorm, colProfile, columns) {
     }
   }
 
-  // 6. Overtime Hours (Giờ tăng ca trung bình)
+  // 6. Overtime Hours (Giờ tăng ca)
+  const isSumOtMention =
+    hasWordOrPhrase(promptNorm, 'tong gio tang ca') ||
+    hasWordOrPhrase(promptNorm, 'tong so gio tang ca') ||
+    hasWordOrPhrase(promptNorm, 'tong tang ca') ||
+    hasWordOrPhrase(promptNorm, 'tong ot');
+
+  const isAvgOtMention =
+    hasWordOrPhrase(promptNorm, 'gio tang ca trung binh') ||
+    hasWordOrPhrase(promptNorm, 'tang ca trung binh') ||
+    hasWordOrPhrase(promptNorm, 'ot trung binh') ||
+    hasWordOrPhrase(promptNorm, 'trung binh gio tang ca');
+
   const isOtMention =
+    isSumOtMention ||
+    isAvgOtMention ||
     hasWordOrPhrase(promptNorm, 'gio tang ca') ||
     hasWordOrPhrase(promptNorm, 'tang ca') ||
     hasWordOrPhrase(promptNorm, 'ot');
@@ -375,16 +393,55 @@ function detectMultipleMetrics(promptNorm, colProfile, columns) {
       return k.includes('tang_ca') || k.includes('ot') || n.includes('tang ca');
     });
     if (otCol) {
-      metrics.push({
-        column: otCol.key,
-        func: 'AVG',
-        alias: `avg_${otCol.key}`,
-      });
+      if (isSumOtMention && !isAvgOtMention) {
+        metrics.push({
+          column: otCol.key,
+          func: 'SUM',
+          alias: `sum_${otCol.key}`,
+        });
+      } else if (isAvgOtMention && !isSumOtMention) {
+        metrics.push({
+          column: otCol.key,
+          func: 'AVG',
+          alias: `avg_${otCol.key}`,
+        });
+      } else if (isSumOtMention && isAvgOtMention) {
+        metrics.push({
+          column: otCol.key,
+          func: 'SUM',
+          alias: `sum_${otCol.key}`,
+        });
+        metrics.push({
+          column: otCol.key,
+          func: 'AVG',
+          alias: `avg_${otCol.key}`,
+        });
+      } else {
+        metrics.push({
+          column: otCol.key,
+          func: 'AVG',
+          alias: `avg_${otCol.key}`,
+        });
+      }
     }
   }
 
-  // 7. Leave Days (Số ngày nghỉ trung bình)
+  // 7. Leave Days (Số ngày nghỉ)
+  const isSumLeaveMention =
+    hasWordOrPhrase(promptNorm, 'tong so ngay nghi') ||
+    hasWordOrPhrase(promptNorm, 'tong ngay nghi') ||
+    hasWordOrPhrase(promptNorm, 'tong nghi phep') ||
+    hasWordOrPhrase(promptNorm, 'tong so ngay phep');
+
+  const isAvgLeaveMention =
+    hasWordOrPhrase(promptNorm, 'so ngay nghi trung binh') ||
+    hasWordOrPhrase(promptNorm, 'ngay nghi trung binh') ||
+    hasWordOrPhrase(promptNorm, 'nghi phep trung binh') ||
+    hasWordOrPhrase(promptNorm, 'trung binh so ngay nghi');
+
   const isLeaveMention =
+    isSumLeaveMention ||
+    isAvgLeaveMention ||
     hasWordOrPhrase(promptNorm, 'ngay nghi') ||
     hasWordOrPhrase(promptNorm, 'so ngay nghi') ||
     hasWordOrPhrase(promptNorm, 'nghi phep') ||
@@ -397,11 +454,36 @@ function detectMultipleMetrics(promptNorm, colProfile, columns) {
       return k.includes('ngay_nghi') || k.includes('phep') || n.includes('ngay nghi');
     });
     if (leaveCol) {
-      metrics.push({
-        column: leaveCol.key,
-        func: 'AVG',
-        alias: `avg_${leaveCol.key}`,
-      });
+      if (isSumLeaveMention && !isAvgLeaveMention) {
+        metrics.push({
+          column: leaveCol.key,
+          func: 'SUM',
+          alias: `sum_${leaveCol.key}`,
+        });
+      } else if (isAvgLeaveMention && !isSumLeaveMention) {
+        metrics.push({
+          column: leaveCol.key,
+          func: 'AVG',
+          alias: `avg_${leaveCol.key}`,
+        });
+      } else if (isSumLeaveMention && isAvgLeaveMention) {
+        metrics.push({
+          column: leaveCol.key,
+          func: 'SUM',
+          alias: `sum_${leaveCol.key}`,
+        });
+        metrics.push({
+          column: leaveCol.key,
+          func: 'AVG',
+          alias: `avg_${leaveCol.key}`,
+        });
+      } else {
+        metrics.push({
+          column: leaveCol.key,
+          func: 'AVG',
+          alias: `avg_${leaveCol.key}`,
+        });
+      }
     }
   }
 
@@ -834,6 +916,7 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
   // B. Categorical Dimension Grouping with Strict Prepositions
   // Prepositions: "theo [X]", "mỗi [X]", "của mỗi [X]", "từng [X]", "cho từng [X]", "của các [X]", "theo các [X]", "phân bổ theo [X]", "cơ cấu theo [X]", "giữa [X]", "liên quan đến [X]", "về [X]"
   const candidateDimensions = colProfile.dimensions.filter((c) => c.key !== entitySubjectKey);
+  const matchedDimensions = [];
 
   for (const col of candidateDimensions) {
     const colNameNorm = normalizeText(col.name);
@@ -901,8 +984,44 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
       }
     }
 
-    if (isMatch && !groupBy.some((g) => (typeof g === 'string' ? g : g.column) === col.key)) {
-      groupBy.push(col.key);
+    if (isMatch && !matchedDimensions.includes(col.key)) {
+      matchedDimensions.push(col.key);
+    }
+  }
+
+  let independentBreakdowns = [];
+  let chartMapping = {};
+
+  if (matchedDimensions.length === 1) {
+    if (!groupBy.some((g) => (typeof g === 'string' ? g : g.column) === matchedDimensions[0])) {
+      groupBy.push(matchedDimensions[0]);
+    }
+  } else if (matchedDimensions.length > 1) {
+    // Check if user specifically requested a 2-dimensional cross-tab or combined grouping
+    const isExplicitCrossGroup =
+      /(?:theo|va)\s+(?:phong\s+ban|bo\s+phan)\s+(?:va|theo)\s+(?:trang\s+thai|tinh\s+trang|chuc\s+vu|chi\s+nhanh)/i.test(promptNorm) ||
+      /(?:ket\s+hop|ma\s+tran|hai\s+chieu|2\s+chieu|cross-tab)/i.test(promptNorm);
+
+    if (isExplicitCrossGroup) {
+      for (const dim of matchedDimensions) {
+        if (!groupBy.some((g) => (typeof g === 'string' ? g : g.column) === dim)) {
+          groupBy.push(dim);
+        }
+      }
+    } else {
+      // Independent breakdown requests in composite prompt (e.g. TC2: theo trạng thái, theo phòng ban)
+      independentBreakdowns = [...matchedDimensions];
+      const deptDim = matchedDimensions.find(k => k === 'phong_ban' || k.includes('phong'));
+      const statusDim = matchedDimensions.find(k => k === 'trang_thai' || k.includes('trang_thai'));
+      const primaryDim = deptDim || matchedDimensions[0];
+
+      if (!groupBy.some((g) => (typeof g === 'string' ? g : g.column) === primaryDim)) {
+        groupBy.push(primaryDim);
+      }
+
+      if (statusDim && deptDim) {
+        chartMapping = { pie: statusDim, bar: deptDim };
+      }
     }
   }
 
@@ -1161,6 +1280,17 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
     (hasWordOrPhrase(promptNorm, 'pie') || hasWordOrPhrase(promptNorm, 'tron')) &&
     (hasWordOrPhrase(promptNorm, 'bar') || hasWordOrPhrase(promptNorm, 'cot'));
 
+  const hasAnyChartExplicit =
+    hasPieAndBar ||
+    hasWordOrPhrase(promptNorm, 'pie') ||
+    hasWordOrPhrase(promptNorm, 'bar') ||
+    hasWordOrPhrase(promptNorm, 'chart') ||
+    hasWordOrPhrase(promptNorm, 'bieu do') ||
+    hasWordOrPhrase(promptNorm, 'tron') ||
+    hasWordOrPhrase(promptNorm, 'cot') ||
+    hasWordOrPhrase(promptNorm, 'line') ||
+    hasWordOrPhrase(promptNorm, 'duong');
+
   let chartPreference = 'BAR';
   if (dateTrunc || hasWordOrPhrase(promptNorm, 'xu huong') || hasWordOrPhrase(promptNorm, 'duong') || hasWordOrPhrase(promptNorm, 'line')) {
     chartPreference = 'LINE';
@@ -1174,7 +1304,10 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
     hasWordOrPhrase(promptNorm, 'ty le')
   ) {
     chartPreference = 'PIE';
-  } else if (hasWordOrPhrase(promptNorm, 'bang') && !hasWordOrPhrase(promptNorm, 'bieu do')) {
+  } else if (
+    (hasWordOrPhrase(promptNorm, 'bang') && !hasWordOrPhrase(promptNorm, 'bieu do')) ||
+    (!hasAnyChartExplicit && isComparingAllDepartments && isMultiMetric)
+  ) {
     chartPreference = 'NONE';
   }
 
@@ -1199,7 +1332,7 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
     intent = 'COMPARISON';
   }
 
-  return {
+  const queryPlan = {
     intent,
     target_sheet: datasetProfile?.active_sheet || 'Sheet1',
     groupBy,
@@ -1211,9 +1344,15 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
     limit,
     chart_preference: chartPreference,
     has_pie_and_bar: hasPieAndBar,
+    independent_breakdowns: independentBreakdowns,
+    chart_mapping: chartMapping,
+    prompt: userPrompt,
     clarification_needed: false,
     clarification_question: null,
   };
+
+  queryPlan.metric_coverage = validateMetricCoverage(userPrompt, queryPlan);
+  return queryPlan;
 }
 
 /**
@@ -1382,9 +1521,71 @@ function planFollowUpQuery(prompt, previousPlan, datasetProfile) {
   return isFollowUp ? clonedPlan : null;
 }
 
+/**
+ * Validate that all metrics requested in natural language prompt are present in the query plan
+ * @param {string} prompt - User question
+ * @param {Object} plan - Query plan
+ * @returns {Object} Validation status and missing metrics
+ */
+function validateMetricCoverage(prompt, plan) {
+  const promptNorm = normalizeText(prompt || '');
+  const aggregations = plan?.aggregations || [];
+  const missing = [];
+
+  const asksSumSal =
+    hasWordOrPhrase(promptNorm, 'tong luong') ||
+    hasWordOrPhrase(promptNorm, 'tong quy luong') ||
+    hasWordOrPhrase(promptNorm, 'chi phi luong') ||
+    hasWordOrPhrase(promptNorm, 'tong luong co ban') ||
+    hasWordOrPhrase(promptNorm, 'tong tien luong');
+  if (asksSumSal && !aggregations.some((a) => String(a.func).toUpperCase() === 'SUM' && /(luong|salary|thu_nhap)/i.test(a.column))) {
+    missing.push('SUM(luong)');
+  }
+
+  const asksAvgSal =
+    hasWordOrPhrase(promptNorm, 'luong trung binh') ||
+    hasWordOrPhrase(promptNorm, 'thu nhap trung binh') ||
+    hasWordOrPhrase(promptNorm, 'binh quan luong') ||
+    hasWordOrPhrase(promptNorm, 'luong tb');
+  if (asksAvgSal && !aggregations.some((a) => String(a.func).toUpperCase() === 'AVG' && /(luong|salary|thu_nhap)/i.test(a.column))) {
+    missing.push('AVG(luong)');
+  }
+
+  const asksAvgKpi =
+    hasWordOrPhrase(promptNorm, 'kpi trung binh') ||
+    hasWordOrPhrase(promptNorm, 'diem kpi') ||
+    hasWordOrPhrase(promptNorm, 'kpi tb');
+  if (asksAvgKpi && !aggregations.some((a) => /(kpi)/i.test(a.column))) {
+    missing.push('AVG(diem_kpi)');
+  }
+
+  const asksSumOt =
+    hasWordOrPhrase(promptNorm, 'tong gio tang ca') ||
+    hasWordOrPhrase(promptNorm, 'tong so gio tang ca') ||
+    hasWordOrPhrase(promptNorm, 'tong tang ca');
+  if (asksSumOt && !aggregations.some((a) => String(a.func).toUpperCase() === 'SUM' && /(tang_ca|ot)/i.test(a.column))) {
+    missing.push('SUM(gio_tang_ca)');
+  }
+
+  const asksSumLeave =
+    hasWordOrPhrase(promptNorm, 'tong so ngay nghi') ||
+    hasWordOrPhrase(promptNorm, 'tong ngay nghi') ||
+    hasWordOrPhrase(promptNorm, 'tong nghi phep') ||
+    hasWordOrPhrase(promptNorm, 'tong so ngay phep');
+  if (asksSumLeave && !aggregations.some((a) => String(a.func).toUpperCase() === 'SUM' && /(ngay_nghi|phep)/i.test(a.column))) {
+    missing.push('SUM(so_ngay_nghi)');
+  }
+
+  return {
+    isComplete: missing.length === 0,
+    missing,
+  };
+}
+
 module.exports = {
   planAnalyticalQuery,
   planFollowUpQuery,
+  validateMetricCoverage,
   matchColumnFromText,
   parseThresholdValue,
   normalizeText,

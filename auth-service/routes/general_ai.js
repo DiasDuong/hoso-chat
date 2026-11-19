@@ -678,12 +678,21 @@ router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req
           // Optional AI Insight from Gemini
           let aiInsight = '';
           try {
+            const summaryData = {
+              primary_breakdown: sanitizeBiData((queryResult.results || []).slice(0, 15)),
+              status_breakdown: queryResult.multi_visual?.status_breakdown || null,
+              overall_kpis: queryResult.summary || null,
+            };
             const insightPrompt = `Dưới đây là kết quả phân tích số liệu thực tế từ tệp bảng tính ${metadata.original_filename}:
-Kế hoạch tính toán: ${JSON.stringify(validatedPlan)}
-Kết quả tổng hợp từ backend:
-${JSON.stringify(sanitizeBiData(queryResult.results.slice(0, 10)), null, 2)}
-Hãy viết 2-3 câu nhận xét điều hành ngắn gọn, nêu bật các điểm quan trọng nhất. Tuyệt đối không bịa số liệu ngoài dữ liệu trên.`;
-            const aiRes = await callGeminiSafe([{ role: 'user', parts: [{ text: insightPrompt }] }], 'Bạn là trợ lý phân tích dữ liệu điều hành SOTRANS.');
+Câu hỏi người dùng: "${userMessage}"
+Tóm tắt số liệu đã xác thực từ hệ thống:
+${JSON.stringify(summaryData, null, 2)}
+Yêu cầu nhận xét điều hành:
+1. Viết 2-3 câu nhận xét điều hành ngắn gọn, trực diện và chuẩn xác.
+2. Nêu bật các phòng ban/nhóm dẫn đầu theo các chỉ tiêu thực tế (Quy mô nhân sự lớn nhất, Chi phí lương cao nhất, hoặc Điểm KPI trung bình cao nhất).
+3. Phân biệt rõ ràng giữa các trạng thái nhân sự (Đang làm việc, Đã nghỉ việc, Thai sản) nếu có trong câu hỏi.
+4. Tuyệt đối bám sát số liệu đã cung cấp, không bịa đặt số liệu hay suy diễn ngoài bảng tổng hợp trên.`;
+            const aiRes = await callGeminiSafe([{ role: 'user', parts: [{ text: insightPrompt }] }], 'Bạn là chuyên gia phân tích dữ liệu điều hành BI SOTRANS.');
             if (aiRes && aiRes.text && !aiRes.isFallback) {
               aiInsight = aiRes.text.trim();
             }
@@ -916,14 +925,23 @@ Hãy viết 2-3 câu nhận xét điều hành ngắn gọn, nêu bật các đi
 
             let aiInsight = '';
             try {
+              const summaryData = {
+                primary_breakdown: sanitizeBiData((queryResult.results || []).slice(0, 15)),
+                status_breakdown: queryResult.multi_visual?.status_breakdown || null,
+                overall_kpis: queryResult.summary || null,
+              };
               const insightPrompt = `Dưới đây là kết quả phân tích số liệu thực tế từ tệp bảng tính ${activeDataset.original_filename}:
-Kế hoạch: ${JSON.stringify(validatedPlan)}
-Dữ liệu:
-${JSON.stringify(sanitizeBiData(queryResult.results.slice(0, 10)), null, 2)}
-Hãy viết 2-3 câu nhận xét điều hành ngắn gọn, súc tích. Tuyệt đối không bịa số liệu.`;
+Câu hỏi người dùng: "${userMessage}"
+Tóm tắt số liệu đã xác thực từ hệ thống:
+${JSON.stringify(summaryData, null, 2)}
+Yêu cầu nhận xét điều hành:
+1. Viết 2-3 câu nhận xét điều hành ngắn gọn, trực diện và chuẩn xác.
+2. Nêu bật các phòng ban/nhóm dẫn đầu theo các chỉ tiêu thực tế (Quy mô nhân sự lớn nhất, Chi phí lương cao nhất, hoặc Điểm KPI trung bình cao nhất).
+3. Phân biệt rõ ràng giữa các trạng thái nhân sự (Đang làm việc, Đã nghỉ việc, Thai sản) nếu có trong câu hỏi.
+4. Tuyệt đối bám sát số liệu đã cung cấp, không bịa đặt số liệu hay suy diễn ngoài bảng tổng hợp trên.`;
               const aiRes = await callGeminiSafe(
                 [{ role: 'user', parts: [{ text: insightPrompt }] }],
-                'Bạn là trợ lý phân tích dữ liệu điều hành SOTRANS.'
+                'Bạn là chuyên gia phân tích dữ liệu điều hành BI SOTRANS.'
               );
               if (aiRes && aiRes.text && !aiRes.isFallback) {
                 aiInsight = aiRes.text.trim();

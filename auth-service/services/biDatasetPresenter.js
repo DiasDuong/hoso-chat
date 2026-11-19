@@ -12,7 +12,7 @@
 
 const { validateDashboardPayload, assertValidDashboardPayload } = require('./biDashboardSchemaValidator');
 const { sanitizeBiData, sanitizeBiProfile } = require('./biPrivacy');
-const { primaryMetric, buildDatasetDashboard } = require('./biReportBuilder');
+const { primaryMetric, buildDatasetDashboard, getFriendlyColumnLabel } = require('./biReportBuilder');
 
 function escapeMarkdown(text) {
   if (text === null || text === undefined) return '';
@@ -136,14 +136,25 @@ function generatePieChartSvg(data, options = {}) {
   const cy = 145;
   const radius = 85;
 
-  const total = data.reduce((acc, d) => acc + (Number(d[yKey]) || 0), 0);
+  const total = options.total || data.reduce((acc, d) => acc + (Number(d[yKey]) || 0), 0);
   if (total <= 0) return '';
+
+  let chartData = data;
+  if (data.length > 7) {
+    const top6 = data.slice(0, 6);
+    const rest = data.slice(6);
+    const restSum = rest.reduce((acc, d) => acc + (Number(d[yKey]) || 0), 0);
+    chartData = [...top6];
+    if (restSum > 0) {
+      chartData.push({ [xKey]: 'Khác', [yKey]: restSum });
+    }
+  }
 
   let currentAngle = -Math.PI / 2;
   let paths = '';
   let legend = '';
 
-  data.forEach((d, i) => {
+  chartData.forEach((d, i) => {
     const val = Number(d[yKey]) || 0;
     const sliceAngle = (val / total) * 2 * Math.PI;
     const endAngle = currentAngle + sliceAngle;
@@ -422,11 +433,31 @@ function formatAnalyticalResultMarkdown(queryPlan, queryResult, dataset, explana
     const metricCol = primaryAlias;
 
     if (groupCol && metricCol) {
-      if (queryPlan.has_pie_and_bar) {
+      if (queryPlan.chart_mapping && queryPlan.chart_mapping.pie && queryPlan.chart_mapping.bar && queryResult.multi_visual?.status_breakdown) {
+        const pieData = queryResult.multi_visual.status_breakdown;
+        const pieTitle = `Cơ Cấu Nhân Sự Theo ${queryPlan.chart_mapping.pie === 'trang_thai' ? 'Trạng Thái' : queryPlan.chart_mapping.pie} (Pie Chart)`;
+        const barTitle = `Số Lượng Nhân Sự Theo ${queryPlan.chart_mapping.bar === 'phong_ban' ? 'Phòng Ban' : queryPlan.chart_mapping.bar} (Bar Chart)`;
+
+        const pieSvg = generatePieChartSvg(pieData, {
+          labelKey: queryPlan.chart_mapping.pie,
+          valueKey: 'distinct_count_ma_nhan_vien',
+          title: pieTitle,
+        });
+        const barSvg = generateBarChartSvg(rows.slice(0, 12), {
+          xKey: queryPlan.chart_mapping.bar,
+          yKey: metricCol,
+          title: barTitle,
+        });
+
+        lines.push('### 📊 Biểu Đồ Trực Quan');
+        lines.push(pieSvg);
+        lines.push(barSvg);
+        lines.push('');
+      } else if (queryPlan.has_pie_and_bar) {
         const countCol = Object.keys(rows[0]).find((k) => k.includes('distinct_count') || k.includes('so_luong_nv') || k.startsWith('count_')) || metricCol;
         const sumSalCol = Object.keys(rows[0]).find((k) => (k.startsWith('sum_') || k.includes('tong')) && (k.includes('luong') || k.includes('salary')));
 
-        const pieSvg = generatePieChartSvg(rows.slice(0, 8), { labelKey: groupCol, valueKey: countCol, title: `Tỷ Trọng Nhân Sự Theo ${groupCol} (Pie Chart)` });
+        const pieSvg = generatePieChartSvg(rows, { labelKey: groupCol, valueKey: countCol, title: `Tỷ Trọng Nhân Sự Theo ${groupCol} (Pie Chart)` });
         const barSvg = sumSalCol
           ? generateBarChartSvg(rows.slice(0, 12), { xKey: groupCol, yKey: sumSalCol, title: `Tổng Quỹ Lương Theo ${groupCol} (Bar Chart)` })
           : generateBarChartSvg(rows.slice(0, 12), { xKey: groupCol, yKey: metricCol, title: `So Sánh Theo ${groupCol} (Bar Chart)` });
@@ -440,7 +471,7 @@ function formatAnalyticalResultMarkdown(queryPlan, queryResult, dataset, explana
         const chartTitle = `${primaryAgg.func} ${primaryAgg.column} theo ${groupCol}`;
 
         if (queryPlan.chart_preference === 'PIE' || (queryPlan.intent === 'DISTRIBUTION' && rows.length <= 8)) {
-          chartSvg = generatePieChartSvg(rows.slice(0, 8), { labelKey: groupCol, valueKey: metricCol, title: chartTitle });
+          chartSvg = generatePieChartSvg(rows, { labelKey: groupCol, valueKey: metricCol, title: chartTitle });
         } else if (queryPlan.chart_preference === 'LINE' || queryPlan.intent === 'TREND') {
           chartSvg = generateLineChartSvg(rows.slice(0, 15), { xKey: groupCol, yKey: metricCol, title: chartTitle });
         } else {
@@ -510,7 +541,7 @@ function formatAnalyticalResultMarkdown(queryPlan, queryResult, dataset, explana
     total_matching: queryResult.total_matching,
     period_comparison: queryResult.period_comparison,
     execution_stats: stats,
-    data: rows.slice(0, 50),
+    data: rows,
   };
 
   lines.push(`<!-- bi-file-report: ${JSON.stringify(structuredReport)} -->`);

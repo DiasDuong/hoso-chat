@@ -1038,6 +1038,31 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
     }).sort((a, b) => b.count_rows - a.count_rows);
   }
 
+  // Status breakdown (trạng thái)
+  let statusRows = [];
+  const statusCol = columns.find(c => /(trang_thai|status|tinh_trang)/i.test(c.key));
+  if (statusCol) {
+    const sMap = new Map();
+    for (const r of rows) {
+      const s = String(r[statusCol.key] || 'Khác').trim() || 'Khác';
+      if (!sMap.has(s)) sMap.set(s, { [statusCol.key]: s, count_rows: 0, distinct_ids: new Set() });
+      const item = sMap.get(s);
+      item.count_rows++;
+      if (empIdCol && r[empIdCol.key]) item.distinct_ids.add(String(r[empIdCol.key]).trim());
+    }
+    const totalCount = rows.length;
+    statusRows = Array.from(sMap.values()).map(item => {
+      const count = empIdCol ? item.distinct_ids.size : item.count_rows;
+      return {
+        [statusCol.key]: item[statusCol.key],
+        distinct_count_ma_nhan_vien: count,
+        count_rows: item.count_rows,
+        ty_trong_pct: totalCount > 0 ? Number(((count / totalCount) * 100).toFixed(2)) : 0,
+        ty_le_phan_tram: totalCount > 0 ? Number(((count / totalCount) * 100).toFixed(2)) : 0,
+      };
+    }).sort((a, b) => b.count_rows - a.count_rows);
+  }
+
   // Monthly trend
   let trendRows = [];
   if (dateCol) {
@@ -1069,6 +1094,14 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
   summary.total_salary = totalSalary;
   summary.avg_salary = avgSalary;
 
+  const isDetailRequested = Boolean(
+    querySpec.intent === 'FILTER' ||
+    querySpec.needs_details ||
+    querySpec.include_detail_rows ||
+    querySpec.show_data_table
+  );
+  const detailRows = isDetailRequested ? rows.slice(0, 1000) : [];
+
   return {
     file_id: dataset.file_id,
     rows_scanned: dataset.rows ? dataset.rows.length : 0,
@@ -1081,8 +1114,9 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
     multi_visual: {
       dept_breakdown: deptRows,
       branch_share: branchRows,
+      status_breakdown: statusRows,
       monthly_trend: trendRows,
-      detail_rows: rows.slice(0, 50),
+      detail_rows: detailRows,
     },
     execution_stats: {
       execution_time_ms: executionTimeMs,
