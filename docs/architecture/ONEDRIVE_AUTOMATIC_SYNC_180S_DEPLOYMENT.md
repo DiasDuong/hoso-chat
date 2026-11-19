@@ -228,3 +228,16 @@ Kiểm tra Playwright UI trên trình duyệt:
 7. [`chat/index.html`](file:///d:/hoso-chat/chat/index.html): Bổ sung thẻ Telemetry Auto-Sync 180s, thống kê trạng thái và nút đồng bộ thủ công.
 8. [`sql/05_onedrive_auto_sync_180s.sql`](file:///d:/hoso-chat/sql/05_onedrive_auto_sync_180s.sql): DDL migration additive.
 9. [`tests/test_onedrive_auto_sync_180s_suite.js`](file:///d:/hoso-chat/tests/test_onedrive_auto_sync_180s_suite.js): Bộ 24 test kiểm thử tự động.
+
+---
+
+## VII. PHỤ LỤC: LỊCH SỬ KHẮC PHỤC LỖI ĐỒNG BỘ ONEDRIVE (BUG REGISTER HỢP NHẤT)
+
+| Mã lỗi | Mức độ | Mô tả lỗi | Nguyên nhân gốc | Giải pháp khắc phục đã triển khai |
+| :---: | :---: | :--- | :--- | :--- |
+| **BUG-OD-01** | **CRITICAL** | Phải bấm "Đồng bộ" 4–5 lần mới thấy dữ liệu mới; mỗi lần bấm đều tăng số phiên bản dù nội dung chưa đổi | Excel Online đệm sửa đổi trong bộ nhớ 10–30s trước khi commit vào OneDrive storage. Hệ thống không kiểm tra mã băm nhị phân nên liên tục tạo bản v6, v7, v8 rác. | Bổ sung SHA-256 `content_hash` trong PostgreSQL và cơ chế Smart Flush Polling khi bấm ép buộc đồng bộ. |
+| **BUG-OD-02** | **HIGH** | Agent vẫn trả lời từ file đính kèm cũ dù OneDrive đã nạp bản mới (Priority Inversion) | `routes/agents.js` duyệt qua `ai_attachments` của hội thoại trước và nạp đường dẫn cũ, ghi đè danh sách `activeFiles` của OneDrive. | Đổi thứ tự: Nạp OneDrive Freshness trước, loại trừ file `ai_attachments` trùng tên với nguồn OneDrive đang hoạt động. |
+| **BUG-OD-03** | **HIGH** | Outbound request gọi Microsoft Graph API nhận dữ liệu cached từ CDN / Edge Proxies | Các request qua `fetchWithTimeout` trong `oneDriveService.js` thiếu headers chống cache. | Thêm `Cache-Control: no-cache, no-store, must-revalidate` và `Pragma: no-cache` trong mọi outbound request tới Graph API. |
+| **BUG-OD-04** | **MEDIUM** | Nút bấm Đồng bộ trên Modal không debounce, tạo nhiều job song song, thông báo `vundefined` | Không vô hiệu hóa nút khi gửi fetch request; frontend đọc `data.active_version` trong khi API cũ trả về `data.version`. | Thêm disabled + spinner trên nút, API trả về cả `version` và `active_version`, dùng Toast thay cho Alert. |
+| **BUG-OD-05** | **MEDIUM** | Người dùng trái phép gọi đồng bộ làm đổi trạng thái tệp của người dùng khác thành `FAILED` (Tenant Leak) | Khối `catch (syncErr)` chạy câu lệnh UPDATE thiếu điều kiện `owner_user_id`. | Bổ sung `WHERE id = $1 AND owner_user_id = $2` trong lệnh cập nhật trạng thái lỗi để cô lập triệt để. |
+| **BUG-OD-06** | **LOW** | Modal quản lý OneDrive thiếu badge phân biệt các trạng thái `FAILED`, `STALE`, `DISCONNECTED` | Frontend chỉ có logic màu sắc cho `SYNCED` và `SYNCING`, các trạng thái khác hiển thị màu vàng mặc định. | Cập nhật hàm `renderOneDriveSourcesList` với đầy đủ dải màu: Xanh lá (`SYNCED`), Xanh dương (`SYNCING`), Cam (`STALE`), Đỏ (`FAILED`), Xám (`DISCONNECTED`). |
