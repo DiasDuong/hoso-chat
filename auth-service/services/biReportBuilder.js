@@ -1,7 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 const { sanitizeBiData } = require('./biPrivacy');
-const { assertValidDashboardPayload } = require('./biDashboardSchemaValidator');
+const { assertValidDashboardPayload, MAX_ROWS_PER_DATASET } = require('./biDashboardSchemaValidator');
 const { signReport } = require('./biExportToken');
 const { normalizeText } = require('./biQueryPlanner');
 
@@ -349,8 +349,8 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
 
   const detailRows = isDetailTableRequested
     ? ((engineMultiVisual.detail_rows && engineMultiVisual.detail_rows.length > 0)
-        ? engineMultiVisual.detail_rows
-        : (hasRealRows ? sanitizeBiData(datasetRows).slice(0, 1000) : []))
+        ? engineMultiVisual.detail_rows.slice(0, MAX_ROWS_PER_DATASET)
+        : (hasRealRows ? sanitizeBiData(datasetRows).slice(0, MAX_ROWS_PER_DATASET) : []))
     : [];
 
   if (detailRows.length > 0) {
@@ -373,9 +373,13 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
     });
   }
   if (isDetailTableRequested && detailRows.length > 0) {
+    const isCapped = matchingRowsValue && matchingRowsValue > detailRows.length;
+    const detailTitle = isCapped
+      ? `Bảng dữ liệu nhân sự chi tiết (Hiển thị ${detailRows.length} trong ${matchingRowsValue.toLocaleString('vi-VN')} dòng)`
+      : 'Bảng dữ liệu nhân sự chi tiết';
     dataTables.push({
       id: 'tbl_details',
-      title: 'Bảng dữ liệu nhân sự chi tiết',
+      title: detailTitle,
       data_ref: rawDataRef,
       columns: Object.keys(detailRows[0]).map(key => ({
         key,

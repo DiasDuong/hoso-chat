@@ -15,6 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
 const { STORAGE_DIR, sanitizeFormulaInjection } = require('./biFileSecurityService');
+const { MAX_ROWS_PER_DATASET } = require('./biDashboardSchemaValidator');
 
 const MAX_SHEETS = 10;
 const MAX_ROWS = 50000;
@@ -1100,7 +1101,7 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
     querySpec.include_detail_rows ||
     querySpec.show_data_table
   );
-  const detailRows = isDetailRequested ? rows.slice(0, 1000) : [];
+  const detailRows = isDetailRequested ? rows.slice(0, MAX_ROWS_PER_DATASET) : [];
 
   return {
     file_id: dataset.file_id,

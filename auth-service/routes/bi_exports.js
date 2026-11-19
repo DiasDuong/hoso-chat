@@ -3,7 +3,7 @@ const express = require('express');
 const XLSX = require('xlsx');
 const { verifyToken } = require('../middleware/auth');
 const { verifyReport } = require('../services/biExportToken');
-const { assertValidDashboardPayload } = require('../services/biDashboardSchemaValidator');
+const { assertValidDashboardPayload, MAX_ROWS_PER_DATASET } = require('../services/biDashboardSchemaValidator');
 const { getDataset, canUserAccessDataset } = require('../services/biDatasetRegistry');
 const { sanitizeBiData } = require('../services/biPrivacy');
 const { sanitizeFormulaInjection } = require('../services/biFileSecurityService');
@@ -38,7 +38,7 @@ router.post('/', verifyToken, async (req, res) => {
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(safe), `Data_${++i}`);
       totalRows += safe.length;
     }
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ title: payload.title, generated_at: payload.generated_at, source: payload.source_type, scope: payload.provenance?.tenant_scope || payload.provenance?.file_id, snapshot: true, filters: JSON.stringify(filters), ranges: JSON.stringify(ranges), row_scope: 'All filtered groups in report snapshot; maximum 500 per data source' }]), 'Provenance');
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ title: payload.title, generated_at: payload.generated_at, source: payload.source_type, scope: payload.provenance?.tenant_scope || payload.provenance?.file_id, snapshot: true, filters: JSON.stringify(filters), ranges: JSON.stringify(ranges), row_scope: `All filtered groups in report snapshot; maximum ${MAX_ROWS_PER_DATASET} per data source` }]), 'Provenance');
     const file = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
     await logBiAuditEvent({ event: 'REPORT_EXPORT', userContext: req.user, fileId: payload.provenance?.file_id, details: { row_count: totalRows } });
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

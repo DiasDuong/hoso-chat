@@ -489,7 +489,11 @@ function formatAnalyticalResultMarkdown(queryPlan, queryResult, dataset, explana
 
   // 4. Detailed Data Table
   if (rows.length > 0) {
-    lines.push(`### 📋 Bảng Số Liệu Chi Tiết (${rows.length} kết quả)`);
+    const isCapped = queryResult.total_matching && queryResult.total_matching > rows.length;
+    const tableHeader = isCapped
+      ? `### 📋 Bảng Số Liệu Chi Tiết (Hiển thị ${rows.length} trong ${queryResult.total_matching.toLocaleString('vi-VN')} dòng)`
+      : `### 📋 Bảng Số Liệu Chi Tiết (${rows.length} kết quả)`;
+    lines.push(tableHeader);
     lines.push('');
 
     const keys = Object.keys(rows[0]);
