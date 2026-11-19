@@ -1,0 +1,14 @@
+# SOTRANS AGENT RULES CONFIGURATION
+# Reference: AGENTS.md
+
+[markdown_policy]
+auto_generate_reports = false
+output_channel = "chat_response"
+allowed_doc_directory = "docs/"
+forbidden_root_markdown = true
+forbidden_temporary_reports = true
+
+[git_policy]
+require_clean_scratch = true
+test_verification_command = "node tests/test_bi_v2_final_e2e_acceptance.js"
+protect_runtime_conversations = true

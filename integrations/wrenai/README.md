@@ -93,7 +93,7 @@ WrenEngine nhận **SQL đã được lập**, không tự biến câu hỏi ti�
 
 ### Bước 1 — Khóa phiên bản và sửa nền BI hiện hữu
 
-Ưu tiên các phát hiện trong `reports/BI_GENERAL_AI_CURRENT_STATE_AUDIT.md`:
+Ưu tiên các phát hiện trong `docs/ai-platform/BI_GENERAL_AI_CURRENT_STATE_AUDIT.md`:
 
 1. Đối chiếu source/deploy baseline, tách mã đang phát triển khỏi bản chạy; đồng bộ Staging theo artifact được chọn.
 2. Sửa growth/period comparison theo thứ tự thời gian, rollup AVG/MEDIAN/MAX/distinct đúng ngữ nghĩa, OCR partial status tương thích contract.

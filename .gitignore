@@ -52,12 +52,22 @@ release_packages/
 # Test artifacts, reports, screenshots & scratch
 scratch/
 scratch_*.*
+scratch/**/*.md
 screenshots/
 reports/
 reports_*/
 audit-report/
 audit_*.js
+audit_report_*.md
+temp_*.md
+*.temp.md
 comprehensive_agent_audit.js
+
+# Whitelist canonical documents and rules
+!docs/**
+!README.md
+!AGENTS.md
+!.agentrules
 
 # OS metadata
 .DS_Store
