@@ -680,12 +680,14 @@ router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req
             const isTraining = validatedPlan.requirements?.some((r) => r.id.includes('dao_tao') || r.id.includes('completed') || r.id.includes('courses'));
             const isSales = validatedPlan.requirements?.some((r) => r.id.includes('revenue') || r.id.includes('orders') || r.id.includes('products'));
             const isLogistics = validatedPlan.requirements?.some((r) => r.id.includes('on_time') || r.id.includes('carrier'));
+            const isPayroll = validatedPlan.requirements?.some((r) => r.id.includes('payroll') || r.id.includes('salary') || r.id.includes('luong') || r.metric?.includes('luong')) ||
+              (validatedPlan.aggregations || []).some(a => a.column?.includes('luong'));
 
             const summaryData = {
               results_by_requirement: queryResult.results_by_requirement || null,
               reconciliation: queryResult.reconciliation || null,
-              primary_breakdown: sanitizeBiData((queryResult.results || []).slice(0, 15)),
-              status_breakdown: (!isTraining && !isSales && !isLogistics) ? queryResult.multi_visual?.status_breakdown || null : null,
+              primary_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll) ? sanitizeBiData((queryResult.results || []).slice(0, 15)) : null,
+              status_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll) ? queryResult.multi_visual?.status_breakdown || null : null,
               overall_kpis: queryResult.summary || null,
             };
 
@@ -706,12 +708,24 @@ router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req
 1. Phân tích tỷ lệ giao đúng hạn của các đơn vị vận chuyển.
 2. Nêu rõ mẫu số chỉ tính trên các đơn đã hoàn tất giao hàng (loại trừ đơn chưa giao).
 3. Tuyệt đối KHÔNG tự ý chèn dữ liệu nhân sự hay lương.`;
+            } else if (isPayroll) {
+              specificGuidelines = `
+1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp và súc tích về phân tích quỹ lương nhân sự theo đúng các chỉ tiêu đã xác thực.
+2. Nêu chuẩn xác:
+   - Tổng quỹ lương cơ bản và mức lương cơ bản bình quân.
+   - Mức lương cá nhân cao nhất và mức lương cá nhân thấp nhất (tuyệt đối trích xuất từ chỉ tiêu MAX/MIN cá nhân, KHÔNG được nhầm với trung bình phòng ban).
+   - Phòng ban có tổng quỹ lương lớn nhất và chức vụ có mức lương bình quân cao nhất.
+   - Nhóm mức lương chiếm đa số nhân sự.
+3. QUY TẮC AN TOÀN VÀ ĐỒNG BỘ TUYỆT ĐỐI:
+   - TUYỆT ĐỐI KHÔNG diễn giải mức lương trung bình của phòng ban thành mức lương cao nhất/thấp nhất của cá nhân nhân viên.
+   - TUYỆT ĐỐI KHÔNG nhắc đến điểm KPI, trạng thái làm việc hay bất kỳ chỉ tiêu nào không được hỏi.
+   - Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
             } else {
               specificGuidelines = `
 1. Viết 2-3 câu nhận xét điều hành ngắn gọn, trực diện và chuẩn xác theo đúng các chỉ tiêu người dùng hỏi.
-2. Nêu bật các phòng ban/nhóm dẫn đầu theo các chỉ tiêu thực tế (Quy mô nhân sự lớn nhất, Chi phí lương cao nhất, hoặc Điểm KPI trung bình cao nhất).
-3. Phân biệt rõ ràng giữa các trạng thái nhân sự (Đang làm việc, Đã nghỉ việc, Thai sản) nếu có trong câu hỏi.
-4. Tuyệt đối bám sát số liệu đã cung cấp, không bịa đặt số liệu hay suy diễn ngoài bảng tổng hợp trên.`;
+2. Bám sát 100% các kết quả đã được xác thực trong results_by_requirement hoặc bảng tổng hợp.
+3. TUYỆT ĐỐI KHÔNG diễn giải giá trị trung bình nhóm thành cực trị cá nhân.
+4. TUYỆT ĐỐI KHÔNG tự ý chèn các chỉ tiêu ngoài phạm vi yêu cầu.`;
             }
 
             const insightPrompt = `Dưới đây là kết quả phân tích số liệu thực tế từ tệp bảng tính ${metadata.original_filename}:
@@ -965,12 +979,14 @@ ${specificGuidelines}`;
               const isTraining = validatedPlan.requirements?.some((r) => r.id.includes('dao_tao') || r.id.includes('completed') || r.id.includes('courses'));
               const isSales = validatedPlan.requirements?.some((r) => r.id.includes('revenue') || r.id.includes('orders') || r.id.includes('products'));
               const isLogistics = validatedPlan.requirements?.some((r) => r.id.includes('on_time') || r.id.includes('carrier'));
+              const isPayroll = validatedPlan.requirements?.some((r) => r.id.includes('payroll') || r.id.includes('salary') || r.id.includes('luong') || r.metric?.includes('luong')) ||
+                (validatedPlan.aggregations || []).some(a => a.column?.includes('luong'));
 
               const summaryData = {
                 results_by_requirement: queryResult.results_by_requirement || null,
                 reconciliation: queryResult.reconciliation || null,
-                primary_breakdown: sanitizeBiData((queryResult.results || []).slice(0, 15)),
-                status_breakdown: (!isTraining && !isSales && !isLogistics) ? queryResult.multi_visual?.status_breakdown || null : null,
+                primary_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll) ? sanitizeBiData((queryResult.results || []).slice(0, 15)) : null,
+                status_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll) ? queryResult.multi_visual?.status_breakdown || null : null,
                 overall_kpis: queryResult.summary || null,
               };
 
@@ -991,12 +1007,24 @@ ${specificGuidelines}`;
 1. Phân tích tỷ lệ giao đúng hạn của các đơn vị vận chuyển.
 2. Nêu rõ mẫu số chỉ tính trên các đơn đã hoàn tất giao hàng (loại trừ đơn chưa giao).
 3. Tuyệt đối KHÔNG tự ý chèn dữ liệu nhân sự hay lương.`;
+              } else if (isPayroll) {
+                specificGuidelines = `
+1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp và súc tích về phân tích quỹ lương nhân sự theo đúng các chỉ tiêu đã xác thực.
+2. Nêu chuẩn xác:
+   - Tổng quỹ lương cơ bản và mức lương cơ bản bình quân.
+   - Mức lương cá nhân cao nhất và mức lương cá nhân thấp nhất (tuyệt đối trích xuất từ chỉ tiêu MAX/MIN cá nhân, KHÔNG được nhầm với trung bình phòng ban).
+   - Phòng ban có tổng quỹ lương lớn nhất và chức vụ có mức lương bình quân cao nhất.
+   - Nhóm mức lương chiếm đa số nhân sự.
+3. QUY TẮC AN TOÀN VÀ ĐỒNG BỘ TUYỆT ĐỐI:
+   - TUYỆT ĐỐI KHÔNG diễn giải mức lương trung bình của phòng ban thành mức lương cao nhất/thấp nhất của cá nhân nhân viên.
+   - TUYỆT ĐỐI KHÔNG nhắc đến điểm KPI, trạng thái làm việc hay bất kỳ chỉ tiêu nào không được hỏi.
+   - Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
               } else {
                 specificGuidelines = `
 1. Viết 2-3 câu nhận xét điều hành ngắn gọn, trực diện và chuẩn xác theo đúng các chỉ tiêu người dùng hỏi.
-2. Nêu bật các phòng ban/nhóm dẫn đầu theo các chỉ tiêu thực tế (Quy mô nhân sự lớn nhất, Chi phí lương cao nhất, hoặc Điểm KPI trung bình cao nhất).
-3. Phân biệt rõ ràng giữa các trạng thái nhân sự (Đang làm việc, Đã nghỉ việc, Thai sản) nếu có trong câu hỏi.
-4. Tuyệt đối bám sát số liệu đã cung cấp, không bịa đặt số liệu hay suy diễn ngoài bảng tổng hợp trên.`;
+2. Bám sát 100% các kết quả đã được xác thực trong results_by_requirement hoặc bảng tổng hợp.
+3. TUYỆT ĐỐI KHÔNG diễn giải giá trị trung bình nhóm thành cực trị cá nhân.
+4. TUYỆT ĐỐI KHÔNG tự ý chèn các chỉ tiêu ngoài phạm vi yêu cầu.`;
               }
 
               const insightPrompt = `Dưới đây là kết quả phân tích số liệu thực tế từ tệp bảng tính ${activeDataset.original_filename}:

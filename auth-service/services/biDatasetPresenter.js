@@ -418,35 +418,72 @@ function formatAnalyticalResultMarkdown(queryPlan, queryResult, dataset, explana
     lines.push('');
 
     // Visual Charts
-    const deptReq = resByReq['req_dept_breakdown'];
-    const kpiByCoursesReq = resByReq['req_kpi_by_courses'];
-    const trendReq = Object.values(resByReq).find((r) => r.type === 'TREND');
-
-    if (deptReq?.data || kpiByCoursesReq?.data || trendReq?.data) {
+    const visualReqs = queryPlan.requirements.filter(r => resByReq[r.id]?.data?.length > 0 && r.type !== 'METRIC');
+    if (visualReqs.length > 0) {
       lines.push('### 📊 Biểu Đồ Trực Quan');
-      if (deptReq?.data) {
-        const barSvg = generateBarChartSvg(deptReq.data, {
-          xKey: deptReq.dimension,
-          yKey: deptReq.metric_alias,
-          title: `Thống Kê Khóa Đào Tạo Theo Phòng Ban (${deptReq.unit || 'Lượt hoàn thành'})`,
-        });
-        lines.push(barSvg);
-      }
-      if (kpiByCoursesReq?.data) {
-        const corrSvg = generateBarChartSvg(kpiByCoursesReq.data, {
-          xKey: 'so_khoa',
-          yKey: 'avg_kpi',
-          title: 'Điểm Đánh Giá KPI Trung Bình Theo Số Khóa Đào Tạo (0 - 5)',
-        });
-        lines.push(corrSvg);
-      }
-      if (trendReq?.data) {
-        const trendSvg = generateLineChartSvg(trendReq.data, {
-          xKey: 'thoi_gian',
-          yKey: Object.keys(trendReq.data[0]).find((k) => k !== 'thoi_gian' && k !== 'period' && k !== 'count_rows') || 'value',
-          title: trendReq.title || 'Xu hướng theo thời gian',
-        });
-        lines.push(trendSvg);
+      for (const req of visualReqs) {
+        const res = resByReq[req.id];
+        if (!res?.data || res.data.length === 0) continue;
+
+        if (req.type === 'GROUP_BY') {
+          const dimKey = req.dimension || (typeof req.groupBy[0] === 'string' ? req.groupBy[0] : req.groupBy[0]?.column) || 'phong_ban';
+          const valKey = req.alias || Object.keys(res.data[0]).find(k => typeof res.data[0][k] === 'number' && k !== 'count_rows') || 'value';
+          const wantsPie = req.visualization_type === 'PIE' || req.id.includes('pie') || req.title.toLowerCase().includes('tỷ trọng');
+          if (wantsPie) {
+            const pieSvg = generatePieChartSvg(res.data, {
+              labelKey: dimKey,
+              valueKey: valKey,
+              title: req.title,
+            });
+            if (pieSvg) lines.push(pieSvg);
+          } else {
+            const barSvg = generateBarChartSvg(res.data.slice(0, 15), {
+              xKey: dimKey,
+              yKey: valKey,
+              title: `${req.title} (${req.unit || ''})`.trim(),
+            });
+            if (barSvg) lines.push(barSvg);
+          }
+        } else if (req.type === 'DISTRIBUTION' || req.type === 'BUCKET') {
+          const catKey = req.dimension || 'nhom_muc_luong';
+          const wantsPie = req.visualization_type === 'PIE' || req.id.includes('pie');
+          if (wantsPie) {
+            const pieSvg = generatePieChartSvg(res.data, {
+              labelKey: catKey,
+              valueKey: 'so_nhan_vien',
+              title: req.title,
+            });
+            if (pieSvg) lines.push(pieSvg);
+          } else {
+            const distSvg = generateBarChartSvg(res.data, {
+              xKey: catKey,
+              yKey: 'so_nhan_vien',
+              title: `${req.title} (${req.unit || 'nhân sự'})`,
+            });
+            if (distSvg) lines.push(distSvg);
+          }
+        } else if (req.type === 'CORRELATION_BREAKDOWN') {
+          const corrSvg = generateBarChartSvg(res.data, {
+            xKey: 'so_khoa',
+            yKey: 'avg_kpi',
+            title: req.title || 'Điểm Đánh Giá KPI Trung Bình Theo Số Khóa Đào Tạo (0 - 5)',
+          });
+          if (corrSvg) lines.push(corrSvg);
+        } else if (req.type === 'TREND') {
+          const trendSvg = generateLineChartSvg(res.data, {
+            xKey: 'thoi_gian',
+            yKey: Object.keys(res.data[0]).find((k) => k !== 'thoi_gian' && k !== 'period' && k !== 'count_rows') || 'value',
+            title: req.title || 'Xu hướng theo thời gian',
+          });
+          if (trendSvg) lines.push(trendSvg);
+        } else if (req.type === 'RATIO') {
+          const ratioSvg = generateBarChartSvg(res.data, {
+            xKey: req.dimension,
+            yKey: 'ty_le_dung_han_pct',
+            title: req.title || 'Tỷ lệ đúng hạn theo đơn vị vận chuyển (%)',
+          });
+          if (ratioSvg) lines.push(ratioSvg);
+        }
       }
       lines.push('');
     }
@@ -459,24 +496,89 @@ function formatAnalyticalResultMarkdown(queryPlan, queryResult, dataset, explana
       if (req.type === 'GROUP_BY') {
         lines.push(`### 📋 ${req.title}`);
         lines.push('');
-        const headers = ['Phòng Ban', 'Số Khóa Hoàn Thành', 'Tỷ Trọng (%)'];
+        if (req.id === 'req_dept_breakdown') {
+          // Backward compatibility for training suite
+          const headers = ['Phòng Ban', 'Số Khóa Hoàn Thành', 'Tỷ Trọng (%)'];
+          lines.push(`| ${headers.join(' | ')} |`);
+          lines.push(`| ${headers.map(() => ':---').join(' | ')} |`);
+          for (const row of res.data) {
+            lines.push(`| **${escapeMarkdown(row[req.groupBy[0]])}** | ${Number(row[req.alias || Object.keys(row)[1]]).toLocaleString('vi-VN')} lượt | ${row.ty_trong_pct}% |`);
+          }
+          if (queryResult.reconciliation) {
+            lines.push(`\n*Đối chiếu toàn tập: Tổng 6 phòng ban (${queryResult.reconciliation.group_sum.toLocaleString('vi-VN')} lượt) khớp 100% với tổng toàn bộ nhân sự (${queryResult.reconciliation.total_metric.toLocaleString('vi-VN')} lượt).*`);
+          }
+        } else {
+          const dimColKey = req.dimension || (typeof req.groupBy[0] === 'string' ? req.groupBy[0] : req.groupBy[0]?.column) || 'phong_ban';
+          const valColKey = req.alias || Object.keys(res.data[0]).find(k => typeof res.data[0][k] === 'number' && k !== 'count_rows') || 'value';
+          const dimLabel = getFriendlyColumnLabel(dimColKey);
+          const valLabel = getFriendlyColumnLabel(valColKey);
+          const headers = [dimLabel, valLabel];
+          if (res.data[0]?.ty_trong_pct !== undefined) headers.push('Tỷ Trọng (%)');
+          lines.push(`| ${headers.join(' | ')} |`);
+          lines.push(`| ${headers.map(() => ':---').join(' | ')} |`);
+          for (const row of res.data) {
+            const valFormatted = typeof row[valColKey] === 'number' ? row[valColKey].toLocaleString('vi-VN') : escapeMarkdown(row[valColKey]);
+            const rowParts = [`**${escapeMarkdown(row[dimColKey])}**`, valFormatted];
+            if (row.ty_trong_pct !== undefined) rowParts.push(`${row.ty_trong_pct}%`);
+            lines.push(`| ${rowParts.join(' | ')} |`);
+          }
+          if (queryResult.reconciliation && req.id.includes('dept')) {
+            lines.push(`\n*Đối chiếu toàn tập: Tổng các phòng ban (${queryResult.reconciliation.group_sum.toLocaleString('vi-VN')} ${queryResult.reconciliation.unit || ''}) khớp với chỉ số toàn thể (${queryResult.reconciliation.total_metric.toLocaleString('vi-VN')} ${queryResult.reconciliation.unit || ''}).*`);
+          }
+        }
+        lines.push('');
+      } else if (req.type === 'DISTRIBUTION' || req.type === 'BUCKET') {
+        lines.push(`### 📋 ${req.title}`);
+        lines.push('');
+        const catColKey = req.dimension || 'nhom_muc_luong';
+        const headers = [getFriendlyColumnLabel(catColKey), 'Số Lượng Nhân Sự', 'Tỷ Trọng (%)'];
+        if (res.data[0]?.tong_quy_luong !== undefined) headers.push('Tổng Quỹ Lương (VNĐ)');
         lines.push(`| ${headers.join(' | ')} |`);
         lines.push(`| ${headers.map(() => ':---').join(' | ')} |`);
         for (const row of res.data) {
-          lines.push(`| **${escapeMarkdown(row[req.groupBy[0]])}** | ${Number(row[req.alias || Object.keys(row)[1]]).toLocaleString('vi-VN')} lượt | ${row.ty_trong_pct}% |`);
-        }
-        if (queryResult.reconciliation) {
-          lines.push(`\n*Đối chiếu toàn tập: Tổng 6 phòng ban (${queryResult.reconciliation.group_sum.toLocaleString('vi-VN')} lượt) khớp 100% với tổng toàn bộ nhân sự (${queryResult.reconciliation.total_metric.toLocaleString('vi-VN')} lượt).*`);
+          const rowParts = [
+            `**${escapeMarkdown(row[catColKey] || row.label)}**`,
+            `${row.so_nhan_vien} người`,
+            `${row.ty_trong_pct}%`,
+          ];
+          if (row.tong_quy_luong !== undefined) {
+            rowParts.push(`${Number(row.tong_quy_luong).toLocaleString('vi-VN')} VNĐ`);
+          }
+          lines.push(`| ${rowParts.join(' | ')} |`);
         }
         lines.push('');
       } else if (req.type === 'RANKING') {
-        lines.push(`### 📋 ${req.title} (Sắp xếp theo Khóa học DESC, KPI DESC, Mã NV ASC)`);
-        lines.push('');
-        const headers = ['Hạng', 'Mã NV', 'Họ Tên', 'Phòng Ban', 'Khóa Đào Tạo', 'Điểm KPI'];
-        lines.push(`| ${headers.join(' | ')} |`);
-        lines.push(`| :---: | :---: | :--- | :--- | :---: | :---: |`);
-        for (const row of res.data) {
-          lines.push(`| ${row.hang} | \`${row.ma_nhan_vien}\` | ${escapeMarkdown(row.ho_ten)} | ${escapeMarkdown(row.phong_ban)} | **${row.khoa_dao_tao_hoan_thanh}** | **${Number(row.diem_kpi).toFixed(1)}** |`);
+        if (req.id === 'req_top_10_employees') {
+          // Backward compatibility for training suite
+          lines.push(`### 📋 ${req.title} (Sắp xếp theo Khóa học DESC, KPI DESC, Mã NV ASC)`);
+          lines.push('');
+          const headers = ['Hạng', 'Mã NV', 'Họ Tên', 'Phòng Ban', 'Khóa Đào Tạo', 'Điểm KPI'];
+          lines.push(`| ${headers.join(' | ')} |`);
+          lines.push(`| :---: | :---: | :--- | :--- | :---: | :---: |`);
+          for (const row of res.data) {
+            lines.push(`| ${row.hang} | \`${row.ma_nhan_vien}\` | ${escapeMarkdown(row.ho_ten)} | ${escapeMarkdown(row.phong_ban)} | **${row.khoa_dao_tao_hoan_thanh}** | **${Number(row.diem_kpi).toFixed(1)}** |`);
+          }
+        } else {
+          lines.push(`### 📋 ${req.title}`);
+          lines.push('');
+          const rankCols = ['Hạng', 'Mã NV', 'Họ Tên', 'Phòng Ban'];
+          if (res.data[0]?.chuc_vu) rankCols.push('Chức Vụ');
+          const metricCol = req.column || 'luong_co_ban_vnd';
+          rankCols.push(getFriendlyColumnLabel(metricCol));
+          lines.push(`| ${rankCols.join(' | ')} |`);
+          lines.push(`| :---: | :---: | :--- | :--- | ${res.data[0]?.chuc_vu ? ':--- | ' : ''}:---: |`);
+          for (const row of res.data) {
+            const metricVal = typeof row[metricCol] === 'number' ? row[metricCol].toLocaleString('vi-VN') : escapeMarkdown(row[metricCol]);
+            const rowParts = [
+              row.hang,
+              `\`${row.ma_nhan_vien}\``,
+              escapeMarkdown(row.ho_ten),
+              escapeMarkdown(row.phong_ban),
+            ];
+            if (row.chuc_vu) rowParts.push(escapeMarkdown(row.chuc_vu));
+            rowParts.push(`**${metricVal}**`);
+            lines.push(`| ${rowParts.join(' | ')} |`);
+          }
         }
         lines.push('');
       } else if (req.type === 'CORRELATION_BREAKDOWN') {

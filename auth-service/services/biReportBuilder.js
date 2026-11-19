@@ -68,6 +68,11 @@ function getFriendlyColumnLabel(key) {
     sum_so_ngay_nghi: 'Tổng Ngày Nghỉ',
     distinct_count_ma_nhan_vien_ty_trong_pct: 'Tỷ Trọng (%)',
     khoa_dao_tao_hoan_thanh: 'Khóa Đào Tạo',
+    tong_quy_luong: 'Tổng Quỹ Lương (VNĐ)',
+    luong_trung_binh: 'Lương Trung Bình (VNĐ)',
+    nhom_muc_luong: 'Nhóm Mức Lương',
+    so_nhan_vien: 'Số Nhân Viên',
+    ty_trong_pct: 'Tỷ Trọng (%)',
   };
   return map[key] || key;
 }
@@ -129,12 +134,16 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
         dataStore[groupDataRef] = groupData;
         const catCol = req.groupBy ? (typeof req.groupBy[0] === 'string' ? req.groupBy[0] : req.groupBy[0]?.column) : 'phong_ban';
         const valCol = req.alias || (groupData[0] ? Object.keys(groupData[0]).find(k => typeof groupData[0][k] === 'number' && k !== 'count_rows') : 'value');
+        const chartType = (req.visualization_type && ['BAR', 'PIE', 'LINE', 'DONUT', 'AREA', 'STACKED_BAR'].includes(String(req.visualization_type).toUpperCase()))
+          ? String(req.visualization_type).toUpperCase()
+          : (req.title?.toLowerCase().includes('tỷ trọng') ? 'PIE' : 'BAR');
+
         visualizations.push({
           id: `viz_${req.id}`,
           title: req.title,
-          chart_type: 'BAR',
+          chart_type: chartType,
           data_ref: groupDataRef,
-          mapping: { category: catCol, value: valCol || 'value' },
+          mapping: { category: catCol, value: (chartType === 'PIE' && groupData[0]?.ty_trong_pct !== undefined) ? (valCol || 'value') : (valCol || 'value') },
           interactions: { selectable: true, filterable: true, drilldown: false },
           drill_dimensions: [catCol],
           grid_col_span: 6,
@@ -143,30 +152,77 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
           id: `tbl_${req.id}`,
           title: req.title,
           data_ref: groupDataRef,
-          columns: Object.keys(groupData[0] || {}).map(k => ({
+          columns: Object.keys(groupData[0] || {}).filter(k => k !== 'count_rows').map(k => ({
             key: k,
             label: getFriendlyColumnLabel(k),
             type: typeof (groupData[0] || {})[k] === 'number' ? 'number' : 'string',
           })),
           pagination: { page_size: 15, total_rows: groupData.length },
         });
+      } else if (req.type === 'DISTRIBUTION' || req.type === 'BUCKET') {
+        const distData = res?.data || [];
+        const distDataRef = `dataset_${req.id}`;
+        dataStore[distDataRef] = distData;
+        const catCol = req.dimension || 'nhom_muc_luong';
+        const chartType = (req.visualization_type && ['BAR', 'PIE', 'DONUT'].includes(String(req.visualization_type).toUpperCase()))
+          ? String(req.visualization_type).toUpperCase()
+          : 'BAR';
+
+        visualizations.push({
+          id: `viz_${req.id}`,
+          title: req.title,
+          chart_type: chartType,
+          data_ref: distDataRef,
+          mapping: { category: catCol, value: 'so_nhan_vien' },
+          interactions: { selectable: true, filterable: true, drilldown: false },
+          drill_dimensions: [catCol],
+          grid_col_span: 6,
+        });
+
+        dataTables.push({
+          id: `tbl_${req.id}`,
+          title: req.title,
+          data_ref: distDataRef,
+          columns: [
+            { key: catCol, label: getFriendlyColumnLabel(catCol), type: 'string' },
+            { key: 'so_nhan_vien', label: 'Số Nhân Viên', type: 'number' },
+            { key: 'ty_trong_pct', label: 'Tỷ Trọng (%)', type: 'number' },
+            { key: 'tong_quy_luong', label: 'Tổng Quỹ Lương (VNĐ)', type: 'number' },
+            { key: 'luong_trung_binh', label: 'Lương Trung Bình (VNĐ)', type: 'number' },
+          ].filter(c => distData[0] && distData[0][c.key] !== undefined),
+          pagination: { page_size: 10, total_rows: distData.length },
+        });
       } else if (req.type === 'RANKING') {
         const rankData = res?.data || [];
         const rankDataRef = `dataset_${req.id}`;
         dataStore[rankDataRef] = rankData;
+
+        const rankCols = [
+          { key: 'hang', label: 'Hạng', type: 'number' },
+          { key: 'ma_nhan_vien', label: 'Mã NV', type: 'string' },
+          { key: 'ho_ten', label: 'Họ Tên', type: 'string' },
+          { key: 'phong_ban', label: 'Phòng Ban', type: 'string' },
+        ];
+        if (rankData[0]?.chuc_vu) {
+          rankCols.push({ key: 'chuc_vu', label: 'Chức Vụ', type: 'string' });
+        }
+        const metricCol = req.column || req.metric || 'luong_co_ban_vnd';
+        if (metricCol && !rankCols.some(c => c.key === metricCol) && rankData[0] && rankData[0][metricCol] !== undefined) {
+          rankCols.push({ key: metricCol, label: getFriendlyColumnLabel(metricCol), type: 'number' });
+        }
+        if (rankData[0]?.diem_kpi !== undefined && (req.column === 'diem_kpi' || req.orderBy?.some(o => o.col === 'diem_kpi'))) {
+          rankCols.push({ key: 'diem_kpi', label: 'Điểm KPI', type: 'number' });
+        }
+        if (rankData[0]?.khoa_dao_tao_hoan_thanh !== undefined && req.column === 'khoa_dao_tao_hoan_thanh') {
+          rankCols.push({ key: 'khoa_dao_tao_hoan_thanh', label: 'Khóa Đào Tạo', type: 'number' });
+        }
+
         dataTables.push({
           id: `tbl_${req.id}`,
           title: req.title,
           data_ref: rankDataRef,
-          columns: [
-            { key: 'hang', label: 'Hạng', type: 'number' },
-            { key: 'ma_nhan_vien', label: 'Mã NV', type: 'string' },
-            { key: 'ho_ten', label: 'Họ Tên', type: 'string' },
-            { key: 'phong_ban', label: 'Phòng Ban', type: 'string' },
-            { key: req.column || 'khoa_dao_tao_hoan_thanh', label: getFriendlyColumnLabel(req.column || 'khoa_dao_tao_hoan_thanh'), type: 'number' },
-            { key: 'diem_kpi', label: 'Điểm KPI', type: 'number' },
-          ],
-          pagination: { page_size: 10, total_rows: rankData.length },
+          columns: rankCols,
+          pagination: { page_size: req.limit || 10, total_rows: rankData.length },
         });
       } else if (req.type === 'CORRELATION_BREAKDOWN') {
         const corrData = res?.data || [];

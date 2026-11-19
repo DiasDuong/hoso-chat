@@ -120,7 +120,9 @@ function validateQueryPlan(queryPlan, dataset, userContext) {
 
   // Build Column Lookup Map
   const requestedSheet = queryPlan.target_sheet || dataset.profile?.active_sheet;
-  if (requestedSheet && requestedSheet !== dataset.profile?.active_sheet) throw new QueryValidationError('Cần chọn schema của sheet trước khi xác thực query.', 'SHEET_SCHEMA_MISMATCH');
+  if (requestedSheet && dataset.profile?.active_sheet && requestedSheet !== dataset.profile.active_sheet) {
+    throw new QueryValidationError('Cần chọn schema của sheet trước khi xác thực query.', 'SHEET_SCHEMA_MISMATCH');
+  }
   const columns = (dataset.columns || dataset.profile?.columns || []).filter(c => !credentialKey(c.key || c.name));
   if (columns.length === 0) {
     throw new QueryValidationError('Bộ dữ liệu không chứa danh sách cột hợp lệ.', 'DATASET_CORRUPTED');
@@ -417,15 +419,31 @@ function validateQueryPlan(queryPlan, dataset, userContext) {
           }
         }
       }
+      // Check dimension if present and not a calculated bucket dimension
+      if (req.dimension && !colMap.has(req.dimension) && !['nhom_muc_luong', 'salary_band', 'nhom_chi_tieu'].includes(req.dimension) && !req.dimension.startsWith('nhom_')) {
+        req.status = 'DATA_UNAVAILABLE';
+        req.reason = `Cột phân nhóm "${req.dimension}" không tồn tại trong bộ dữ liệu này.`;
+      }
       validatedRequirements.push(req);
     }
   }
+
+  const totalReqs = validatedRequirements ? validatedRequirements.length : 0;
+  const unavailableReqs = validatedRequirements ? validatedRequirements.filter(r => r.status === 'DATA_UNAVAILABLE') : [];
+  const resolvedReqs = totalReqs - unavailableReqs.length;
 
   return {
     file_id: dataset.file_id,
     target_sheet: queryPlan.target_sheet || dataset.profile?.active_sheet || 'Sheet1',
     intent: queryPlan.intent || 'AGGREGATION',
     requirements: validatedRequirements,
+    metric_coverage: {
+      isComplete: unavailableReqs.length === 0,
+      total_requirements: totalReqs,
+      resolved_requirements: resolvedReqs,
+      unavailable_requirements: unavailableReqs.length,
+      missing: unavailableReqs.map(r => r.title),
+    },
     groupBy: validatedGroupBy,
     aggregations: validatedAggs,
     filters: validatedFilters,

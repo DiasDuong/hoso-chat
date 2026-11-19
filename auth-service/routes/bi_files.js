@@ -315,7 +315,7 @@ router.post('/:fileId/query', verifyToken, async (req, res) => {
       });
     }
 
-    const querySpec = req.body || {};
+    const querySpec = req.body.querySpec || req.body || {};
     const sheetDataset = await getDatasetForSheet(dataset, querySpec.target_sheet);
     const validatedPlan = validateQueryPlan(querySpec, sheetDataset, req.user);
     const queryResult = await queryIsolatedDataset(dataset.file_id, validatedPlan);

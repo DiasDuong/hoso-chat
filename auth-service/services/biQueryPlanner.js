@@ -351,13 +351,20 @@ function detectMultipleMetrics(promptNorm, colProfile, columns) {
     }
   }
 
-  // 5. Average KPI
+  // 5. Average KPI (Prevent false trigger from UI request like "KPI Cards", "thẻ KPI")
+  const isKpiCardUiMention =
+    hasWordOrPhrase(promptNorm, 'kpi cards') ||
+    hasWordOrPhrase(promptNorm, 'kpi card') ||
+    hasWordOrPhrase(promptNorm, 'the kpi') ||
+    hasWordOrPhrase(promptNorm, 'hien thi kpi') ||
+    hasWordOrPhrase(promptNorm, 'cards');
+
   const isKpiMention =
     hasWordOrPhrase(promptNorm, 'kpi trung binh') ||
     hasWordOrPhrase(promptNorm, 'diem kpi') ||
     hasWordOrPhrase(promptNorm, 'kpi tb') ||
     hasWordOrPhrase(promptNorm, 'hieu suat kpi') ||
-    hasWordOrPhrase(promptNorm, 'kpi');
+    (hasWordOrPhrase(promptNorm, 'kpi') && !isKpiCardUiMention);
 
   if (isKpiMention) {
     const kpiCol = colProfile.measures.find((c) => {
@@ -590,7 +597,9 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
         hasWordOrPhrase(promptNorm, 'khong khoa') ||
         hasWordOrPhrase(promptNorm, 'chua co khoa') ||
         hasWordOrPhrase(promptNorm, 'chua hoc') ||
-        hasWordOrPhrase(promptNorm, 'chua tham gia')
+        hasWordOrPhrase(promptNorm, 'chua tham gia') ||
+        hasWordOrPhrase(promptNorm, 'chua hoan thanh') ||
+        hasWordOrPhrase(promptNorm, 'chua hoan thanh khoa nao')
       ) {
         requirements.push({
           id: 'req_zero_courses',
@@ -799,7 +808,497 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
     return requirements;
   }
 
-  return null;
+  // CASE D: PAYROLL & SALARY DISTRIBUTION
+  const isPayrollAsked =
+    hasWordOrPhrase(promptNorm, 'quy luong') ||
+    hasWordOrPhrase(promptNorm, 'tien luong') ||
+    hasWordOrPhrase(promptNorm, 'bang luong') ||
+    hasWordOrPhrase(promptNorm, 'luong co ban') ||
+    hasWordOrPhrase(promptNorm, 'chi phi luong') ||
+    hasWordOrPhrase(promptNorm, 'phan tich quy luong') ||
+    hasWordOrPhrase(promptNorm, 'phan tich luong') ||
+    hasWordOrPhrase(promptNorm, 'nhom muc luong') ||
+    hasWordOrPhrase(promptNorm, 'nhom luong') ||
+    hasWordOrPhrase(promptNorm, 'phan bo quy luong') ||
+    (hasWordOrPhrase(promptNorm, 'luong') && !hasWordOrPhrase(promptNorm, 'so luong') && (
+      isCompositeStructure ||
+      hasWordOrPhrase(promptNorm, 'phong ban') ||
+      hasWordOrPhrase(promptNorm, 'chuc vu') ||
+      hasWordOrPhrase(promptNorm, 'top') ||
+      hasWordOrPhrase(promptNorm, 'trung binh') ||
+      hasWordOrPhrase(promptNorm, 'cao nhat')
+    ));
+
+  if (isPayrollAsked && (isCompositeStructure || hasWordOrPhrase(promptNorm, 'phan tich') || hasWordOrPhrase(promptNorm, 'quy luong') || hasWordOrPhrase(promptNorm, 'nhom muc luong') || hasWordOrPhrase(promptNorm, 'nhom luong') || hasWordOrPhrase(promptNorm, 'phan loai'))) {
+    const salCol = columns.find((c) =>
+      /(luong.*co.*ban|luong|salary|thu.*nhap)/i.test(c.key) ||
+      /(luong.*co.*ban|luong|thu.*nhap)/i.test(normalizeText(c.name))
+    );
+    const deptCol = colProfile.dimensions.find((c) => /(phong|dept|bo.*phan)/i.test(c.key)) ||
+      columns.find((c) => /(phong|dept|bo.*phan)/i.test(c.key)) ||
+      { key: 'phong_ban', name: 'Phòng Ban' };
+    const titleCol = colProfile.dimensions.find((c) => /(chuc.*vu|vi.*tri|position|chuc.*danh)/i.test(c.key)) ||
+      columns.find((c) => /(chuc.*vu|vi.*tri|position)/i.test(c.key)) ||
+      { key: 'chuc_vu', name: 'Chức Vụ' };
+    const empIdCol = colProfile.identifiers.find((c) => /(nhan_vien|nv|emp|id)/i.test(c.key)) ||
+      colProfile.identifiers[0] ||
+      { key: 'ma_nhan_vien', name: 'Mã Nhân Viên' };
+
+    const requirements = [];
+
+    // 1. Total basic salary (REQ-01)
+    if (
+      hasWordOrPhrase(promptNorm, 'tong quy luong') ||
+      hasWordOrPhrase(promptNorm, 'tong luong') ||
+      hasWordOrPhrase(promptNorm, 'tong luong co ban') ||
+      hasWordOrPhrase(promptNorm, 'chi phi luong') ||
+      hasWordOrPhrase(promptNorm, 'phan tich quy luong') ||
+      hasWordOrPhrase(promptNorm, '1. tong quy luong co ban') ||
+      promptNorm.includes('1. tong')
+    ) {
+      requirements.push({
+        id: 'req_total_salary',
+        requirement_id: 'REQ-01',
+        original_user_request: 'Tổng quỹ lương cơ bản',
+        title: 'Tổng quỹ lương cơ bản',
+        type: 'METRIC',
+        func: 'SUM',
+        aggregation: 'SUM',
+        column: salCol ? salCol.key : 'luong_co_ban_vnd',
+        metric: salCol ? salCol.key : 'luong_co_ban_vnd',
+        unit: 'VNĐ',
+        visualization_type: 'KPI_CARD',
+        status: salCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        reason: salCol ? null : 'Tệp không chứa cột lương cơ bản.',
+        data_source_reference: salCol ? salCol.key : null,
+      });
+    }
+
+    // 2. Average basic salary (REQ-02)
+    if (
+      hasWordOrPhrase(promptNorm, 'luong co ban trung binh') ||
+      hasWordOrPhrase(promptNorm, 'luong trung binh') ||
+      hasWordOrPhrase(promptNorm, 'thu nhap trung binh') ||
+      hasWordOrPhrase(promptNorm, 'binh quan luong') ||
+      hasWordOrPhrase(promptNorm, '2. luong co ban trung binh') ||
+      promptNorm.includes('2. luong')
+    ) {
+      requirements.push({
+        id: 'req_avg_salary',
+        requirement_id: 'REQ-02',
+        original_user_request: 'Lương cơ bản trung bình',
+        title: 'Lương cơ bản trung bình',
+        type: 'METRIC',
+        func: 'AVG',
+        aggregation: 'AVG',
+        column: salCol ? salCol.key : 'luong_co_ban_vnd',
+        metric: salCol ? salCol.key : 'luong_co_ban_vnd',
+        unit: 'VNĐ/người',
+        visualization_type: 'KPI_CARD',
+        status: salCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        reason: salCol ? null : 'Tệp không chứa cột lương cơ bản.',
+        data_source_reference: salCol ? salCol.key : null,
+      });
+    }
+
+    // 3. Max basic salary (REQ-03)
+    if (
+      hasWordOrPhrase(promptNorm, 'luong cao nhat') ||
+      hasWordOrPhrase(promptNorm, 'cao nhat va thap nhat') ||
+      hasWordOrPhrase(promptNorm, 'cao nhat') ||
+      hasWordOrPhrase(promptNorm, 'max') ||
+      promptNorm.includes('3. luong cao nhat')
+    ) {
+      requirements.push({
+        id: 'req_max_salary',
+        requirement_id: 'REQ-03',
+        original_user_request: 'Lương cao nhất',
+        title: 'Lương cơ bản cao nhất',
+        type: 'METRIC',
+        func: 'MAX',
+        aggregation: 'MAX',
+        column: salCol ? salCol.key : 'luong_co_ban_vnd',
+        metric: salCol ? salCol.key : 'luong_co_ban_vnd',
+        unit: 'VNĐ',
+        visualization_type: 'KPI_CARD',
+        status: salCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        reason: salCol ? null : 'Tệp không chứa cột lương cơ bản.',
+        data_source_reference: salCol ? salCol.key : null,
+      });
+    }
+
+    // 4. Min basic salary (REQ-04)
+    if (
+      hasWordOrPhrase(promptNorm, 'luong thap nhat') ||
+      hasWordOrPhrase(promptNorm, 'cao nhat va thap nhat') ||
+      hasWordOrPhrase(promptNorm, 'thap nhat') ||
+      hasWordOrPhrase(promptNorm, 'min') ||
+      promptNorm.includes('thap nhat')
+    ) {
+      requirements.push({
+        id: 'req_min_salary',
+        requirement_id: 'REQ-04',
+        original_user_request: 'Lương thấp nhất',
+        title: 'Lương cơ bản thấp nhất',
+        type: 'METRIC',
+        func: 'MIN',
+        aggregation: 'MIN',
+        column: salCol ? salCol.key : 'luong_co_ban_vnd',
+        metric: salCol ? salCol.key : 'luong_co_ban_vnd',
+        unit: 'VNĐ',
+        visualization_type: 'KPI_CARD',
+        status: salCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        reason: salCol ? null : 'Tệp không chứa cột lương cơ bản.',
+        data_source_reference: salCol ? salCol.key : null,
+      });
+    }
+
+    // 5. Department allocation (REQ-05A & REQ-05B: Bar and Pie)
+    if (
+      hasWordOrPhrase(promptNorm, 'theo phong ban') ||
+      hasWordOrPhrase(promptNorm, 'phan bo quy luong') ||
+      hasWordOrPhrase(promptNorm, 'phan bo') ||
+      hasWordOrPhrase(promptNorm, 'phong ban') ||
+      promptNorm.includes('4. phan bo')
+    ) {
+      const wantsPie = hasWordOrPhrase(promptNorm, 'pie') || hasWordOrPhrase(promptNorm, 'bieu do tron') || hasWordOrPhrase(promptNorm, 'ty trong');
+      requirements.push({
+        id: 'req_salary_by_dept_bar',
+        requirement_id: 'REQ-05',
+        original_user_request: 'Phân bổ quỹ lương theo phòng ban',
+        title: 'Quỹ lương theo phòng ban',
+        type: 'GROUP_BY',
+        groupBy: [deptCol.key],
+        dimension: deptCol.key,
+        column: salCol ? salCol.key : 'luong_co_ban_vnd',
+        metric: salCol ? salCol.key : 'luong_co_ban_vnd',
+        func: 'SUM',
+        aggregation: 'SUM',
+        alias: 'tong_quy_luong',
+        unit: 'VNĐ',
+        visualization_type: 'BAR',
+        status: (salCol && deptCol) ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        reason: (salCol && deptCol) ? null : 'Thiếu cột phòng ban hoặc lương cơ bản.',
+        data_source_reference: deptCol ? deptCol.key : null,
+      });
+
+      if (wantsPie) {
+        requirements.push({
+          id: 'req_salary_by_dept_pie',
+          requirement_id: 'REQ-05B',
+          original_user_request: 'Tỷ trọng phân bổ quỹ lương theo phòng ban',
+          title: 'Tỷ trọng quỹ lương theo phòng ban',
+          type: 'GROUP_BY',
+          groupBy: [deptCol.key],
+          dimension: deptCol.key,
+          column: salCol ? salCol.key : 'luong_co_ban_vnd',
+          metric: salCol ? salCol.key : 'luong_co_ban_vnd',
+          func: 'SUM',
+          aggregation: 'SUM',
+          alias: 'tong_quy_luong',
+          unit: 'VNĐ',
+          visualization_type: 'PIE',
+          status: (salCol && deptCol) ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+          reason: (salCol && deptCol) ? null : 'Thiếu cột phòng ban hoặc lương cơ bản.',
+          data_source_reference: deptCol ? deptCol.key : null,
+        });
+      }
+    }
+
+    // 6. Job title breakdown (REQ-06)
+    if (
+      hasWordOrPhrase(promptNorm, 'chuc vu') ||
+      hasWordOrPhrase(promptNorm, 'vi tri') ||
+      hasWordOrPhrase(promptNorm, 'cap bac') ||
+      hasWordOrPhrase(promptNorm, 'theo chuc vu') ||
+      promptNorm.includes('5. so sanh')
+    ) {
+      requirements.push({
+        id: 'req_avg_salary_by_title',
+        requirement_id: 'REQ-06',
+        original_user_request: 'So sánh lương trung bình giữa các chức vụ',
+        title: 'Lương trung bình theo chức vụ',
+        type: 'GROUP_BY',
+        groupBy: [titleCol.key],
+        dimension: titleCol.key,
+        column: salCol ? salCol.key : 'luong_co_ban_vnd',
+        metric: salCol ? salCol.key : 'luong_co_ban_vnd',
+        func: 'AVG',
+        aggregation: 'AVG',
+        alias: 'luong_trung_binh',
+        unit: 'VNĐ/người',
+        visualization_type: 'BAR',
+        status: (salCol && titleCol) ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        reason: (salCol && titleCol) ? null : 'Thiếu cột chức vụ hoặc lương cơ bản.',
+        data_source_reference: titleCol ? titleCol.key : null,
+      });
+    }
+
+    // 7. Salary bands / distribution (REQ-07)
+    if (
+      hasWordOrPhrase(promptNorm, 'nhom muc luong') ||
+      hasWordOrPhrase(promptNorm, 'nhom luong') ||
+      hasWordOrPhrase(promptNorm, 'muc luong') ||
+      hasWordOrPhrase(promptNorm, 'phan loai nhan vien theo nhom') ||
+      hasWordOrPhrase(promptNorm, 'phan loai') ||
+      hasWordOrPhrase(promptNorm, 'salary band') ||
+      hasWordOrPhrase(promptNorm, 'khoang luong') ||
+      promptNorm.includes('6. phan loai')
+    ) {
+      requirements.push({
+        id: 'req_salary_bands',
+        requirement_id: 'REQ-07',
+        original_user_request: 'Phân loại nhân viên theo nhóm mức lương',
+        title: 'Phân loại nhân viên theo nhóm mức lương',
+        type: 'DISTRIBUTION',
+        dimension: 'nhom_muc_luong',
+        column: salCol ? salCol.key : 'luong_co_ban_vnd',
+        metric: salCol ? salCol.key : 'luong_co_ban_vnd',
+        aggregation: 'COUNT',
+        band_type: 'SALARY_BAND',
+        unit: 'nhân sự',
+        visualization_type: 'BAR',
+        status: salCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        reason: salCol ? null : 'Tệp không chứa cột lương cơ bản.',
+        data_source_reference: salCol ? salCol.key : null,
+      });
+    }
+
+    // 8. Top 10 highest paid employees (REQ-08)
+    if (
+      hasWordOrPhrase(promptNorm, 'top 10') ||
+      hasWordOrPhrase(promptNorm, 'top') ||
+      hasWordOrPhrase(promptNorm, 'bang xep hang') ||
+      hasWordOrPhrase(promptNorm, 'xep hang') ||
+      promptNorm.includes('7. top 10')
+    ) {
+      const topLimitMatch = promptNorm.match(/top\s*(\d+)/i);
+      const limitVal = topLimitMatch ? parseInt(topLimitMatch[1], 10) : 10;
+      requirements.push({
+        id: 'req_top_10_salary',
+        requirement_id: 'REQ-08',
+        original_user_request: `Top ${limitVal} nhân viên có lương cao nhất`,
+        title: `Top ${limitVal} nhân viên có lương cao nhất`,
+        type: 'RANKING',
+        limit: limitVal,
+        column: salCol ? salCol.key : 'luong_co_ban_vnd',
+        metric: salCol ? salCol.key : 'luong_co_ban_vnd',
+        orderBy: [
+          { col: salCol ? salCol.key : 'luong_co_ban_vnd', dir: 'DESC' },
+          { col: empIdCol ? empIdCol.key : 'ma_nhan_vien', dir: 'ASC' },
+        ],
+        visualization_type: 'TABLE',
+        status: salCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        reason: salCol ? null : 'Tệp không chứa cột lương cơ bản.',
+        data_source_reference: salCol ? salCol.key : null,
+      });
+    }
+
+    if (requirements.length > 0) {
+      return requirements;
+    }
+  }
+
+  // CASE E: GENERIC MULTI-INTENT NUMBERED/BULLET DECOMPOSITION
+  // Supports comma, semicolon, newline delimiters between numbered items (e.g. "1. A, 2. B, 3. C")
+  const numberedMatches = [...promptRaw.matchAll(/(?:^|\n|\s)(\d+)[.)]\s*(.+?)(?=\s*(?:[.,;]|\n)?\s*\d+[.)]|$)/gs)];
+  if (numberedMatches.length >= 2) {
+    const genericReqs = [];
+    let reqIndex = 1;
+    for (const match of numberedMatches) {
+      const clauseRaw = match[2].trim().replace(/[.,;]+$/, '');
+      const clauseNorm = normalizeText(clauseRaw);
+
+      // Skip UI-only directives like "8. Hiển thị KPI Cards, Bar Chart..."
+      if (
+        hasWordOrPhrase(clauseNorm, 'hien thi kpi cards') ||
+        hasWordOrPhrase(clauseNorm, 'hien thi bieu do') ||
+        hasWordOrPhrase(clauseNorm, 'hien thi dashboard') ||
+        (hasWordOrPhrase(clauseNorm, 'hien thi') && hasWordOrPhrase(clauseNorm, 'chart') && !hasWordOrPhrase(clauseNorm, 'theo'))
+      ) {
+        continue;
+      }
+
+      // Match candidate measure
+      let measureCol = null;
+      for (const col of colProfile.measures.concat(colProfile.quantities)) {
+        const k = normalizeText(col.key);
+        const n = normalizeText(col.name);
+        if (hasWordOrPhrase(clauseNorm, k) || hasWordOrPhrase(clauseNorm, n)) {
+          measureCol = col;
+          break;
+        }
+      }
+      if (!measureCol && colProfile.measures.length > 0) {
+        measureCol = colProfile.measures[0];
+      }
+
+      // Match candidate dimension
+      let dimCol = null;
+      for (const col of colProfile.dimensions) {
+        const k = normalizeText(col.key);
+        const n = normalizeText(col.name);
+        if (hasWordOrPhrase(clauseNorm, k) || hasWordOrPhrase(clauseNorm, n)) {
+          dimCol = col;
+          break;
+        }
+      }
+
+      const reqIdStr = `REQ-${String(reqIndex).padStart(2, '0')}`;
+
+      // Detect intent in clause
+      if (hasWordOrPhrase(clauseNorm, 'top') || hasWordOrPhrase(clauseNorm, 'xep hang')) {
+        const topMatch = clauseNorm.match(/top\s*(\d+)/i);
+        const limitVal = topMatch ? parseInt(topMatch[1], 10) : 10;
+        const idCol = colProfile.identifiers[0] || { key: 'id', name: 'ID' };
+        genericReqs.push({
+          id: `req_generic_top_${reqIndex}`,
+          requirement_id: reqIdStr,
+          original_user_request: clauseRaw,
+          title: `Top ${limitVal} theo ${measureCol ? measureCol.name : 'chỉ số'}`,
+          type: 'RANKING',
+          limit: limitVal,
+          column: measureCol ? measureCol.key : 'value',
+          metric: measureCol ? measureCol.key : 'value',
+          orderBy: [
+            { col: measureCol ? measureCol.key : 'value', dir: 'DESC' },
+            { col: idCol.key, dir: 'ASC' },
+          ],
+          visualization_type: 'TABLE',
+          status: measureCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        });
+        reqIndex++;
+      } else if (dimCol && (hasWordOrPhrase(clauseNorm, 'theo') || hasWordOrPhrase(clauseNorm, 'so sanh') || hasWordOrPhrase(clauseNorm, 'phan bo') || hasWordOrPhrase(clauseNorm, 'giua'))) {
+        const func = hasWordOrPhrase(clauseNorm, 'trung binh') || hasWordOrPhrase(clauseNorm, 'binh quan') ? 'AVG' : (hasWordOrPhrase(clauseNorm, 'dem') || hasWordOrPhrase(clauseNorm, 'so luong') ? 'COUNT' : 'SUM');
+        const isPie = hasWordOrPhrase(clauseNorm, 'pie') || hasWordOrPhrase(clauseNorm, 'ty trong') || hasWordOrPhrase(clauseNorm, 'tron');
+        genericReqs.push({
+          id: `req_generic_group_${reqIndex}`,
+          requirement_id: reqIdStr,
+          original_user_request: clauseRaw,
+          title: `${func === 'AVG' ? 'Trung bình' : 'Tổng'} theo ${dimCol.name}`,
+          type: 'GROUP_BY',
+          groupBy: [dimCol.key],
+          dimension: dimCol.key,
+          column: measureCol ? measureCol.key : 'value',
+          metric: measureCol ? measureCol.key : 'value',
+          func,
+          aggregation: func,
+          alias: `${func.toLowerCase()}_${measureCol ? measureCol.key : 'value'}`,
+          unit: '',
+          visualization_type: isPie ? 'PIE' : 'BAR',
+          status: (measureCol && dimCol) ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        });
+        reqIndex++;
+      } else if (hasWordOrPhrase(clauseNorm, 'phan loai') || hasWordOrPhrase(clauseNorm, 'nhom')) {
+        genericReqs.push({
+          id: `req_generic_dist_${reqIndex}`,
+          requirement_id: reqIdStr,
+          original_user_request: clauseRaw,
+          title: `Phân loại theo ${measureCol ? measureCol.name : 'mức'}`,
+          type: 'DISTRIBUTION',
+          dimension: 'nhom_chi_tieu',
+          column: measureCol ? measureCol.key : 'value',
+          metric: measureCol ? measureCol.key : 'value',
+          aggregation: 'COUNT',
+          visualization_type: 'BAR',
+          status: measureCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        });
+        reqIndex++;
+      } else if ((hasWordOrPhrase(clauseNorm, 'cao nhat') || hasWordOrPhrase(clauseNorm, 'max')) && (hasWordOrPhrase(clauseNorm, 'thap nhat') || hasWordOrPhrase(clauseNorm, 'min'))) {
+        genericReqs.push({
+          id: `req_generic_max_${reqIndex}`,
+          requirement_id: `${reqIdStr}A`,
+          original_user_request: `${clauseRaw} (Cao nhất)`,
+          title: `${measureCol ? measureCol.name : 'Chỉ số'} cao nhất`,
+          type: 'METRIC',
+          func: 'MAX',
+          aggregation: 'MAX',
+          column: measureCol ? measureCol.key : 'value',
+          metric: measureCol ? measureCol.key : 'value',
+          visualization_type: 'KPI_CARD',
+          status: measureCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        });
+        genericReqs.push({
+          id: `req_generic_min_${reqIndex}`,
+          requirement_id: `${reqIdStr}B`,
+          original_user_request: `${clauseRaw} (Thấp nhất)`,
+          title: `${measureCol ? measureCol.name : 'Chỉ số'} thấp nhất`,
+          type: 'METRIC',
+          func: 'MIN',
+          aggregation: 'MIN',
+          column: measureCol ? measureCol.key : 'value',
+          metric: measureCol ? measureCol.key : 'value',
+          visualization_type: 'KPI_CARD',
+          status: measureCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        });
+        reqIndex++;
+      } else if (hasWordOrPhrase(clauseNorm, 'cao nhat') || hasWordOrPhrase(clauseNorm, 'max')) {
+        genericReqs.push({
+          id: `req_generic_max_${reqIndex}`,
+          requirement_id: reqIdStr,
+          original_user_request: clauseRaw,
+          title: `${measureCol ? measureCol.name : 'Chỉ số'} cao nhất`,
+          type: 'METRIC',
+          func: 'MAX',
+          aggregation: 'MAX',
+          column: measureCol ? measureCol.key : 'value',
+          metric: measureCol ? measureCol.key : 'value',
+          visualization_type: 'KPI_CARD',
+          status: measureCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        });
+        reqIndex++;
+      } else if (hasWordOrPhrase(clauseNorm, 'thap nhat') || hasWordOrPhrase(clauseNorm, 'min')) {
+        genericReqs.push({
+          id: `req_generic_min_${reqIndex}`,
+          requirement_id: reqIdStr,
+          original_user_request: clauseRaw,
+          title: `${measureCol ? measureCol.name : 'Chỉ số'} thấp nhất`,
+          type: 'METRIC',
+          func: 'MIN',
+          aggregation: 'MIN',
+          column: measureCol ? measureCol.key : 'value',
+          metric: measureCol ? measureCol.key : 'value',
+          visualization_type: 'KPI_CARD',
+          status: measureCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        });
+        reqIndex++;
+      } else if (hasWordOrPhrase(clauseNorm, 'trung binh') || hasWordOrPhrase(clauseNorm, 'binh quan')) {
+        genericReqs.push({
+          id: `req_generic_avg_${reqIndex}`,
+          requirement_id: reqIdStr,
+          original_user_request: clauseRaw,
+          title: `${measureCol ? measureCol.name : 'Chỉ số'} trung bình`,
+          type: 'METRIC',
+          func: 'AVG',
+          aggregation: 'AVG',
+          column: measureCol ? measureCol.key : 'value',
+          metric: measureCol ? measureCol.key : 'value',
+          visualization_type: 'KPI_CARD',
+          status: measureCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        });
+        reqIndex++;
+      } else if (hasWordOrPhrase(clauseNorm, 'tong')) {
+        genericReqs.push({
+          id: `req_generic_sum_${reqIndex}`,
+          requirement_id: reqIdStr,
+          original_user_request: clauseRaw,
+          title: `Tổng ${measureCol ? measureCol.name : 'chỉ số'}`,
+          type: 'METRIC',
+          func: 'SUM',
+          aggregation: 'SUM',
+          column: measureCol ? measureCol.key : 'value',
+          metric: measureCol ? measureCol.key : 'value',
+          visualization_type: 'KPI_CARD',
+          status: measureCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        });
+        reqIndex++;
+      }
+    }
+
+    if (genericReqs.length >= 2) {
+      return genericReqs;
+    }
+  }
 }
 
 /**
@@ -878,7 +1377,7 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
   const compositeRequirements = decomposeCompositeRequirements(promptNorm, prompt, datasetProfile, columns, colProfile);
   if (compositeRequirements && compositeRequirements.length > 0) {
     const primaryReq = compositeRequirements.find(r => r.type === 'GROUP_BY') || compositeRequirements.find(r => r.type === 'METRIC') || compositeRequirements[0];
-    const groupBy = primaryReq.groupBy ? [...primaryReq.groupBy] : (primaryReq.dimension ? [primaryReq.dimension] : []);
+    const groupBy = primaryReq.groupBy ? [...primaryReq.groupBy] : (primaryReq.type === 'GROUP_BY' && primaryReq.dimension ? [primaryReq.dimension] : []);
     const targetCol = primaryReq.column || (columns[0] ? columns[0].key : 'col_1');
     const targetMeta = columns.find(c => c.key === targetCol);
     const isTargetNumeric = targetMeta && (targetMeta.type === 'INTEGER' || targetMeta.type === 'FLOAT');
@@ -888,7 +1387,7 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
       func: targetFunc,
       alias: primaryReq.alias || `${targetFunc.toLowerCase()}_${targetCol}`,
     }];
-    const chartPref = compositeRequirements.some(r => r.type === 'GROUP_BY' || r.type === 'CORRELATION_BREAKDOWN') ? 'BAR' : 'NONE';
+    const chartPref = compositeRequirements.some(r => r.type === 'GROUP_BY' || r.type === 'CORRELATION_BREAKDOWN' || r.type === 'DISTRIBUTION') ? 'BAR' : 'NONE';
 
     return {
       intent: 'COMPOSITE',

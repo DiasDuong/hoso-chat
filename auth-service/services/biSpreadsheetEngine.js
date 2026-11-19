@@ -702,7 +702,7 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
     }
 
     let rows = dataset.rows || [];
-    const columns = dataset.columns || [];
+    const columns = dataset.columns || (dataset.profile && dataset.profile.columns) || [];
 
   // 1. Filter Stage
   if (Array.isArray(querySpec.filters) && querySpec.filters.length > 0) {
@@ -1132,9 +1132,15 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
             gVal = s.size;
           } else {
             const nums = item.rows.map((r) => parseNumericValue(r[measureCol])).filter((n) => n !== null);
-            gVal = nums.length > 0 ? (func === 'AVG' ? Number((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2)) : Number(nums.reduce((a, b) => a + b, 0).toFixed(2))) : 0;
+            gVal = nums.length > 0
+              ? (func === 'AVG'
+                  ? Number((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2))
+                  : (func === 'MIN' ? Math.min(...nums) : (func === 'MAX' ? Math.max(...nums) : Number(nums.reduce((a, b) => a + b, 0).toFixed(2)))))
+              : 0;
           }
-          grandTotal += gVal;
+          if (func === 'SUM' || func === 'COUNT' || func === 'DISTINCT_COUNT') {
+            grandTotal += gVal;
+          }
           const targetAlias = req.alias || `${func.toLowerCase()}_${measureCol}`;
           groupResults.push({
             [groupDim]: gKey,
@@ -1146,13 +1152,16 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
         const targetAlias = req.alias || `${func.toLowerCase()}_${measureCol}`;
         for (const grp of groupResults) {
           const gVal = grp[targetAlias];
-          grp.ty_trong_pct = grandTotal > 0 ? Number(((gVal / grandTotal) * 100).toFixed(2)) : 0;
+          if (grandTotal > 0 && (func === 'SUM' || func === 'COUNT' || func === 'DISTINCT_COUNT')) {
+            grp.ty_trong_pct = Number(((gVal / grandTotal) * 100).toFixed(2));
+          }
         }
 
         groupResults.sort((a, b) => (b[targetAlias] || 0) - (a[targetAlias] || 0));
 
         resultsByRequirement[req.id] = {
           id: req.id,
+          requirement_id: req.requirement_id || req.id,
           title: req.title,
           type: 'GROUP_BY',
           dimension: groupDim,
@@ -1162,14 +1171,104 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
           total_sum: Number(grandTotal.toFixed(2)),
           status: 'AVAILABLE',
         };
+      } else if (req.type === 'DISTRIBUTION' || req.type === 'BUCKET') {
+        const measureCol = req.column || req.metric;
+        const targetDim = req.dimension || 'nhom_muc_luong';
+        const isSalary = req.band_type === 'SALARY_BAND' || (measureCol && (measureCol.includes('luong') || measureCol.includes('salary')));
+
+        let buckets = [];
+        if (isSalary) {
+          // Strictly non-overlapping salary intervals
+          buckets = [
+            { label: 'Dưới 15 triệu', check: v => v < 15000000, min: null, max: 15000000 },
+            { label: '15 - 25 triệu', check: v => v >= 15000000 && v <= 25000000, min: 15000000, max: 25000000 },
+            { label: '25 - 35 triệu', check: v => v > 25000000 && v <= 35000000, min: 25000000, max: 35000000 },
+            { label: 'Trên 35 triệu', check: v => v > 35000000, min: 35000000, max: null },
+          ];
+        } else {
+          const nums = targetRows.map(r => parseNumericValue(r[measureCol])).filter(n => n !== null).sort((a, b) => a - b);
+          if (nums.length > 0) {
+            const q1 = nums[Math.floor(nums.length * 0.25)];
+            const q2 = nums[Math.floor(nums.length * 0.50)];
+            const q3 = nums[Math.floor(nums.length * 0.75)];
+            buckets = [
+              { label: `< ${q1.toLocaleString('vi-VN')}`, check: v => v < q1, min: null, max: q1 },
+              { label: `${q1.toLocaleString('vi-VN')} - ${q2.toLocaleString('vi-VN')}`, check: v => v >= q1 && v <= q2, min: q1, max: q2 },
+              { label: `${q2.toLocaleString('vi-VN')} - ${q3.toLocaleString('vi-VN')}`, check: v => v > q2 && v <= q3, min: q2, max: q3 },
+              { label: `> ${q3.toLocaleString('vi-VN')}`, check: v => v > q3, min: q3, max: null },
+            ];
+          }
+        }
+
+        const breakdown = [];
+        let totalCount = 0;
+        let grandSum = 0;
+        for (const b of buckets) {
+          const matching = targetRows.filter(r => {
+            const val = parseNumericValue(r[measureCol]);
+            if (val === null) return false;
+            return b.check(val);
+          });
+          const distinctIds = new Set(matching.map(r => r.ma_nhan_vien || r.id || r.manv).filter(Boolean));
+          const count = distinctIds.size > 0 ? distinctIds.size : matching.length;
+          totalCount += count;
+          const nums = matching.map(r => parseNumericValue(r[measureCol])).filter(n => n !== null);
+          const totalMeasure = nums.reduce((a, b) => a + b, 0);
+          grandSum += totalMeasure;
+          const avgMeasure = nums.length > 0 ? Number((totalMeasure / nums.length).toFixed(2)) : 0;
+          breakdown.push({
+            [targetDim]: b.label,
+            nhom_muc_luong: b.label,
+            label: b.label,
+            so_nhan_vien: count,
+            count_rows: count,
+            tong_quy_luong: totalMeasure,
+            luong_trung_binh: avgMeasure,
+            min_boundary: b.min,
+            max_boundary: b.max,
+          });
+        }
+
+        for (const item of breakdown) {
+          item.ty_trong_pct = totalCount > 0 ? Number(((item.so_nhan_vien / totalCount) * 100).toFixed(2)) : 0;
+        }
+
+        resultsByRequirement[req.id] = {
+          id: req.id,
+          requirement_id: req.requirement_id || req.id,
+          title: req.title,
+          type: 'DISTRIBUTION',
+          dimension: targetDim,
+          data: breakdown,
+          total_count: totalCount,
+          total_sum: grandSum,
+          status: 'AVAILABLE',
+        };
       } else if (req.type === 'RANKING') {
-        const sortCriteria = req.orderBy || [{ col: req.column, dir: 'DESC' }];
+        const getRowFieldValue = (row, candidates) => {
+          if (!row || typeof row !== 'object') return '';
+          for (const c of candidates) {
+            if (row[c] !== undefined && row[c] !== null && row[c] !== '') return row[c];
+          }
+          const rowKeys = Object.keys(row);
+          for (const key of rowKeys) {
+            const normKey = normalizeHeaderKey(key, 0);
+            for (const c of candidates) {
+              if (normKey === normalizeHeaderKey(c, 0)) {
+                if (row[key] !== undefined && row[key] !== null && row[key] !== '') return row[key];
+              }
+            }
+          }
+          return '';
+        };
+
+        const sortCriteria = req.orderBy || [{ col: req.column || req.metric, dir: 'DESC' }];
         const sorted = [...targetRows].sort((a, b) => {
           for (const crit of sortCriteria) {
             const col = crit.col;
             const dir = String(crit.dir || 'DESC').toUpperCase();
-            const valA = a[col];
-            const valB = b[col];
+            const valA = a[col] ?? getRowFieldValue(a, [col]);
+            const valB = b[col] ?? getRowFieldValue(b, [col]);
             const numA = parseNumericValue(valA);
             const numB = parseNumericValue(valB);
             if (numA !== null && numB !== null) {
@@ -1177,7 +1276,7 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
             } else {
               const strA = String(valA || '');
               const strB = String(valB || '');
-              const cmp = strA.localeCompare(strB);
+              const cmp = strA.localeCompare(strB, 'vi');
               if (cmp !== 0) return dir === 'DESC' ? -cmp : cmp;
             }
           }
@@ -1185,25 +1284,44 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
         });
 
         const limit = req.limit || 10;
+        const targetCol = req.column || req.metric;
         const topSlice = sorted.slice(0, limit).map((r, idx) => {
+          const empCode = getRowFieldValue(r, ['ma_nhan_vien', 'Mã Nhân Viên', 'id', 'manv', 'employee_id']);
+          const empName = getRowFieldValue(r, ['ho_ten', 'Họ Tên', 'hoten', 'ten', 'full_name', 'name']);
+          const empDept = getRowFieldValue(r, ['phong_ban', 'Phòng Ban', 'bo_phan', 'department', 'dept']);
+          const empTitle = getRowFieldValue(r, ['chuc_vu', 'Chức Vụ', 'position', 'title']);
+          const targetVal = parseNumericValue(getRowFieldValue(r, [targetCol, 'luong_co_ban_vnd', 'Lương Cơ Bản (VNĐ)', 'salary'])) ?? getRowFieldValue(r, [targetCol]);
+
           const item = {
             hang: idx + 1,
-            ma_nhan_vien: r.ma_nhan_vien || r.id || r.manv || '',
-            ho_ten: r.ho_ten || r.hoten || r.ten || '',
-            phong_ban: r.phong_ban || r.bo_phan || '',
+            ma_nhan_vien: empCode,
+            ho_ten: empName,
+            phong_ban: empDept,
+            chuc_vu: empTitle,
             ...r,
           };
-          if (r.khoa_dao_tao_hoan_thanh !== undefined) {
-            item.khoa_dao_tao_hoan_thanh = parseNumericValue(r.khoa_dao_tao_hoan_thanh);
+          item.ma_nhan_vien = empCode;
+          item.ho_ten = empName;
+          item.phong_ban = empDept;
+          item.chuc_vu = empTitle;
+          if (targetCol) {
+            item[targetCol] = targetVal;
           }
-          if (r.diem_kpi !== undefined) {
-            item.diem_kpi = parseNumericValue(r.diem_kpi);
+          if (r['Lương Cơ Bản (VNĐ)'] !== undefined || r['luong_co_ban_vnd'] !== undefined) {
+            item['luong_co_ban_vnd'] = targetVal;
+          }
+          if (r.khoa_dao_tao_hoan_thanh !== undefined || r['Khóa Đào Tạo Hoành Thành'] !== undefined) {
+            item.khoa_dao_tao_hoan_thanh = parseNumericValue(getRowFieldValue(r, ['khoa_dao_tao_hoan_thanh', 'Khóa Đào Tạo Hoàn Thành']));
+          }
+          if (r.diem_kpi !== undefined || r['Điểm KPI'] !== undefined) {
+            item.diem_kpi = parseNumericValue(getRowFieldValue(r, ['diem_kpi', 'Điểm KPI']));
           }
           return item;
         });
 
         resultsByRequirement[req.id] = {
           id: req.id,
+          requirement_id: req.requirement_id || req.id,
           title: req.title,
           type: 'RANKING',
           limit,
