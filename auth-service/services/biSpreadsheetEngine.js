@@ -227,6 +227,33 @@ function parseCsvBuffer(buffer) {
   return { rawRows, delimiter: bestDelimiter };
 }
 
+function inferColumnUnit(colName, colKey) {
+  const norm = normalizeHeaderKey(colName) + ' ' + String(colKey || '').toLowerCase();
+  if (/(luong|salary|thu_nhap|tien|vnd|cost|chi_phi|doanh_so|doanh_thu|gia)/i.test(norm)) return 'VNĐ';
+  if (/(kpi|score|diem)/i.test(norm)) return 'điểm';
+  if (/(gio|hour|tang_ca|ot)/i.test(norm)) return 'giờ';
+  if (/(ngay_nghi|ngay_cong|phep)/i.test(norm)) return 'ngày';
+  if (/(khoa|dao_tao|luot_hoc)/i.test(norm)) return 'lượt hoàn thành';
+  if (/(ty_le|ty_trong|pct|phan_tram)/i.test(norm)) return '%';
+  if (/(so_luong|sl|qty|quantity|san_luong)/i.test(norm)) return 'đơn vị';
+  return '';
+}
+
+function inferSemanticRole(colName, colKey, inferredType, cardinality, totalCount) {
+  const norm = normalizeHeaderKey(colName) + ' ' + String(colKey || '').toLowerCase();
+  if (/(^id$|_id$|^ma_|_ma$|cccd|cmnd|employee_id|order_id|shipment_id)/i.test(norm)) return 'IDENTIFIER';
+  if (/(ho_ten|ten_|nguoi_tao|nguoi_nhan|ten_kh|ten_sp)/i.test(norm)) return 'LABEL';
+  if (inferredType === 'DATE' || inferredType === 'DATETIME') return 'DIMENSION_TEMPORAL';
+  if (inferredType === 'INTEGER' || inferredType === 'FLOAT') {
+    if (/(luong|salary|thu_nhap|tien|vnd|cost|chi_phi|doanh_so|doanh_thu|gia)/i.test(norm)) return 'MEASURE_CURRENCY';
+    if (/(kpi|score|diem)/i.test(norm)) return 'MEASURE_RATING';
+    if (/(so_luong|sl|qty|quantity|san_luong|khoa|so_lo|so_don)/i.test(norm)) return 'MEASURE_QUANTITY';
+    return 'MEASURE_NUMERIC';
+  }
+  if (cardinality > 0 && cardinality <= 50) return 'DIMENSION_CATEGORY';
+  return 'DIMENSION_TEXT';
+}
+
 /**
  * Infer Column Data Type & Compute Column Statistics
  */
@@ -240,6 +267,7 @@ function profileColumn(columnName, columnKey, values) {
   let floatCount = 0;
   let dateCount = 0;
   let booleanCount = 0;
+  let zeroCount = 0;
 
   for (const raw of values) {
     if (raw === null || raw === undefined || raw === '') {
@@ -270,6 +298,9 @@ function profileColumn(columnName, columnKey, values) {
     // Number check
     const num = parseNumericValue(raw);
     if (num !== null) {
+      if (num === 0) {
+        zeroCount++;
+      }
       if (Number.isInteger(num)) {
         integerCount++;
       } else {
@@ -280,6 +311,7 @@ function profileColumn(columnName, columnKey, values) {
 
   const nonNullTotal = nonNullValues.length;
   const nullRatio = total > 0 ? Number(((nullCount / total) * 100).toFixed(2)) : 0;
+  const zeroRatio = total > 0 ? Number(((zeroCount / total) * 100).toFixed(2)) : 0;
   const cardinality = freqMap.size;
 
   // Infer dominant type
@@ -294,6 +326,14 @@ function profileColumn(columnName, columnKey, values) {
     }
   }
 
+  const unit = inferColumnUnit(columnName, columnKey);
+  const semanticRole = inferSemanticRole(columnName, columnKey, inferredType, cardinality, total);
+  const searchTokens = Array.from(new Set(
+    (normalizeHeaderKey(columnName) + '_' + String(columnKey).toLowerCase())
+      .split(/[^a-z0-9]+/i)
+      .filter((t) => t.length > 1)
+  ));
+
   const profile = {
     name: columnName,
     key: columnKey,
@@ -302,6 +342,11 @@ function profileColumn(columnName, columnKey, values) {
     non_null_count: nonNullTotal,
     null_count: nullCount,
     null_ratio_pct: nullRatio,
+    zero_count: zeroCount,
+    zero_ratio_pct: zeroRatio,
+    unit,
+    semantic_role: semanticRole,
+    search_tokens: searchTokens,
     cardinality,
   };
 
@@ -550,6 +595,31 @@ async function processAndProfileDataset(metadata, buffer) {
   const suggestedQuestions = generateAnalysisSuggestions(columnsProfile);
   const previewRows = structuredRows.slice(0, 10);
 
+  // Infer Grain (meaning of a single row)
+  let grain = 'RECORD';
+  let grainDescription = 'Mỗi dòng là một bản ghi dữ liệu';
+  const idCol = columnsProfile.find((c) => c.semantic_role === 'IDENTIFIER' || /(^ma_|_id$|^id$)/i.test(c.key));
+  if (idCol && idCol.cardinality === structuredRows.length && structuredRows.length > 0) {
+    if (/(nhan_vien|emp|nv|nhan_su)/i.test(idCol.key)) {
+      grain = 'EMPLOYEE';
+      grainDescription = 'Mỗi dòng là một nhân viên';
+    } else if (/(don_hang|order|don)/i.test(idCol.key)) {
+      grain = 'ORDER';
+      grainDescription = 'Mỗi dòng là một đơn hàng';
+    } else if (/(van_don|shipment|lo_hang)/i.test(idCol.key)) {
+      grain = 'SHIPMENT';
+      grainDescription = 'Mỗi dòng là một lô hàng / chuyến hàng';
+    }
+  } else if (idCol && idCol.cardinality < structuredRows.length) {
+    if (/(don_hang|order|don)/i.test(idCol.key)) {
+      grain = 'ORDER_ITEM';
+      grainDescription = 'Mỗi dòng là một dòng sản phẩm của đơn hàng (đa dòng)';
+    } else if (/(van_don|shipment|chuyen_hang)/i.test(idCol.key)) {
+      grain = 'SHIPMENT_ITEM';
+      grainDescription = 'Mỗi dòng là một kiện hàng trong chuyến';
+    }
+  }
+
   const dataProfile = {
     file_id: metadata.file_id,
     original_filename: metadata.original_filename,
@@ -559,6 +629,8 @@ async function processAndProfileDataset(metadata, buffer) {
     row_count: structuredRows.length,
     column_count: columnsProfile.length,
     columns: columnsProfile,
+    grain,
+    grain_description: grainDescription,
     quality_alerts: qualityAlerts,
     suggested_questions: suggestedQuestions,
     preview_rows: previewRows,
@@ -957,6 +1029,328 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
   const endHeap = process.memoryUsage().heapUsed;
   const memoryDeltaKb = Math.max(0, Math.round((endHeap - startHeap) / 1024));
 
+  // 6a. Execute Composite Requirements if present
+  let resultsByRequirement = null;
+  let reconciliation = null;
+
+  if (Array.isArray(querySpec.requirements) && querySpec.requirements.length > 0) {
+    resultsByRequirement = {};
+    for (const req of querySpec.requirements) {
+      if (req.status === 'DATA_UNAVAILABLE') {
+        resultsByRequirement[req.id] = {
+          id: req.id,
+          title: req.title,
+          status: 'DATA_UNAVAILABLE',
+          reason: req.reason || 'Dữ liệu không khả dụng trong bộ dữ liệu này.',
+        };
+        continue;
+      }
+
+      let targetRows = rows;
+      if (Array.isArray(req.filters) && req.filters.length > 0) {
+        targetRows = targetRows.filter((r) => {
+          for (const f of req.filters) {
+            const val = r[f.column];
+            const numVal = parseNumericValue(val);
+            const compVal = parseNumericValue(f.value);
+            if (f.op === 'eq') {
+              if (numVal !== null && compVal !== null) {
+                if (numVal !== compVal) return false;
+              } else if (String(val).toLowerCase() !== String(f.value).toLowerCase()) {
+                return false;
+              }
+            } else if (f.op === 'neq') {
+              if (numVal !== null && compVal !== null) {
+                if (numVal === compVal) return false;
+              } else if (String(val).toLowerCase() === String(f.value).toLowerCase()) {
+                return false;
+              }
+            } else if (f.op === 'lte') {
+              if (numVal === null || compVal === null || numVal > compVal) return false;
+            } else if (f.op === 'gte') {
+              if (numVal === null || compVal === null || numVal < compVal) return false;
+            } else if (f.op === 'lt') {
+              if (numVal === null || compVal === null || numVal >= compVal) return false;
+            } else if (f.op === 'gt') {
+              if (numVal === null || compVal === null || numVal <= compVal) return false;
+            }
+          }
+          return true;
+        });
+      }
+
+      if (req.type === 'METRIC') {
+        const func = String(req.func || 'SUM').toUpperCase();
+        const col = req.column;
+        let metricVal = null;
+        if (func === 'COUNT') {
+          metricVal = targetRows.length;
+        } else if (func === 'DISTINCT_COUNT') {
+          const s = new Set(targetRows.map((r) => r[col]).filter((v) => v !== null && v !== undefined && v !== ''));
+          metricVal = s.size;
+        } else {
+          const nums = targetRows.map((r) => parseNumericValue(r[col])).filter((n) => n !== null);
+          if (nums.length > 0) {
+            if (func === 'SUM') metricVal = Number(nums.reduce((a, b) => a + b, 0).toFixed(2));
+            else if (func === 'AVG') metricVal = Number((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2));
+            else if (func === 'MIN') metricVal = Math.min(...nums);
+            else if (func === 'MAX') metricVal = Math.max(...nums);
+          }
+        }
+        resultsByRequirement[req.id] = {
+          id: req.id,
+          title: req.title,
+          type: 'METRIC',
+          func,
+          column: col,
+          value: metricVal,
+          unit: req.unit || '',
+          sample_size: targetRows.length,
+          status: 'AVAILABLE',
+        };
+      } else if (req.type === 'GROUP_BY') {
+        const groupCols = req.groupBy || [];
+        const groupDim = typeof groupCols[0] === 'string' ? groupCols[0] : groupCols[0]?.column;
+        const measureCol = req.column;
+        const func = String(req.func || 'SUM').toUpperCase();
+        const gMap = new Map();
+
+        for (const r of targetRows) {
+          const gKey = String(r[groupDim] || 'Khác').trim() || 'Khác';
+          if (!gMap.has(gKey)) gMap.set(gKey, { key: gKey, rows: [] });
+          gMap.get(gKey).rows.push(r);
+        }
+
+        const groupResults = [];
+        let grandTotal = 0;
+        for (const [gKey, item] of gMap.entries()) {
+          let gVal = 0;
+          if (func === 'COUNT') {
+            gVal = item.rows.length;
+          } else if (func === 'DISTINCT_COUNT') {
+            const s = new Set(item.rows.map((r) => r[measureCol]).filter((v) => v !== null && v !== undefined && v !== ''));
+            gVal = s.size;
+          } else {
+            const nums = item.rows.map((r) => parseNumericValue(r[measureCol])).filter((n) => n !== null);
+            gVal = nums.length > 0 ? (func === 'AVG' ? Number((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2)) : Number(nums.reduce((a, b) => a + b, 0).toFixed(2))) : 0;
+          }
+          grandTotal += gVal;
+          const targetAlias = req.alias || `${func.toLowerCase()}_${measureCol}`;
+          groupResults.push({
+            [groupDim]: gKey,
+            [targetAlias]: gVal,
+            count_rows: item.rows.length,
+          });
+        }
+
+        const targetAlias = req.alias || `${func.toLowerCase()}_${measureCol}`;
+        for (const grp of groupResults) {
+          const gVal = grp[targetAlias];
+          grp.ty_trong_pct = grandTotal > 0 ? Number(((gVal / grandTotal) * 100).toFixed(2)) : 0;
+        }
+
+        groupResults.sort((a, b) => (b[targetAlias] || 0) - (a[targetAlias] || 0));
+
+        resultsByRequirement[req.id] = {
+          id: req.id,
+          title: req.title,
+          type: 'GROUP_BY',
+          dimension: groupDim,
+          metric_alias: targetAlias,
+          unit: req.unit || '',
+          data: groupResults,
+          total_sum: Number(grandTotal.toFixed(2)),
+          status: 'AVAILABLE',
+        };
+      } else if (req.type === 'RANKING') {
+        const sortCriteria = req.orderBy || [{ col: req.column, dir: 'DESC' }];
+        const sorted = [...targetRows].sort((a, b) => {
+          for (const crit of sortCriteria) {
+            const col = crit.col;
+            const dir = String(crit.dir || 'DESC').toUpperCase();
+            const valA = a[col];
+            const valB = b[col];
+            const numA = parseNumericValue(valA);
+            const numB = parseNumericValue(valB);
+            if (numA !== null && numB !== null) {
+              if (numA !== numB) return dir === 'DESC' ? numB - numA : numA - numB;
+            } else {
+              const strA = String(valA || '');
+              const strB = String(valB || '');
+              const cmp = strA.localeCompare(strB);
+              if (cmp !== 0) return dir === 'DESC' ? -cmp : cmp;
+            }
+          }
+          return 0;
+        });
+
+        const limit = req.limit || 10;
+        const topSlice = sorted.slice(0, limit).map((r, idx) => {
+          const item = {
+            hang: idx + 1,
+            ma_nhan_vien: r.ma_nhan_vien || r.id || r.manv || '',
+            ho_ten: r.ho_ten || r.hoten || r.ten || '',
+            phong_ban: r.phong_ban || r.bo_phan || '',
+            ...r,
+          };
+          if (r.khoa_dao_tao_hoan_thanh !== undefined) {
+            item.khoa_dao_tao_hoan_thanh = parseNumericValue(r.khoa_dao_tao_hoan_thanh);
+          }
+          if (r.diem_kpi !== undefined) {
+            item.diem_kpi = parseNumericValue(r.diem_kpi);
+          }
+          return item;
+        });
+
+        resultsByRequirement[req.id] = {
+          id: req.id,
+          title: req.title,
+          type: 'RANKING',
+          limit,
+          data: topSlice,
+          status: 'AVAILABLE',
+        };
+      } else if (req.type === 'CORRELATION_BREAKDOWN') {
+        const dimCol = req.dimension;
+        const targetMeasureCol = req.target_measure;
+        const distinctVals = req.discrete_values || [0, 1, 2, 3, 4, 5];
+        const breakdown = [];
+
+        for (const dVal of distinctVals) {
+          const matching = targetRows.filter((r) => parseNumericValue(r[dimCol]) === dVal);
+          const distinctIds = new Set(matching.map((r) => r.ma_nhan_vien || r.id).filter(Boolean));
+          const countEmployees = distinctIds.size > 0 ? distinctIds.size : matching.length;
+          const kpiNums = matching.map((r) => parseNumericValue(r[targetMeasureCol])).filter((n) => n !== null);
+          const avgKpi = kpiNums.length > 0 ? Number((kpiNums.reduce((a, b) => a + b, 0) / kpiNums.length).toFixed(2)) : 0;
+          breakdown.push({
+            [dimCol]: dVal,
+            so_khoa: `${dVal} khóa`,
+            so_nhan_vien: countEmployees,
+            avg_kpi: avgKpi,
+            diem_kpi_trung_binh: avgKpi,
+          });
+        }
+
+        resultsByRequirement[req.id] = {
+          id: req.id,
+          title: req.title,
+          type: 'CORRELATION_BREAKDOWN',
+          dimension: dimCol,
+          target_measure: targetMeasureCol,
+          data: breakdown,
+          status: 'AVAILABLE',
+        };
+      } else if (req.type === 'TREND') {
+        const dateKey = typeof req.groupBy?.[0] === 'object' ? req.groupBy[0].column : (req.date_column || req.groupBy?.[0]);
+        const dateTruncType = req.groupBy?.[0]?.date_trunc || 'month';
+        const measureCol = req.column;
+        const func = String(req.func || 'SUM').toUpperCase();
+        const tMap = new Map();
+
+        for (const r of targetRows) {
+          const t = truncateDate(r[dateKey], dateTruncType) || 'Khác';
+          if (!tMap.has(t)) tMap.set(t, { period: t, rows: [] });
+          tMap.get(t).rows.push(r);
+        }
+
+        const trendList = [];
+        for (const [period, item] of tMap.entries()) {
+          if (period === 'Khác') continue;
+          let periodVal = 0;
+          if (func === 'COUNT') {
+            periodVal = item.rows.length;
+          } else if (func === 'DISTINCT_COUNT') {
+            const s = new Set(item.rows.map((r) => r[measureCol]).filter(Boolean));
+            periodVal = s.size;
+          } else {
+            const nums = item.rows.map((r) => parseNumericValue(r[measureCol])).filter((n) => n !== null);
+            periodVal = nums.length > 0 ? (func === 'AVG' ? Number((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2)) : Number(nums.reduce((a, b) => a + b, 0).toFixed(2))) : 0;
+          }
+          trendList.push({
+            thoi_gian: period,
+            period,
+            [req.alias || `${func.toLowerCase()}_${measureCol}`]: periodVal,
+            count_rows: item.rows.length,
+          });
+        }
+        trendList.sort((a, b) => String(a.period).localeCompare(String(b.period)));
+
+        resultsByRequirement[req.id] = {
+          id: req.id,
+          title: req.title,
+          type: 'TREND',
+          data: trendList,
+          status: 'AVAILABLE',
+        };
+      } else if (req.type === 'RATIO') {
+        const dimCol = req.dimension;
+        const promisedCol = req.promised_date_col || 'ngay_giao_cam_ket';
+        const actualCol = req.actual_date_col || 'ngay_giao_thuc_te';
+        const statusFilterCol = req.status_col || 'trang_thai';
+        const deliveredVal = req.delivered_status_value || 'Da_giao';
+
+        const gMap = new Map();
+        for (const r of targetRows) {
+          const dimVal = String(r[dimCol] || 'Khác').trim() || 'Khác';
+          if (!gMap.has(dimVal)) gMap.set(dimVal, { carrier: dimVal, total_orders: 0, delivered_orders: 0, on_time_orders: 0, pending_orders: 0 });
+          const item = gMap.get(dimVal);
+          item.total_orders++;
+          const status = String(r[statusFilterCol] || '').trim();
+          const sLower = status.toLowerCase();
+          const isPending = sLower.includes('dang') || sLower.includes('đang') || sLower.includes('cho') || sLower.includes('chờ') || sLower.includes('pending') || sLower.includes('transit');
+          const isDelivered = !isPending && (sLower === deliveredVal.toLowerCase() || sLower === 'da_giao' || sLower.includes('đã giao') || sLower.includes('hoàn thành') || sLower === 'delivered' || sLower === 'thành công' || (!status && r[actualCol]));
+          if (isDelivered) {
+            item.delivered_orders++;
+            const promisedDate = parseDateValue(r[promisedCol]);
+            const actualDate = parseDateValue(r[actualCol]);
+            if (promisedDate && actualDate) {
+              if (new Date(actualDate) <= new Date(promisedDate)) {
+                item.on_time_orders++;
+              }
+            }
+          } else {
+            item.pending_orders++;
+          }
+        }
+
+        const ratioResults = [];
+        for (const item of gMap.values()) {
+          const rate = item.delivered_orders > 0 ? Number(((item.on_time_orders / item.delivered_orders) * 100).toFixed(2)) : 0;
+          ratioResults.push({
+            [dimCol]: item.carrier,
+            tong_don: item.total_orders,
+            da_giao: item.delivered_orders,
+            chua_giao: item.pending_orders,
+            giao_dung_han: item.on_time_orders,
+            ty_le_dung_han_pct: rate,
+          });
+        }
+        ratioResults.sort((a, b) => b.ty_le_dung_han_pct - a.ty_le_dung_han_pct);
+
+        resultsByRequirement[req.id] = {
+          id: req.id,
+          title: req.title,
+          type: 'RATIO',
+          dimension: dimCol,
+          data: ratioResults,
+          status: 'AVAILABLE',
+        };
+      }
+    }
+
+    // Cross-reconciliation check
+    const totalMetricReq = Object.values(resultsByRequirement).find((r) => r.type === 'METRIC' && String(r.id).includes('total'));
+    const groupBreakdownReq = Object.values(resultsByRequirement).find((r) => r.type === 'GROUP_BY');
+    if (totalMetricReq && groupBreakdownReq && totalMetricReq.value !== null && groupBreakdownReq.total_sum !== undefined) {
+      reconciliation = {
+        is_balanced: Math.abs(totalMetricReq.value - groupBreakdownReq.total_sum) < 0.01,
+        total_metric: totalMetricReq.value,
+        group_sum: groupBreakdownReq.total_sum,
+        unit: totalMetricReq.unit || groupBreakdownReq.unit,
+      };
+    }
+  }
+
   // 6b. Generate Multi-Visual Engine Aggregations on matching rows (Guarantees multi-visual on all routes)
   const deptCol = columns.find(c => /(phong|dept|bo_phan)/i.test(c.key));
   const branchCol = columns.find(c => /(chi_nhanh|branch|cong_ty)/i.test(c.key));
@@ -1112,6 +1506,8 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
     summary,
     total_groups: resultRows.length,
     period_comparison: periodComparisonResult,
+    results_by_requirement: resultsByRequirement,
+    reconciliation,
     multi_visual: {
       dept_breakdown: deptRows,
       branch_share: branchRows,

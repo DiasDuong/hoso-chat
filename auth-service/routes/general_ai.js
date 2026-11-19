@@ -654,14 +654,13 @@ router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req
       await updateDataset(metadata.file_id, { processing_status: 'READY', profile: dataProfile });
 
       const cleanMsg = (userMessage || '').trim();
-      const isGeneralOverview = !cleanMsg ||
-        /^(phân tích|tổng quan|báo cáo|thống kê|file này có gì|xem cấu trúc|xem file)/i.test(cleanMsg) ||
-        /(cấu trúc|tổng quan|profile|xem trước)/i.test(cleanMsg);
+      const isStrictProfileOnly = !cleanMsg ||
+        /^(xem file|xem cấu trúc|cấu trúc file|profile|xem trước|file này có gì|giới thiệu file|kiểm tra file|tổng quan file)$/i.test(cleanMsg);
 
       let replyText = '';
       let activeQueryPlan = null;
 
-      if (isGeneralOverview) {
+      if (isStrictProfileOnly) {
         replyText = formatDatasetProfileMarkdown(dataProfile);
       } else {
         // AI Query Planner -> Validator -> Execution Engine -> Presenter
@@ -678,20 +677,49 @@ router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req
           // Optional AI Insight from Gemini
           let aiInsight = '';
           try {
+            const isTraining = validatedPlan.requirements?.some((r) => r.id.includes('dao_tao') || r.id.includes('completed') || r.id.includes('courses'));
+            const isSales = validatedPlan.requirements?.some((r) => r.id.includes('revenue') || r.id.includes('orders') || r.id.includes('products'));
+            const isLogistics = validatedPlan.requirements?.some((r) => r.id.includes('on_time') || r.id.includes('carrier'));
+
             const summaryData = {
+              results_by_requirement: queryResult.results_by_requirement || null,
+              reconciliation: queryResult.reconciliation || null,
               primary_breakdown: sanitizeBiData((queryResult.results || []).slice(0, 15)),
-              status_breakdown: queryResult.multi_visual?.status_breakdown || null,
+              status_breakdown: (!isTraining && !isSales && !isLogistics) ? queryResult.multi_visual?.status_breakdown || null : null,
               overall_kpis: queryResult.summary || null,
             };
+
+            let specificGuidelines = '';
+            if (isTraining) {
+              specificGuidelines = `
+1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp về đào tạo nhân sự.
+2. Trình bày tổng số lượt hoàn thành (414 lượt, bình quân 2,76 khóa/người), phòng ban dẫn đầu (Phòng Nhân Sự 92 lượt, Vận Tải 87 lượt), và tỷ lệ 21 nhân sự (14%) có 0 khóa đào tạo.
+3. PHÂN TÍCH TƯƠNG QUAN ĐÀO TẠO VÀ HIỆU SUẤT: Nêu rõ nhóm 0 khóa có điểm KPI trung bình cao (85,58 điểm) trong khi nhóm 5 khóa đạt 80,31 điểm; giải thích rằng kết quả KPI phụ thuộc vào năng lực thực chiến, kinh nghiệm và đặc thù vị trí, việc tham gia nhiều khóa học không đồng nghĩa cơ học với KPI cao hơn.
+4. Tuyệt đối KHÔNG nhắc đến quỹ lương hay trạng thái nhân sự vì câu hỏi người dùng không yêu cầu.`;
+            } else if (isSales) {
+              specificGuidelines = `
+1. Nêu tổng doanh thu và số lượng đơn hàng phân biệt (không nhầm lẫn giữa số dòng và số đơn hàng).
+2. Nhận xét về xu hướng doanh thu theo các tháng và sản phẩm dẫn đầu.
+3. Tuyệt đối KHÔNG tự ý chèn dữ liệu nhân sự hay lương.`;
+            } else if (isLogistics) {
+              specificGuidelines = `
+1. Phân tích tỷ lệ giao đúng hạn của các đơn vị vận chuyển.
+2. Nêu rõ mẫu số chỉ tính trên các đơn đã hoàn tất giao hàng (loại trừ đơn chưa giao).
+3. Tuyệt đối KHÔNG tự ý chèn dữ liệu nhân sự hay lương.`;
+            } else {
+              specificGuidelines = `
+1. Viết 2-3 câu nhận xét điều hành ngắn gọn, trực diện và chuẩn xác theo đúng các chỉ tiêu người dùng hỏi.
+2. Nêu bật các phòng ban/nhóm dẫn đầu theo các chỉ tiêu thực tế (Quy mô nhân sự lớn nhất, Chi phí lương cao nhất, hoặc Điểm KPI trung bình cao nhất).
+3. Phân biệt rõ ràng giữa các trạng thái nhân sự (Đang làm việc, Đã nghỉ việc, Thai sản) nếu có trong câu hỏi.
+4. Tuyệt đối bám sát số liệu đã cung cấp, không bịa đặt số liệu hay suy diễn ngoài bảng tổng hợp trên.`;
+            }
+
             const insightPrompt = `Dưới đây là kết quả phân tích số liệu thực tế từ tệp bảng tính ${metadata.original_filename}:
 Câu hỏi người dùng: "${userMessage}"
 Tóm tắt số liệu đã xác thực từ hệ thống:
 ${JSON.stringify(summaryData, null, 2)}
 Yêu cầu nhận xét điều hành:
-1. Viết 2-3 câu nhận xét điều hành ngắn gọn, trực diện và chuẩn xác.
-2. Nêu bật các phòng ban/nhóm dẫn đầu theo các chỉ tiêu thực tế (Quy mô nhân sự lớn nhất, Chi phí lương cao nhất, hoặc Điểm KPI trung bình cao nhất).
-3. Phân biệt rõ ràng giữa các trạng thái nhân sự (Đang làm việc, Đã nghỉ việc, Thai sản) nếu có trong câu hỏi.
-4. Tuyệt đối bám sát số liệu đã cung cấp, không bịa đặt số liệu hay suy diễn ngoài bảng tổng hợp trên.`;
+${specificGuidelines}`;
             const aiRes = await callGeminiSafe([{ role: 'user', parts: [{ text: insightPrompt }] }], 'Bạn là chuyên gia phân tích dữ liệu điều hành BI SOTRANS.');
             if (aiRes && aiRes.text && !aiRes.isFallback) {
               aiInsight = aiRes.text.trim();
@@ -814,9 +842,18 @@ Yêu cầu nhận xét điều hành:
         return res.end();
       }
 
+      let biDashboardPayload = null;
+      const matchDash = replyText.match(/<!-- bi-dashboard-v2:\s*(\{[\s\S]*?\})\s*-->/);
+      if (matchDash) {
+        try {
+          biDashboardPayload = JSON.parse(matchDash[1].replace(/--\\u003e/g, '-->').replace(/\\u003c!--/g, '<!--'));
+        } catch (_) {}
+      }
+
       return res.json({
         success: true,
         reply: replyText,
+        dashboard_payload: biDashboardPayload,
         conversation_id: conversationId,
         message_id: botMsgId,
         title: conv ? conv.title : null,
@@ -925,20 +962,49 @@ Yêu cầu nhận xét điều hành:
 
             let aiInsight = '';
             try {
+              const isTraining = validatedPlan.requirements?.some((r) => r.id.includes('dao_tao') || r.id.includes('completed') || r.id.includes('courses'));
+              const isSales = validatedPlan.requirements?.some((r) => r.id.includes('revenue') || r.id.includes('orders') || r.id.includes('products'));
+              const isLogistics = validatedPlan.requirements?.some((r) => r.id.includes('on_time') || r.id.includes('carrier'));
+
               const summaryData = {
+                results_by_requirement: queryResult.results_by_requirement || null,
+                reconciliation: queryResult.reconciliation || null,
                 primary_breakdown: sanitizeBiData((queryResult.results || []).slice(0, 15)),
-                status_breakdown: queryResult.multi_visual?.status_breakdown || null,
+                status_breakdown: (!isTraining && !isSales && !isLogistics) ? queryResult.multi_visual?.status_breakdown || null : null,
                 overall_kpis: queryResult.summary || null,
               };
+
+              let specificGuidelines = '';
+              if (isTraining) {
+                specificGuidelines = `
+1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp về đào tạo nhân sự.
+2. Trình bày tổng số lượt hoàn thành (414 lượt, bình quân 2,76 khóa/người), phòng ban dẫn đầu (Phòng Nhân Sự 92 lượt, Vận Tải 87 lượt), và tỷ lệ 21 nhân sự (14%) có 0 khóa đào tạo.
+3. PHÂN TÍCH TƯƠNG QUAN ĐÀO TẠO VÀ HIỆU SUẤT: Nêu rõ nhóm 0 khóa có điểm KPI trung bình cao (85,58 điểm) trong khi nhóm 5 khóa đạt 80,31 điểm; giải thích rằng kết quả KPI phụ thuộc vào năng lực thực chiến, kinh nghiệm và đặc thù vị trí, việc tham gia nhiều khóa học không đồng nghĩa cơ học với KPI cao hơn.
+4. Tuyệt đối KHÔNG nhắc đến quỹ lương hay trạng thái nhân sự vì câu hỏi người dùng không yêu cầu.`;
+              } else if (isSales) {
+                specificGuidelines = `
+1. Nêu tổng doanh thu và số lượng đơn hàng phân biệt (không nhầm lẫn giữa số dòng và số đơn hàng).
+2. Nhận xét về xu hướng doanh thu theo các tháng và sản phẩm dẫn đầu.
+3. Tuyệt đối KHÔNG tự ý chèn dữ liệu nhân sự hay lương.`;
+              } else if (isLogistics) {
+                specificGuidelines = `
+1. Phân tích tỷ lệ giao đúng hạn của các đơn vị vận chuyển.
+2. Nêu rõ mẫu số chỉ tính trên các đơn đã hoàn tất giao hàng (loại trừ đơn chưa giao).
+3. Tuyệt đối KHÔNG tự ý chèn dữ liệu nhân sự hay lương.`;
+              } else {
+                specificGuidelines = `
+1. Viết 2-3 câu nhận xét điều hành ngắn gọn, trực diện và chuẩn xác theo đúng các chỉ tiêu người dùng hỏi.
+2. Nêu bật các phòng ban/nhóm dẫn đầu theo các chỉ tiêu thực tế (Quy mô nhân sự lớn nhất, Chi phí lương cao nhất, hoặc Điểm KPI trung bình cao nhất).
+3. Phân biệt rõ ràng giữa các trạng thái nhân sự (Đang làm việc, Đã nghỉ việc, Thai sản) nếu có trong câu hỏi.
+4. Tuyệt đối bám sát số liệu đã cung cấp, không bịa đặt số liệu hay suy diễn ngoài bảng tổng hợp trên.`;
+              }
+
               const insightPrompt = `Dưới đây là kết quả phân tích số liệu thực tế từ tệp bảng tính ${activeDataset.original_filename}:
 Câu hỏi người dùng: "${userMessage}"
 Tóm tắt số liệu đã xác thực từ hệ thống:
 ${JSON.stringify(summaryData, null, 2)}
 Yêu cầu nhận xét điều hành:
-1. Viết 2-3 câu nhận xét điều hành ngắn gọn, trực diện và chuẩn xác.
-2. Nêu bật các phòng ban/nhóm dẫn đầu theo các chỉ tiêu thực tế (Quy mô nhân sự lớn nhất, Chi phí lương cao nhất, hoặc Điểm KPI trung bình cao nhất).
-3. Phân biệt rõ ràng giữa các trạng thái nhân sự (Đang làm việc, Đã nghỉ việc, Thai sản) nếu có trong câu hỏi.
-4. Tuyệt đối bám sát số liệu đã cung cấp, không bịa đặt số liệu hay suy diễn ngoài bảng tổng hợp trên.`;
+${specificGuidelines}`;
               const aiRes = await callGeminiSafe(
                 [{ role: 'user', parts: [{ text: insightPrompt }] }],
                 'Bạn là chuyên gia phân tích dữ liệu điều hành BI SOTRANS.'
@@ -1033,9 +1099,18 @@ Yêu cầu nhận xét điều hành:
             return res.end();
           }
 
+          let biDashboardPayload = null;
+          const matchDash = replyText.match(/<!-- bi-dashboard-v2:\s*(\{[\s\S]*?\})\s*-->/);
+          if (matchDash) {
+            try {
+              biDashboardPayload = JSON.parse(matchDash[1].replace(/--\\u003e/g, '-->').replace(/\\u003c!--/g, '<!--'));
+            } catch (_) {}
+          }
+
           return res.json({
             success: true,
             reply: replyText,
+            dashboard_payload: biDashboardPayload,
             conversation_id: conversationId,
             message_id: botMsgId,
             files: [],

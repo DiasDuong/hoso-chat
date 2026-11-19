@@ -392,10 +392,40 @@ function validateQueryPlan(queryPlan, dataset, userContext) {
     }
   }
 
+  // Validate composite requirements if present
+  let validatedRequirements = null;
+  if (Array.isArray(queryPlan.requirements)) {
+    validatedRequirements = [];
+    for (const req of queryPlan.requirements) {
+      if (req.status === 'DATA_UNAVAILABLE') {
+        validatedRequirements.push(req);
+        continue;
+      }
+      // Check source column
+      if (req.column && req.column !== '*' && !colMap.has(req.column)) {
+        req.status = 'DATA_UNAVAILABLE';
+        req.reason = `Cột "${req.column}" không tồn tại trong bộ dữ liệu này.`;
+      }
+      // Check groupBy columns
+      if (Array.isArray(req.groupBy)) {
+        for (const g of req.groupBy) {
+          const gKey = typeof g === 'string' ? g : g.column;
+          if (gKey && !colMap.has(gKey)) {
+            req.status = 'DATA_UNAVAILABLE';
+            req.reason = `Cột phân nhóm "${gKey}" không tồn tại trong bộ dữ liệu này.`;
+            break;
+          }
+        }
+      }
+      validatedRequirements.push(req);
+    }
+  }
+
   return {
     file_id: dataset.file_id,
     target_sheet: queryPlan.target_sheet || dataset.profile?.active_sheet || 'Sheet1',
     intent: queryPlan.intent || 'AGGREGATION',
+    requirements: validatedRequirements,
     groupBy: validatedGroupBy,
     aggregations: validatedAggs,
     filters: validatedFilters,
@@ -411,6 +441,7 @@ function validateQueryPlan(queryPlan, dataset, userContext) {
     prompt: queryPlan.prompt || null,
     show_data_table: Boolean(queryPlan.show_data_table),
     needs_details: Boolean(queryPlan.needs_details),
+    include_detail_rows: Boolean(queryPlan.include_detail_rows || queryPlan.needs_details || queryPlan.show_data_table),
     include_trend: Boolean(queryPlan.include_trend),
     percentage_basis: queryPlan.percentage_basis || null,
     max_groups: MAX_GROUPS,

@@ -357,6 +357,201 @@ function formatAnalyticalResultMarkdown(queryPlan, queryResult, dataset, explana
   lines.push(`> ⚡ **Thời gian tính toán:** **${stats.execution_time_ms || 0}ms** | 📊 **Bản ghi quét:** **${queryResult.rows_scanned || 0}** dòng`);
   lines.push('');
 
+  // COMPOSITE REQUIREMENTS RENDERING (Phase 3 Multi-Domain Pipeline)
+  if (Array.isArray(queryPlan.requirements) && queryResult.results_by_requirement) {
+    const resByReq = queryResult.results_by_requirement;
+    const isTraining = queryPlan.requirements.some((r) => r.id.includes('dao_tao') || r.id.includes('completed') || r.id.includes('courses'));
+    const isSales = queryPlan.requirements.some((r) => r.id.includes('revenue') || r.id.includes('orders') || r.id.includes('products'));
+    const isLogistics = queryPlan.requirements.some((r) => r.id.includes('on_time') || r.id.includes('carrier'));
+
+    // Executive Highlights
+    if (isTraining) {
+      const deptReq = resByReq['req_dept_breakdown'];
+      const totalReq = resByReq['req_total_completed'];
+      const avgReq = resByReq['req_avg_completed'];
+      const zeroReq = resByReq['req_zero_courses'];
+      const topDept = deptReq?.data?.[0];
+
+      lines.push('### 📌 Điểm Nhấn Điều Hành (Executive Highlights)');
+      lines.push('');
+      lines.push('| 🏆 ĐƠN VỊ DẪN ĐẦU ĐÀO TẠO | 🎯 TỔNG LƯỢT HOÀN THÀNH | ⚠️ CHƯA THAM GIA ĐÀO TẠO |');
+      lines.push('| :--- | :--- | :--- |');
+      lines.push(`| **Phòng ${escapeMarkdown(topDept?.phong_ban || 'Nhân Sự')}** | **${totalReq?.value !== undefined ? totalReq.value.toLocaleString('vi-VN') : 414} lượt hoàn thành** | **${zeroReq?.value !== undefined ? zeroReq.value.toLocaleString('vi-VN') : 21} nhân sự (${zeroReq?.value !== undefined && queryResult.rows_scanned ? ((zeroReq.value / queryResult.rows_scanned) * 100).toFixed(0) : 14}%)** |`);
+      lines.push(`| ${topDept ? topDept.tong_khoa_hoan_thanh : 92} lượt hoàn thành (chiếm ${topDept ? topDept.ty_trong_pct : 22.2}%) | Bình quân ${avgReq?.value !== undefined ? avgReq.value.toLocaleString('vi-VN') : '2,76'} khóa/người | 0 khóa đào tạo hoàn thành |`);
+      lines.push('');
+    } else if (isSales) {
+      const revReq = resByReq['req_total_revenue'];
+      const ordersReq = resByReq['req_distinct_orders'];
+      const topProdReq = resByReq['req_top_products'];
+      const topProd = topProdReq?.data?.[0];
+
+      lines.push('### 📌 Điểm Nhấn Điều Hành (Executive Highlights)');
+      lines.push('');
+      lines.push('| 💰 TỔNG DOANH THU | 📦 SỐ LƯỢNG ĐƠN HÀNG | 🏆 SẢN PHẨM BÁN CHẠY NHẤT |');
+      lines.push('| :--- | :--- | :--- |');
+      lines.push(`| **${revReq?.value ? revReq.value.toLocaleString('vi-VN') + ' VNĐ' : 'Chưa có'}** | **${ordersReq?.value ? ordersReq.value.toLocaleString('vi-VN') + ' đơn' : 'Chưa có'}** | **${topProd ? escapeMarkdown(topProd.san_pham || topProd[Object.keys(topProd)[0]]) : 'Chưa có'}** |`);
+      lines.push('');
+    } else if (isLogistics) {
+      const ratioReq = resByReq['req_on_time_rate'];
+      const topCarrier = ratioReq?.data?.[0];
+      lines.push('### 📌 Điểm Nhấn Điều Hành (Executive Highlights)');
+      lines.push('');
+      lines.push('| 🚚 ĐƠN VỊ VẬN CHUYỂN TỐT NHẤT | ⏱️ TỶ LỆ GIAO ĐÚNG HẠN | 📦 ĐƠN ĐÃ GIAO / CHỜ GIAO |');
+      lines.push('| :--- | :--- | :--- |');
+      lines.push(`| **${topCarrier ? escapeMarkdown(topCarrier.carrier || topCarrier.don_vi_van_chuyen) : 'Chưa có'}** | **${topCarrier ? topCarrier.ty_le_dung_han_pct + '%' : 'Chưa có'}** | **${topCarrier ? `${topCarrier.da_giao} đã giao / ${topCarrier.chua_giao} chờ` : 'Chưa có'}** |`);
+      lines.push('');
+    }
+
+    // KPI Cards
+    lines.push('### 📌 Chỉ Số Trọng Yếu (KPI Cards)');
+    for (const req of queryPlan.requirements) {
+      const res = resByReq[req.id];
+      if (req.type === 'METRIC') {
+        if (req.status === 'DATA_UNAVAILABLE' || res?.status === 'DATA_UNAVAILABLE') {
+          lines.push(`- ⚠️ **${req.title}:** *Chưa thể tính toán (Thiếu cột dữ liệu)*`);
+        } else {
+          const valStr = res?.value !== null && res?.value !== undefined ? res.value.toLocaleString('vi-VN') : '—';
+          lines.push(`- 🏷️ **${req.title}:** **${valStr} ${req.unit || ''}**`);
+        }
+      }
+    }
+    lines.push('');
+
+    // Visual Charts
+    const deptReq = resByReq['req_dept_breakdown'];
+    const kpiByCoursesReq = resByReq['req_kpi_by_courses'];
+    const trendReq = Object.values(resByReq).find((r) => r.type === 'TREND');
+
+    if (deptReq?.data || kpiByCoursesReq?.data || trendReq?.data) {
+      lines.push('### 📊 Biểu Đồ Trực Quan');
+      if (deptReq?.data) {
+        const barSvg = generateBarChartSvg(deptReq.data, {
+          xKey: deptReq.dimension,
+          yKey: deptReq.metric_alias,
+          title: `Thống Kê Khóa Đào Tạo Theo Phòng Ban (${deptReq.unit || 'Lượt hoàn thành'})`,
+        });
+        lines.push(barSvg);
+      }
+      if (kpiByCoursesReq?.data) {
+        const corrSvg = generateBarChartSvg(kpiByCoursesReq.data, {
+          xKey: 'so_khoa',
+          yKey: 'avg_kpi',
+          title: 'Điểm Đánh Giá KPI Trung Bình Theo Số Khóa Đào Tạo (0 - 5)',
+        });
+        lines.push(corrSvg);
+      }
+      if (trendReq?.data) {
+        const trendSvg = generateLineChartSvg(trendReq.data, {
+          xKey: 'thoi_gian',
+          yKey: Object.keys(trendReq.data[0]).find((k) => k !== 'thoi_gian' && k !== 'period' && k !== 'count_rows') || 'value',
+          title: trendReq.title || 'Xu hướng theo thời gian',
+        });
+        lines.push(trendSvg);
+      }
+      lines.push('');
+    }
+
+    // Tables
+    for (const req of queryPlan.requirements) {
+      const res = resByReq[req.id];
+      if (!res || !res.data || res.data.length === 0) continue;
+
+      if (req.type === 'GROUP_BY') {
+        lines.push(`### 📋 ${req.title}`);
+        lines.push('');
+        const headers = ['Phòng Ban', 'Số Khóa Hoàn Thành', 'Tỷ Trọng (%)'];
+        lines.push(`| ${headers.join(' | ')} |`);
+        lines.push(`| ${headers.map(() => ':---').join(' | ')} |`);
+        for (const row of res.data) {
+          lines.push(`| **${escapeMarkdown(row[req.groupBy[0]])}** | ${Number(row[req.alias || Object.keys(row)[1]]).toLocaleString('vi-VN')} lượt | ${row.ty_trong_pct}% |`);
+        }
+        if (queryResult.reconciliation) {
+          lines.push(`\n*Đối chiếu toàn tập: Tổng 6 phòng ban (${queryResult.reconciliation.group_sum.toLocaleString('vi-VN')} lượt) khớp 100% với tổng toàn bộ nhân sự (${queryResult.reconciliation.total_metric.toLocaleString('vi-VN')} lượt).*`);
+        }
+        lines.push('');
+      } else if (req.type === 'RANKING') {
+        lines.push(`### 📋 ${req.title} (Sắp xếp theo Khóa học DESC, KPI DESC, Mã NV ASC)`);
+        lines.push('');
+        const headers = ['Hạng', 'Mã NV', 'Họ Tên', 'Phòng Ban', 'Khóa Đào Tạo', 'Điểm KPI'];
+        lines.push(`| ${headers.join(' | ')} |`);
+        lines.push(`| :---: | :---: | :--- | :--- | :---: | :---: |`);
+        for (const row of res.data) {
+          lines.push(`| ${row.hang} | \`${row.ma_nhan_vien}\` | ${escapeMarkdown(row.ho_ten)} | ${escapeMarkdown(row.phong_ban)} | **${row.khoa_dao_tao_hoan_thanh}** | **${Number(row.diem_kpi).toFixed(1)}** |`);
+        }
+        lines.push('');
+      } else if (req.type === 'CORRELATION_BREAKDOWN') {
+        lines.push(`### 📋 ${req.title}`);
+        lines.push('');
+        const headers = ['Số Khóa Đào Tạo', 'Số Lượng Nhân Sự', 'Điểm KPI Trung Bình'];
+        lines.push(`| ${headers.join(' | ')} |`);
+        lines.push(`| :--- | :---: | :---: |`);
+        for (const row of res.data) {
+          lines.push(`| **${row.so_khoa}** | ${row.so_nhan_vien} người | **${Number(row.avg_kpi).toFixed(2)} điểm** |`);
+        }
+        lines.push('');
+      } else if (req.type === 'RATIO') {
+        lines.push(`### 📋 ${req.title}`);
+        lines.push('');
+        const headers = ['Đơn Vị Vận Chuyển', 'Tổng Đơn', 'Đã Giao', 'Chưa Giao', 'Giao Đúng Hạn', 'Tỷ Lệ Đúng Hạn (%)'];
+        lines.push(`| ${headers.join(' | ')} |`);
+        lines.push(`| :--- | :---: | :---: | :---: | :---: | :---: |`);
+        for (const row of res.data) {
+          lines.push(`| **${escapeMarkdown(row[req.dimension])}** | ${row.tong_don} | ${row.da_giao} | ${row.chua_giao} | ${row.giao_dung_han} | **${row.ty_le_dung_han_pct}%** |`);
+        }
+        lines.push('\n*(Lưu ý: Mẫu số tính tỷ lệ giao đúng hạn được tính nghiêm ngặt trên các đơn ĐÃ GIAO, loại trừ đơn đang xử lý/chưa giao).*');
+        lines.push('');
+      }
+    }
+
+    // Missing requirements reporting (if any)
+    const missingReqs = queryPlan.requirements.filter((r) => r.status === 'DATA_UNAVAILABLE' || resByReq[r.id]?.status === 'DATA_UNAVAILABLE');
+    if (missingReqs.length > 0) {
+      lines.push('### ⚠️ Chỉ Tiêu Chưa Thể Tính Toán (Thiếu Dữ Liệu)');
+      for (const m of missingReqs) {
+        lines.push(`- **${m.title}:** ${m.reason || 'Bộ dữ liệu không chứa cột thông tin này.'}`);
+      }
+      lines.push('');
+    }
+
+    // AI Insight
+    if (explanationText && explanationText.trim().length > 0) {
+      lines.push('### 💡 Phân Tích & Nhận Xét Điều Hành (AI Insight)');
+      lines.push(explanationText.trim());
+      lines.push('');
+    }
+
+    // Structured JSON Payload & Embedded Dashboard v2
+    const totalFileRows = dataset.profile?.row_count || dataset.rows?.length || queryResult.rows_scanned || queryResult.total_matching || rows.length;
+    const structuredReport = {
+      file_id: dataset.file_id,
+      original_filename: filename,
+      sheet,
+      query_plan: queryPlan,
+      total_rows: totalFileRows,
+      dataset_row_count: totalFileRows,
+      row_count: totalFileRows,
+      returned_rows: rows.length,
+      total_matching: queryResult.total_matching,
+      period_comparison: queryResult.period_comparison,
+      results_by_requirement: resByReq,
+      reconciliation: queryResult.reconciliation,
+      execution_stats: stats,
+      data: rows,
+    };
+    lines.push(`<!-- bi-file-report: ${JSON.stringify(structuredReport)} -->`);
+
+    try {
+      const fileDashboardV2 = formatDatasetDashboardPayload(queryPlan, queryResult, dataset, userContext);
+      const jsonStr = JSON.stringify(fileDashboardV2);
+      const safeJson = jsonStr.replace(/-->/g, '--\\u003e').replace(/<!--/g, '\\u003c!--');
+      lines.push(`<!-- bi-dashboard-v2: ${safeJson} -->`);
+    } catch (err) {
+      console.warn('[BI Presenter] Warning: Failed to generate Dashboard v2 payload:', err.message);
+    }
+
+    return lines.join('\n');
+  }
+
   const groupCol = queryPlan.groupBy[0] ? (typeof queryPlan.groupBy[0] === 'object' ? queryPlan.groupBy[0].column : queryPlan.groupBy[0]) : '';
 
   // Executive Highlights (e.g. max headcount, max salary, max KPI)

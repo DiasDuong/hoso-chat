@@ -43,8 +43,8 @@ function hasWordOrPhrase(textNorm, phrase) {
 
 // Common business aliases in logistics, HR, and finance
 const COLUMN_SYNONYMS = {
-  doanh_so: ['doanh so', 'doanh thu', 'sales', 'revenue', 'tong thu'],
-  doanh_thu: ['doanh thu', 'doanh so', 'sales', 'revenue', 'tong thu'],
+  doanh_so: ['doanh so', 'doanh thu', 'sales', 'revenue', 'tong thu', 'thanh tien', 'gia tri don'],
+  doanh_thu: ['doanh thu', 'doanh so', 'sales', 'revenue', 'tong thu', 'thanh tien', 'gia tri don'],
   luong: ['luong', 'thu nhap', 'salary', 'tien luong', 'tong luong', 'chi phi luong', 'luong co ban', 'bang luong', 'muc luong'],
   phong_ban: ['phong ban', 'bo phan', 'don vi', 'department', 'khoa', 'to', 'nhom', 'phong'],
   nhan_vien: ['nhan vien', 'nhan su', 'ho ten', 'ten', 'employee', 'nguoi', 'can bo', 'lao dong', 'nguoi tao'],
@@ -58,6 +58,14 @@ const COLUMN_SYNONYMS = {
   chuc_vu: ['chuc vu', 'vi tri', 'cap bac', 'position'],
   gioi_tinh: ['gioi tinh', 'nam nu', 'gender'],
   so_lo: ['so lo', 'lo hang', 'so lo xu ly', 'lo'],
+  khoa_dao_tao: ['khoa dao tao', 'dao tao', 'khoa hoc', 'luot hoc', 'khoa dao tao hoan thanh', 'so khoa', 'so khoa dao tao', 'luot hoan thanh'],
+  kpi: ['kpi', 'diem kpi', 'hieu suat kpi', 'danh gia kpi', 'diem danh gia'],
+  don_hang: ['don hang', 'don', 'so don', 'ma don', 'ma don hang', 'order', 'orders'],
+  san_pham: ['san pham', 'ten san pham', 'hang hoa', 'mat hang', 'product', 'item'],
+  don_vi_van_chuyen: ['don vi van chuyen', 'nguoi van chuyen', 'nha xe', 'carrier', 'hang van chuyen', 'doi tac van chuyen'],
+  ngay_giao_cam_ket: ['ngay giao cam ket', 'han giao', 'ngay cam ket', 'promised date', 'due date'],
+  ngay_giao_thuc_te: ['ngay giao thuc te', 'ngay giao hang', 'ngay nhan hang', 'actual date', 'delivery date'],
+  trang_thai_giao: ['trang thai giao', 'trang thai giao hang', 'tinh trang giao', 'delivery status'],
 };
 
 /**
@@ -491,6 +499,310 @@ function detectMultipleMetrics(promptNorm, colProfile, columns) {
 }
 
 /**
+ * Decompose composite/multi-intent analytical queries into individual verifiable requirements
+ */
+function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, columns, colProfile) {
+  const isTrainingAsked =
+    hasWordOrPhrase(promptNorm, 'dao tao') ||
+    hasWordOrPhrase(promptNorm, 'khoa hoc') ||
+    hasWordOrPhrase(promptNorm, 'khoa dao tao') ||
+    hasWordOrPhrase(promptNorm, 'khoa dao tao hoan thanh');
+
+  const isSalesAsked =
+    hasWordOrPhrase(promptNorm, 'doanh thu') ||
+    hasWordOrPhrase(promptNorm, 'doanh so') ||
+    hasWordOrPhrase(promptNorm, 'ban hang') ||
+    (hasWordOrPhrase(promptNorm, 'don hang') && (hasWordOrPhrase(promptNorm, 'doanh thu') || hasWordOrPhrase(promptNorm, 'san pham')));
+
+  const isLogisticsAsked =
+    hasWordOrPhrase(promptNorm, 'dung han') ||
+    hasWordOrPhrase(promptNorm, 'giao hang') ||
+    hasWordOrPhrase(promptNorm, 'van chuyen') ||
+    hasWordOrPhrase(promptNorm, 'ty le giao');
+
+  // Check if prompt is structured as a multi-part question
+  const isCompositeStructure =
+    promptNorm.includes(',') ||
+    promptNorm.includes(':') ||
+    promptNorm.includes(';') ||
+    hasWordOrPhrase(promptNorm, 'tinh hinh dao tao') ||
+    hasWordOrPhrase(promptNorm, 'bao cao dao tao') ||
+    hasWordOrPhrase(promptNorm, 'bao cao tinh hinh dao tao') ||
+    hasWordOrPhrase(promptNorm, 'bao cao doanh so') ||
+    hasWordOrPhrase(promptNorm, 'bao cao giao hang') ||
+    (hasWordOrPhrase(promptNorm, 'va') && (hasWordOrPhrase(promptNorm, 'top') || hasWordOrPhrase(promptNorm, 'trung binh') || hasWordOrPhrase(promptNorm, 'theo')));
+
+  // CASE A: TRAINING & PERFORMANCE (HR)
+  if (isTrainingAsked && (isCompositeStructure || hasWordOrPhrase(promptNorm, 'khoa dao tao'))) {
+    const trainingCol = columns.find((c) =>
+      /(khoa.*dao.*tao|dao.*tao|khoa_hoc|khoa_dao_tao_hoan_thanh)/i.test(c.key) ||
+      /(khoa.*dao.*tao|dao.*tao)/i.test(normalizeText(c.name))
+    );
+    const empIdCol = colProfile.identifiers.find((c) => /(nhan_vien|nv|emp)/i.test(c.key)) || colProfile.identifiers[0];
+    const kpiCol = columns.find((c) => /kpi/i.test(c.key) || /kpi/i.test(c.name));
+    const deptCol = colProfile.dimensions.find((c) => /(phong|dept|bo_phan)/i.test(c.key)) || { key: 'phong_ban', name: 'Phòng Ban' };
+
+    if (trainingCol) {
+      const requirements = [];
+
+      // 1. Total completed courses
+      if (
+        hasWordOrPhrase(promptNorm, 'tong so khoa') ||
+        hasWordOrPhrase(promptNorm, 'tong khoa') ||
+        hasWordOrPhrase(promptNorm, 'tong so khoa hoan thanh') ||
+        hasWordOrPhrase(promptNorm, 'tong luot') ||
+        hasWordOrPhrase(promptNorm, 'tong so luot') ||
+        hasWordOrPhrase(promptNorm, 'bao cao tinh hinh dao tao') ||
+        hasWordOrPhrase(promptNorm, 'bao cao dao tao')
+      ) {
+        requirements.push({
+          id: 'req_total_completed',
+          title: 'Tổng số khóa hoàn thành',
+          type: 'METRIC',
+          func: 'SUM',
+          column: trainingCol.key,
+          unit: 'lượt hoàn thành',
+          status: 'AVAILABLE',
+        });
+      }
+
+      // 2. Average per employee
+      if (
+        hasWordOrPhrase(promptNorm, 'trung binh') ||
+        hasWordOrPhrase(promptNorm, 'so khoa trung binh') ||
+        hasWordOrPhrase(promptNorm, 'binh quan') ||
+        hasWordOrPhrase(promptNorm, 'moi nguoi')
+      ) {
+        requirements.push({
+          id: 'req_avg_completed',
+          title: 'Số khóa trung bình mỗi người',
+          type: 'METRIC',
+          func: 'AVG',
+          column: trainingCol.key,
+          unit: 'khóa/người',
+          status: 'AVAILABLE',
+        });
+      }
+
+      // 3. Number with 0 courses
+      if (
+        hasWordOrPhrase(promptNorm, '0 khoa') ||
+        hasWordOrPhrase(promptNorm, 'khong khoa') ||
+        hasWordOrPhrase(promptNorm, 'chua co khoa') ||
+        hasWordOrPhrase(promptNorm, 'chua hoc') ||
+        hasWordOrPhrase(promptNorm, 'chua tham gia')
+      ) {
+        requirements.push({
+          id: 'req_zero_courses',
+          title: 'Số nhân sự có 0 khóa đào tạo',
+          type: 'METRIC',
+          func: 'COUNT',
+          column: empIdCol ? empIdCol.key : trainingCol.key,
+          filters: [{ column: trainingCol.key, op: 'eq', value: 0 }],
+          unit: 'người',
+          status: 'AVAILABLE',
+        });
+      }
+
+      // 4. Department breakdown
+      if (
+        hasWordOrPhrase(promptNorm, 'theo phong ban') ||
+        hasWordOrPhrase(promptNorm, 'tung phong ban') ||
+        hasWordOrPhrase(promptNorm, 'thong ke theo phong ban') ||
+        hasWordOrPhrase(promptNorm, 'cac phong ban') ||
+        hasWordOrPhrase(promptNorm, 'phong ban')
+      ) {
+        requirements.push({
+          id: 'req_dept_breakdown',
+          title: 'Thống kê khóa đào tạo theo phòng ban',
+          type: 'GROUP_BY',
+          groupBy: [deptCol.key],
+          column: trainingCol.key,
+          func: 'SUM',
+          alias: 'tong_khoa_hoan_thanh',
+          unit: 'lượt hoàn thành',
+          status: 'AVAILABLE',
+        });
+      }
+
+      // 5. Top 10 employees
+      if (
+        hasWordOrPhrase(promptNorm, 'top 10') ||
+        hasWordOrPhrase(promptNorm, 'top nhan vien') ||
+        hasWordOrPhrase(promptNorm, 'cao nhat')
+      ) {
+        const topLimitMatch = promptNorm.match(/top\s*(\d+)/i);
+        const limitVal = topLimitMatch ? parseInt(topLimitMatch[1], 10) : 10;
+        requirements.push({
+          id: 'req_top_10_employees',
+          title: `Top ${limitVal} nhân viên có số khóa đào tạo cao nhất`,
+          type: 'RANKING',
+          limit: limitVal,
+          column: trainingCol.key,
+          orderBy: [
+            { col: trainingCol.key, dir: 'DESC' },
+            { col: kpiCol ? kpiCol.key : 'diem_kpi', dir: 'DESC' },
+            { col: empIdCol ? empIdCol.key : 'ma_nhan_vien', dir: 'ASC' },
+          ],
+          status: 'AVAILABLE',
+        });
+      }
+
+      // 6. KPI by course count (0 to 5)
+      if (
+        hasWordOrPhrase(promptNorm, 'kpi theo so khoa') ||
+        hasWordOrPhrase(promptNorm, 'kpi theo khoa') ||
+        hasWordOrPhrase(promptNorm, 'phan tich kpi') ||
+        (hasWordOrPhrase(promptNorm, 'kpi') && hasWordOrPhrase(promptNorm, '0 den 5')) ||
+        (hasWordOrPhrase(promptNorm, 'kpi') && hasWordOrPhrase(promptNorm, 'tu 0'))
+      ) {
+        requirements.push({
+          id: 'req_kpi_by_courses',
+          title: 'Phân tích điểm KPI theo số khóa đào tạo (0 - 5)',
+          type: 'CORRELATION_BREAKDOWN',
+          dimension: trainingCol.key,
+          target_measure: kpiCol ? kpiCol.key : 'diem_kpi',
+          discrete_values: [0, 1, 2, 3, 4, 5],
+          status: kpiCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+          reason: kpiCol ? null : 'Bộ dữ liệu không có cột điểm KPI.',
+        });
+      }
+
+      // Missing metric check (e.g. chi phí đào tạo)
+      if (hasWordOrPhrase(promptNorm, 'chi phi dao tao') || hasWordOrPhrase(promptNorm, 'ngan sach dao tao')) {
+        const costCol = columns.find((c) => /(chi_phi_dao_tao|ngan_sach_dao_tao)/i.test(c.key));
+        requirements.push({
+          id: 'req_missing_training_cost',
+          title: 'Chi phí đào tạo',
+          type: 'METRIC',
+          status: costCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+          reason: costCol ? null : 'Tệp không chứa thông tin chi phí đào tạo (cần bổ sung cột Chi Phí Đào Tạo).',
+        });
+      }
+
+      if (requirements.length > 0) {
+        return requirements;
+      }
+    }
+  }
+
+  // CASE B: SALES & ORDERS
+  if (isSalesAsked && isCompositeStructure) {
+    const revCol = columns.find((c) =>
+      /(doanh_thu|doanh_so|tong_tien|thanh_tien|revenue|sales|tong_gia_tri)/i.test(c.key) ||
+      /(doanh thu|doanh so|tong tien|thanh tien)/i.test(normalizeText(c.name))
+    );
+    const orderIdCol = columns.find((c) =>
+      /(ma_don|order_id|so_don|ma_don_hang)/i.test(c.key) ||
+      /(ma don|order id)/i.test(normalizeText(c.name))
+    );
+    const productCol = columns.find((c) =>
+      /(san_pham|product|ten_sp|hang_hoa|mat_hang)/i.test(c.key) ||
+      /(san pham|ten sp|mat hang)/i.test(normalizeText(c.name))
+    );
+    const orderDateCol = colProfile.dates[0] || columns.find((c) => /(ngay_dat|ngay_tao|order_date|ngay_don)/i.test(c.key));
+
+    const requirements = [];
+    if (hasWordOrPhrase(promptNorm, 'tong doanh thu') || hasWordOrPhrase(promptNorm, 'doanh thu')) {
+      requirements.push({
+        id: 'req_total_revenue',
+        title: 'Tổng doanh thu',
+        type: 'METRIC',
+        func: 'SUM',
+        column: revCol ? revCol.key : 'doanh_thu',
+        unit: 'VNĐ',
+        status: revCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        reason: revCol ? null : 'Tệp không chứa cột doanh thu/số tiền.',
+      });
+    }
+
+    if (hasWordOrPhrase(promptNorm, 'so don') || hasWordOrPhrase(promptNorm, 'so don hang') || hasWordOrPhrase(promptNorm, 'don phan biet')) {
+      requirements.push({
+        id: 'req_distinct_orders',
+        title: 'Số đơn hàng phân biệt',
+        type: 'METRIC',
+        func: 'DISTINCT_COUNT',
+        column: orderIdCol ? orderIdCol.key : 'ma_don',
+        unit: 'đơn hàng',
+        status: orderIdCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        reason: orderIdCol ? null : 'Tệp không chứa cột mã đơn hàng để đếm đơn phân biệt.',
+      });
+    }
+
+    if (hasWordOrPhrase(promptNorm, 'theo thang') || hasWordOrPhrase(promptNorm, 'xu huong')) {
+      requirements.push({
+        id: 'req_monthly_revenue',
+        title: 'Doanh thu theo tháng',
+        type: 'TREND',
+        groupBy: [{ column: orderDateCol ? orderDateCol.key : 'ngay', date_trunc: 'month' }],
+        column: revCol ? revCol.key : 'doanh_thu',
+        func: 'SUM',
+        alias: 'tong_doanh_thu',
+        unit: 'VNĐ',
+        status: (revCol && orderDateCol) ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        reason: (revCol && orderDateCol) ? null : 'Thiếu cột ngày tháng hoặc doanh thu để phân tích xu hướng.',
+      });
+    }
+
+    if (hasWordOrPhrase(promptNorm, 'top san pham') || hasWordOrPhrase(promptNorm, 'san pham ban chay')) {
+      requirements.push({
+        id: 'req_top_products',
+        title: 'Top sản phẩm bán chạy',
+        type: 'GROUP_BY',
+        groupBy: [productCol ? productCol.key : 'san_pham'],
+        column: revCol ? revCol.key : 'doanh_thu',
+        func: 'SUM',
+        alias: 'tong_doanh_thu',
+        unit: 'VNĐ',
+        status: (revCol && productCol) ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        reason: (revCol && productCol) ? null : 'Thiếu cột sản phẩm hoặc doanh thu.',
+      });
+    }
+
+    if (requirements.length > 0) {
+      return requirements;
+    }
+  }
+
+  // CASE C: LOGISTICS & ON-TIME DELIVERY
+  if (isLogisticsAsked) {
+    const carrierCol = columns.find((c) =>
+      /(don_vi_van_chuyen|nguoi_van_chuyen|carrier|nha_xe|van_tai|doi_tac_vc)/i.test(c.key) ||
+      /(van chuyen|nha xe|carrier)/i.test(normalizeText(c.name))
+    );
+    const promisedCol = columns.find((c) =>
+      /(ngay_giao_cam_ket|promised|han_giao|ngay_cam_ket)/i.test(c.key) ||
+      /(cam ket|han giao|han chot)/i.test(normalizeText(c.name))
+    );
+    const actualCol = columns.find((c) =>
+      c.key !== promisedCol?.key && (
+        /(ngay_giao_thuc_te|actual|ngay_nhan|giao_thuc_te)/i.test(c.key) ||
+        /(thuc te|ngay nhan|hoan tat)/i.test(normalizeText(c.name)) ||
+        (/(ngay giao)/i.test(normalizeText(c.name)) && !/(cam ket|han giao)/i.test(normalizeText(c.name)))
+      )
+    );
+    const statusCol = columns.find((c) => /(trang_thai|status|tinh_trang)/i.test(c.key));
+
+    const requirements = [{
+      id: 'req_on_time_rate',
+      title: 'Tỷ lệ giao hàng đúng hạn theo đơn vị vận chuyển',
+      type: 'RATIO',
+      dimension: carrierCol ? carrierCol.key : 'don_vi_van_chuyen',
+      promised_date_col: promisedCol?.key,
+      actual_date_col: actualCol?.key,
+      status_col: statusCol?.key,
+      delivered_status_value: 'Da_giao',
+      status: (carrierCol && promisedCol && actualCol) ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+      reason: (carrierCol && promisedCol && actualCol) ? null : 'Thiếu cột ngày giao cam kết hoặc ngày giao thực tế để tính tỷ lệ đúng hạn.',
+    }];
+
+    return requirements;
+  }
+
+  return null;
+}
+
+/**
  * Plan an Analytical Query from User Prompt & Dataset Schema
  * @param {string} userPrompt - Natural language prompt
  * @param {Object} datasetProfile - Schema & columns profile from biSpreadsheetEngine
@@ -559,6 +871,41 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
       chart_preference: 'NONE',
       clarification_needed: false,
       clarification_question: null,
+    };
+  }
+
+  // 1b. Composite Analytical Requirements Check (Phase 3 Multi-Domain Pipeline)
+  const compositeRequirements = decomposeCompositeRequirements(promptNorm, prompt, datasetProfile, columns, colProfile);
+  if (compositeRequirements && compositeRequirements.length > 0) {
+    const primaryReq = compositeRequirements.find(r => r.type === 'GROUP_BY') || compositeRequirements.find(r => r.type === 'METRIC') || compositeRequirements[0];
+    const groupBy = primaryReq.groupBy ? [...primaryReq.groupBy] : (primaryReq.dimension ? [primaryReq.dimension] : []);
+    const targetCol = primaryReq.column || (columns[0] ? columns[0].key : 'col_1');
+    const targetMeta = columns.find(c => c.key === targetCol);
+    const isTargetNumeric = targetMeta && (targetMeta.type === 'INTEGER' || targetMeta.type === 'FLOAT');
+    const targetFunc = primaryReq.func || (isTargetNumeric ? 'SUM' : 'COUNT');
+    const aggregations = [{
+      column: targetCol,
+      func: targetFunc,
+      alias: primaryReq.alias || `${targetFunc.toLowerCase()}_${targetCol}`,
+    }];
+    const chartPref = compositeRequirements.some(r => r.type === 'GROUP_BY' || r.type === 'CORRELATION_BREAKDOWN') ? 'BAR' : 'NONE';
+
+    return {
+      intent: 'COMPOSITE',
+      target_sheet: datasetProfile?.active_sheet || 'Sheet1',
+      requirements: compositeRequirements,
+      groupBy,
+      aggregations,
+      filters: [],
+      computations: [],
+      period_comparison: null,
+      orderBy: { column: aggregations[0].alias, dir: 'DESC' },
+      limit: 50,
+      chart_preference: chartPref,
+      prompt: userPrompt,
+      clarification_needed: false,
+      clarification_question: null,
+      metric_coverage: { isComplete: true, missing: [] },
     };
   }
 
@@ -1604,6 +1951,7 @@ function validateMetricCoverage(prompt, plan) {
 module.exports = {
   planAnalyticalQuery,
   planFollowUpQuery,
+  decomposeCompositeRequirements,
   validateMetricCoverage,
   matchColumnFromText,
   parseThresholdValue,

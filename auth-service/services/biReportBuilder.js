@@ -97,6 +97,199 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
   const empIdCol = columns.find(c => /(ma_nhan_vien|nhan_vien|emp|id)/i.test(c.key)) || columns[0];
   const salaryCol = columns.find(c => /(luong|salary|thu_nhap)/i.test(c.key));
 
+  // COMPOSITE REQUIREMENTS DASHBOARD (Phase 3 Multi-Domain Pipeline)
+  if (Array.isArray(queryPlan.requirements) && result.results_by_requirement) {
+    const kpis = [];
+    const visualizations = [];
+    const dataTables = [];
+    const dataStore = {
+      [dataRef]: rows,
+    };
+
+    let kpiIdx = 0;
+    for (const req of queryPlan.requirements) {
+      const res = result.results_by_requirement[req.id];
+      if (req.type === 'METRIC') {
+        const val = res ? res.value : null;
+        const isUnavailable = req.status === 'DATA_UNAVAILABLE' || res?.status === 'DATA_UNAVAILABLE' || val === null;
+        kpis.push({
+          id: `kpi_req_${kpiIdx++}`,
+          metric_alias: req.id,
+          kpi_code: `REQ_${req.id}`.toUpperCase().replace(/[^A-Z0-9_]/g, '_'),
+          title: req.title,
+          primary_value: isUnavailable ? null : val,
+          format: 'NUMBER',
+          unit: req.unit || '',
+          status: isUnavailable ? 'DATA_UNAVAILABLE' : 'AVAILABLE',
+          subtext: isUnavailable ? (req.reason || res?.reason || 'Chưa đủ dữ liệu để tính chỉ tiêu này.') : (req.subtext || 'Tính trên toàn bộ tập dữ liệu phù hợp.'),
+        });
+      } else if (req.type === 'GROUP_BY') {
+        const groupData = res?.data || [];
+        const groupDataRef = `dataset_${req.id}`;
+        dataStore[groupDataRef] = groupData;
+        const catCol = req.groupBy ? (typeof req.groupBy[0] === 'string' ? req.groupBy[0] : req.groupBy[0]?.column) : 'phong_ban';
+        const valCol = req.alias || (groupData[0] ? Object.keys(groupData[0]).find(k => typeof groupData[0][k] === 'number' && k !== 'count_rows') : 'value');
+        visualizations.push({
+          id: `viz_${req.id}`,
+          title: req.title,
+          chart_type: 'BAR',
+          data_ref: groupDataRef,
+          mapping: { category: catCol, value: valCol || 'value' },
+          interactions: { selectable: true, filterable: true, drilldown: false },
+          drill_dimensions: [catCol],
+          grid_col_span: 6,
+        });
+        dataTables.push({
+          id: `tbl_${req.id}`,
+          title: req.title,
+          data_ref: groupDataRef,
+          columns: Object.keys(groupData[0] || {}).map(k => ({
+            key: k,
+            label: getFriendlyColumnLabel(k),
+            type: typeof (groupData[0] || {})[k] === 'number' ? 'number' : 'string',
+          })),
+          pagination: { page_size: 15, total_rows: groupData.length },
+        });
+      } else if (req.type === 'RANKING') {
+        const rankData = res?.data || [];
+        const rankDataRef = `dataset_${req.id}`;
+        dataStore[rankDataRef] = rankData;
+        dataTables.push({
+          id: `tbl_${req.id}`,
+          title: req.title,
+          data_ref: rankDataRef,
+          columns: [
+            { key: 'hang', label: 'Hạng', type: 'number' },
+            { key: 'ma_nhan_vien', label: 'Mã NV', type: 'string' },
+            { key: 'ho_ten', label: 'Họ Tên', type: 'string' },
+            { key: 'phong_ban', label: 'Phòng Ban', type: 'string' },
+            { key: req.column || 'khoa_dao_tao_hoan_thanh', label: getFriendlyColumnLabel(req.column || 'khoa_dao_tao_hoan_thanh'), type: 'number' },
+            { key: 'diem_kpi', label: 'Điểm KPI', type: 'number' },
+          ],
+          pagination: { page_size: 10, total_rows: rankData.length },
+        });
+      } else if (req.type === 'CORRELATION_BREAKDOWN') {
+        const corrData = res?.data || [];
+        const corrDataRef = `dataset_${req.id}`;
+        dataStore[corrDataRef] = corrData;
+        visualizations.push({
+          id: `viz_${req.id}`,
+          title: req.title,
+          chart_type: 'BAR',
+          data_ref: corrDataRef,
+          mapping: { category: 'so_khoa', value: 'avg_kpi' },
+          interactions: { selectable: true, filterable: true, drilldown: false },
+          drill_dimensions: ['so_khoa'],
+          grid_col_span: 6,
+        });
+        dataTables.push({
+          id: `tbl_${req.id}`,
+          title: req.title,
+          data_ref: corrDataRef,
+          columns: [
+            { key: 'so_khoa', label: 'Số Khóa Đào Tạo', type: 'string' },
+            { key: 'so_nhan_vien', label: 'Số Nhân Viên', type: 'number' },
+            { key: 'avg_kpi', label: 'Điểm KPI Trung Bình', type: 'number' },
+          ],
+          pagination: { page_size: 10, total_rows: corrData.length },
+        });
+      } else if (req.type === 'TREND') {
+        const trendData = res?.data || [];
+        const trendDataRef = `dataset_${req.id}`;
+        dataStore[trendDataRef] = trendData;
+        visualizations.push({
+          id: `viz_${req.id}`,
+          title: req.title,
+          chart_type: 'LINE',
+          data_ref: trendDataRef,
+          mapping: { category: 'thoi_gian', value: req.alias || 'tong_doanh_thu' },
+          interactions: { selectable: true, filterable: true, drilldown: false },
+          drill_dimensions: ['thoi_gian'],
+          grid_col_span: 12,
+        });
+      } else if (req.type === 'RATIO') {
+        const ratioData = res?.data || [];
+        const ratioDataRef = `dataset_${req.id}`;
+        dataStore[ratioDataRef] = ratioData;
+        visualizations.push({
+          id: `viz_${req.id}`,
+          title: req.title,
+          chart_type: 'BAR',
+          data_ref: ratioDataRef,
+          mapping: { category: req.dimension, value: 'ty_le_dung_han_pct' },
+          interactions: { selectable: true, filterable: true, drilldown: false },
+          drill_dimensions: [req.dimension],
+          grid_col_span: 6,
+        });
+        dataTables.push({
+          id: `tbl_${req.id}`,
+          title: req.title,
+          data_ref: ratioDataRef,
+          columns: [
+            { key: req.dimension, label: getFriendlyColumnLabel(req.dimension), type: 'string' },
+            { key: 'tong_don', label: 'Tổng Đơn', type: 'number' },
+            { key: 'da_giao', label: 'Đã Giao', type: 'number' },
+            { key: 'chua_giao', label: 'Chưa Giao', type: 'number' },
+            { key: 'giao_dung_han', label: 'Giao Đúng Hạn', type: 'number' },
+            { key: 'ty_le_dung_han_pct', label: 'Tỷ Lệ Đúng Hạn (%)', type: 'number' },
+          ],
+          pagination: { page_size: 10, total_rows: ratioData.length },
+        });
+      }
+    }
+
+    if (dataTables.length === 0 && rows.length > 0) {
+      dataTables.push({
+        id: 'tbl_file_summary',
+        title: 'Dữ liệu tổng hợp theo bộ lọc',
+        data_ref: dataRef,
+        columns: Object.keys(rows[0]).map(key => ({
+          key,
+          label: getFriendlyColumnLabel(key),
+          type: typeof rows[0][key] === 'number' ? 'number' : 'string',
+        })),
+        pagination: { page_size: 15, total_rows: rows.length },
+      });
+    }
+
+    const payload = {
+      version: '2.0',
+      dashboard_id: `dash_file_${crypto.randomUUID()}`,
+      source_type: 'FILE_DATASET',
+      title: `Báo Cáo Phân Tích: ${dataset.original_filename || 'Dataset'}`,
+      subtitle: `Trang tính: ${queryPlan.target_sheet || dataset.profile?.active_sheet || 'Sheet1'}`,
+      generated_at: new Date().toISOString(),
+      provenance: {
+        source_system: 'SOTRANS Hub',
+        generated_by: 'Spreadsheet Engine',
+        file_id: dataset.file_id,
+        checksum: dataset.checksum || null,
+        dataset_version: dataset.updated_at || dataset.upload_timestamp || null,
+      },
+      filters: {
+        current_state: { filters: sanitizeBiData(queryPlan.filters || []) },
+        supported_dimensions: Array.from(new Set([
+          deptCol ? deptCol.key : null,
+          branchCol ? branchCol.key : null,
+        ].filter(Boolean))),
+        slicers: [],
+      },
+      query_context: {
+        file_id: dataset.file_id,
+        target_sheet: queryPlan.target_sheet,
+        sheets: (dataset.profile?.sheets || []).map(s => s.name),
+        base_plan: queryPlan,
+      },
+      kpi_strip: kpis,
+      visualizations,
+      data_tables: dataTables,
+      data_store: dataStore,
+    };
+
+    assertValidDashboardPayload(payload, userContext);
+    return signReport(payload, userContext);
+  }
+
   // Resolved metrics directly from engine result and summary
   const matchingRowsValue = result.total_matching ?? result.rows_scanned ?? (datasetRows.length || rows.length);
   const distinctHeadcountValue = result.summary?.distinct_headcount !== undefined
@@ -344,6 +537,7 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
     queryPlan.intent === 'FILTER' ||
     queryPlan.show_data_table ||
     queryPlan.needs_details ||
+    queryPlan.include_detail_rows ||
     (typeof queryPlan.prompt === 'string' && /(danh sach chi tiet|bang chi tiet|xem chi tiet|nhan su chi tiet|toan bo nhan vien|tat ca nhan vien)/i.test(queryPlan.prompt))
   );
 
