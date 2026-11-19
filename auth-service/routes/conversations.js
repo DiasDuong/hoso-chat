@@ -551,7 +551,21 @@ router.get('/:id/export', async (req, res) => {
 
         lines.push(`### ${speaker} — *${timeStr}*`);
         lines.push(``);
-        lines.push(m.content || '*(Không có nội dung văn bản)*');
+
+        // Chuẩn hóa nội dung tin nhắn cho bản xuất Markdown: loại bỏ comment nội bộ BI và mã SVG thô
+        let exportContent = m.content || '*(Không có nội dung văn bản)*';
+        if (!isUser && typeof exportContent === 'string') {
+          exportContent = exportContent
+            .replace(/<!--\s*bi-dashboard-v2:[\s\S]*?-->/gi, '')
+            .replace(/<!--\s*bi-file-report:[\s\S]*?-->/gi, '')
+            .replace(/<!--\s*bi-dataset-widget:[\s\S]*?-->/gi, '')
+            .replace(/<svg[\s\S]*?<\/svg>/gi, '')
+            .replace(/###\s*📊\s*Biểu Đồ Trực Quan\s*/gi, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+        }
+
+        lines.push(exportContent || '*(Không có nội dung văn bản)*');
         lines.push(``);
 
         // Hiển thị tệp đính kèm nếu có

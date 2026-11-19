@@ -489,7 +489,8 @@ function formatAnalyticalResultMarkdown(queryPlan, queryResult, dataset, explana
 
   // 4. Detailed Data Table
   if (rows.length > 0) {
-    const isCapped = queryResult.total_matching && queryResult.total_matching > rows.length;
+    const isDetailQuery = queryPlan.intent === 'FILTER' || !queryPlan.groupBy || queryPlan.groupBy.length === 0;
+    const isCapped = isDetailQuery && queryResult.total_matching && queryResult.total_matching > rows.length;
     const tableHeader = isCapped
       ? `### 📋 Bảng Số Liệu Chi Tiết (Hiển thị ${rows.length} trong ${queryResult.total_matching.toLocaleString('vi-VN')} dòng)`
       : `### 📋 Bảng Số Liệu Chi Tiết (${rows.length} kết quả)`;
