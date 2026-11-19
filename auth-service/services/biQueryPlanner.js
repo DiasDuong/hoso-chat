@@ -1079,11 +1079,17 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
 
   const isFilterOnlyIntent =
     (promptNorm.startsWith('loc') ||
+     promptNorm.startsWith('tim') ||
+     hasWordOrPhrase(promptNorm, 'tim nhan vien') ||
      hasWordOrPhrase(promptNorm, 'loc danh sach') ||
      hasWordOrPhrase(promptNorm, 'loc nhan vien') ||
      hasWordOrPhrase(promptNorm, 'chi lay') ||
      hasWordOrPhrase(promptNorm, 'chi xem') ||
-     hasWordOrPhrase(promptNorm, 'lay danh sach')) &&
+     hasWordOrPhrase(promptNorm, 'lay danh sach') ||
+     hasWordOrPhrase(promptNorm, 'xem danh sach') ||
+     hasWordOrPhrase(promptNorm, 'danh sach chi tiet') ||
+     hasWordOrPhrase(promptNorm, 'bang chi tiet') ||
+     hasWordOrPhrase(promptNorm, 'bang du lieu chi tiet')) &&
     !hasWordOrPhrase(promptNorm, 'tong') &&
     !hasWordOrPhrase(promptNorm, 'trung binh') &&
     !hasWordOrPhrase(promptNorm, 'dem') &&
@@ -1205,6 +1211,19 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
           value: thresh,
         });
       }
+    }
+  }
+
+  // 4b. Explicit Code / ID filter (e.g. "NV_0750", "EMP01")
+  const empIdCol = datasetProfile?.columns?.find(c => /(ma_nhan_vien|emp|id|ma_nv)/i.test(c.key));
+  if (empIdCol && !filters.some(f => f.column === empIdCol.key)) {
+    const codeMatch = prompt.match(/\b([A-Za-z]{2,}_?\d{2,})\b/);
+    if (codeMatch) {
+      filters.push({
+        column: empIdCol.key,
+        op: 'eq',
+        value: codeMatch[1],
+      });
     }
   }
 
