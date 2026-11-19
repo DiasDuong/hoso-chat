@@ -328,3 +328,20 @@ Theo đúng yêu cầu của bản đặc tả kiểm toán, dưới đây là c
 
 ---
 *Báo cáo được lập trên tinh thần khách quan, trung thực kỹ thuật, dựa trên bằng chứng kiểm thử thực tế tại hệ thống SOTRANS Hub ngày 04/11/2026.*
+
+---
+
+# XI. PHỤ LỤC: MA TRẬN KHOẢNG TRỐNG KỸ THUẬT QUẢN TRỊ CHÍNH SÁCH (HỢP NHẤT TỪ CHECKPOINT 0)
+
+| Finding ID | Domain | Mô tả khoảng trống kỹ thuật | Mức nghiêm trọng | Hành động kỹ thuật đã chuẩn hóa | Tiêu chí nghiệm thu (Acceptance Criteria) |
+|:---:|---|---|:---:|---|---|
+| **GAP-01** | Lifecycle | Các endpoint `/submit`, `/approve`, `/reject` thiếu ma trận chuyển đổi tập trung | **HIGH** | Hàm `validateStateTransition(current, target, role)` tập trung | Chuyển đổi trạng thái trái phép trả về HTTP 400 `INVALID_STATE_TRANSITION` |
+| **GAP-02** | Relationships | Chưa có cơ chế phát hiện chu trình vòng lặp quan hệ văn bản | **CRITICAL** | Kiểm tra chu trình đồ thị có hướng (DAG Cycle Check) bằng DFS/BFS | Từ chối tạo chu trình với mã lỗi `CIRCULAR_RELATIONSHIP_DETECTED` |
+| **GAP-03** | Conflict V2 | `policyConflictDetector.js` thiếu nhãn phân loại chuẩn hóa và nhánh fail-closed | **CRITICAL** | Cập nhật hàm `detectPolicyConflicts` trả về 9 nhóm chuẩn và nhánh `UNKNOWN` | Đúng nhãn phân loại; không có trường hợp `UNKNOWN` bị ép thành `SAFE` |
+| **GAP-04** | Shadow Mode | Chưa có module ghi log ngầm bất đồng bộ V2 độc lập ra JSON Lines | **MEDIUM** | Hàm `dispatchShadowConflictAudit` chạy qua `setImmediate` append JSONL | Log ghi đầy đủ `correlation_id`, `v1_result`, `v2_result`, `delta_score` |
+| **GAP-05** | Zero-Chunk Gate | Cần đồng bộ Zero-Chunk Gate tại route `activate` để ngăn kích hoạt văn bản rỗng | **HIGH** | Thêm chốt chặn Zero-Chunk Gate vào route `POST /:id/activate` | Văn bản 0 chunks bị từ chối với mã `ACTIVATE_BLOCKED_ZERO_CHUNK` |
+| **GAP-06** | Consistency | `reconcileGenerationsAndVectors` xóa chunks chưa publish qua 2 câu lệnh rời rạc | **MEDIUM** | Thao tác atomic SQL duy nhất với điều kiện `is_published = FALSE` | Báo cáo `unpublished_chunks_cleaned` khớp 100% số dòng bị xóa |
+| **GAP-07** | Retry Lock | Cần cơ chế khóa thuê `document_retry_leases` chống xung đột worker song song | **HIGH** | Cơ chế lease `acquireRetryLease()` cho `doc_version_id` | Worker thứ hai nhận lỗi `LEASE_ALREADY_ACQUIRED` khi đang tranh chấp |
+| **GAP-08** | RBAC Isolation | Đảm bảo cách ly đa đơn vị: HR STL không thể xem văn bản nội bộ riêng của VTX/SWC | **HIGH** | Bổ sung mệnh đề lọc `branch_scope` chặt chẽ trong `GET /api/documents` | Từ chối truy cập chéo đơn vị với HTTP 403 Forbidden |
+| **GAP-09** | Advanced RAG | RAG Policy Chat cần loại trừ văn bản đã bãi bỏ (`superseded`) | **HIGH** | Bộ lọc payload `status: 'active'` trong Qdrant query | Không lấy văn bản bãi bỏ làm quy định hiện hành; trả về bản mới nhất |
+| **GAP-10** | Dashboard Sync | Thống kê số lượng văn bản xung đột và tài liệu chờ duyệt cần đồng bộ từ DB thật | **MEDIUM** | Chuẩn hóa thống kê tại `GET /api/documents` từ bảng CSDL thật | Số liệu thống kê khớp 100% với database PostgreSQL |

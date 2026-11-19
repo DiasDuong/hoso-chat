@@ -13,7 +13,7 @@ Ngày: 16/11/2026. Nguồn chính là thư mục người dùng cung cấp: `D:\
 
 **Trạng thái 16/11/2026:** Wren đã nối vào General AI; sidecar `wrenai-wren-bi-1` healthy, cấu hình bật và `hr-auth` đã nạp mã mới. 12 đối chiếu tổng hợp trên PostgreSQL thật khớp; một luồng Gemini thật → SQL model → Wren → PostgreSQL khớp đối chiếu. Chưa chạy nghiệm thu bằng tài khoản người dùng thật trong General AI; test route dùng JWT/DB/provider fixture được ghi rõ. Staging ở workspace khác chưa được cập nhật. Unified BI ghép file–hệ thống còn chờ khóa ghép/ngữ nghĩa, chưa bật.
 
-Chi tiết triển khai và giới hạn: `docs/BI_WREN_IMPLEMENTATION_STATUS.md` ở repository gốc.
+Chi tiết triển khai, ma trận tính năng và giới hạn vận hành: xem tại `docs/release/bi_handover/03_BI_FEATURE_MATRIX.md` và `docs/release/bi_handover/07_KNOWN_LIMITATIONS.md` ở repository gốc.
 
 ## 2. Cấu trúc và phần cần dùng
 

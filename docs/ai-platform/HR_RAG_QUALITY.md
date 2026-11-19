@@ -75,3 +75,14 @@ Quy trình RAG tuân thủ bộ quy tắc nghiêm ngặt:
   - Tuyệt đối cấm LLM tự suy diễn hoặc dùng kiến thức bên ngoài xã hội để trả lời thay thế cho quy chế nội bộ doanh nghiệp.
 - **Tiêu chuẩn dẫn nguồn bắt buộc:**
   - Mọi câu trả lời thành công đều phải nêu rõ: Tên quy định/quy chế, số quyết định ban hành, ngày có hiệu lực, số điều khoản và trích dẫn tóm tắt nội dung quy định.
+
+---
+
+## 5. PHỤ LỤC: LỊCH SỬ KHẮC PHỤC LỖI TRUY XUẤT RAG & ANSWER GROUNDING
+
+| Mã lỗi | Phân loại | Mô tả lỗi phát hiện | Nguyên nhân kỹ thuật | Giải pháp khắc phục đã chuẩn hóa |
+|:---:|:---:|---|---|---|
+| **RAG-BUG-01** | Trích xuất sai | RAG trả lời câu hỏi quy chế nhưng trích dẫn điều khoản bãi bỏ | Truy vấn Qdrant thiếu bộ lọc trạng thái hiệu lực văn bản | Bổ sung filter bắt buộc `status = 'ACTIVE'` và loại trừ văn bản bị `superseded` |
+| **RAG-BUG-02** | Rò rỉ văn bản | Nhân viên hỏi chính sách đặc thù nhận được thông tin công ty thành viên khác | Biến `company_id` từ JWT chưa được đưa vào payload filter vector DB | Củng cố `scopeFor(company_id)` chặn cứng cross-tenant retrieval tại Gateway & Worker |
+| **RAG-BUG-03** | Ảo giác trích dẫn | LLM bịa số hiệu điều khoản khi trích đoạn chunk bị mờ hoặc cắt cụt | Prompt thiếu cờ kiểm soát strict evidence quote | Bổ sung validator `evidence_quote` bắt buộc chuỗi trích dẫn phải xuất hiện nguyên văn trong chunk |
+| **RAG-BUG-04** | Cache Stale | Sửa văn bản nhưng chatbot vẫn trả lời theo quy định cũ | Cache key dựa trên query text mà không gắn với mốc thời gian cập nhật tài liệu | Cơ chế `docHash` động gắn vào `cacheKey`, tự động invalidate ngay khi có thay đổi DB |
