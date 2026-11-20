@@ -539,6 +539,160 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
     hasWordOrPhrase(promptNorm, 'bao cao giao hang') ||
     (hasWordOrPhrase(promptNorm, 'va') && (hasWordOrPhrase(promptNorm, 'top') || hasWordOrPhrase(promptNorm, 'trung binh') || hasWordOrPhrase(promptNorm, 'theo')));
 
+  // CASE 0: WORKFORCE STATUS & HEADCOUNT COMPOSITION (Without salary/overtime)
+  const isWorkforceStatusAsked =
+    (
+      hasWordOrPhrase(promptNorm, 'tinh trang nhan vien') ||
+      hasWordOrPhrase(promptNorm, 'trang thai nhan vien') ||
+      hasWordOrPhrase(promptNorm, 'co cau trang thai') ||
+      hasWordOrPhrase(promptNorm, 'so luong va ty le nhan vien theo tung trang thai') ||
+      hasWordOrPhrase(promptNorm, 'ty le nhan vien theo tung trang thai') ||
+      (hasWordOrPhrase(promptNorm, 'trang thai') && (
+        hasWordOrPhrase(promptNorm, 'ty le') ||
+        hasWordOrPhrase(promptNorm, 'dang lam viec thap nhat') ||
+        (hasWordOrPhrase(promptNorm, 'phong ban') && hasWordOrPhrase(promptNorm, 'dang lam viec'))
+      ))
+    ) &&
+    !hasWordOrPhrase(promptNorm, 'tong quy luong') &&
+    !hasWordOrPhrase(promptNorm, 'luong trung binh') &&
+    !hasWordOrPhrase(promptNorm, 'gio tang ca');
+
+  const statusCol = columns.find((c) =>
+    /(trang_thai|status|tinh_trang)/i.test(c.key) ||
+    /(trang thai|tinh trang)/i.test(normalizeText(c.name))
+  );
+
+  if (isWorkforceStatusAsked && statusCol) {
+    const deptCol = colProfile.dimensions.find((c) => /(phong|dept|bo_phan)/i.test(c.key)) ||
+      columns.find((c) => /(phong|dept|bo_phan)/i.test(c.key)) ||
+      { key: 'phong_ban', name: 'Phòng Ban' };
+    const empIdCol = colProfile.identifiers.find((c) => /(nhan_vien|nv|emp|id)/i.test(c.key)) ||
+      colProfile.identifiers[0] ||
+      { key: 'ma_nhan_vien', name: 'Mã Nhân Viên' };
+
+    const requirements = [];
+
+    // 1. Total Headcount (REQ-01)
+    requirements.push({
+      id: 'req_status_total_headcount',
+      requirement_id: 'REQ-01',
+      original_user_request: 'Tổng số nhân viên toàn công ty',
+      title: 'Tổng số nhân viên',
+      type: 'METRIC',
+      func: 'DISTINCT_COUNT',
+      column: empIdCol ? empIdCol.key : 'ma_nhan_vien',
+      unit: 'nhân sự',
+      visualization_type: 'KPI_CARD',
+      status: 'AVAILABLE',
+      subtext: 'Toàn bộ nhân sự công ty',
+    });
+
+    // 2. Active Status (REQ-02)
+    requirements.push({
+      id: 'req_status_active',
+      requirement_id: 'REQ-02',
+      original_user_request: 'Số lượng và tỷ lệ nhân viên đang làm việc',
+      title: 'Đang làm việc',
+      type: 'METRIC',
+      func: 'COUNT',
+      column: empIdCol ? empIdCol.key : statusCol.key,
+      filters: [{ column: statusCol.key, op: 'eq', value: 'Đang làm việc' }],
+      unit: 'nhân sự',
+      visualization_type: 'KPI_CARD',
+      status: 'AVAILABLE',
+    });
+
+    // 3. Resigned Status (REQ-03)
+    requirements.push({
+      id: 'req_status_resigned',
+      requirement_id: 'REQ-03',
+      original_user_request: 'Số lượng và tỷ lệ nhân viên đã nghỉ việc',
+      title: 'Đã nghỉ việc',
+      type: 'METRIC',
+      func: 'COUNT',
+      column: empIdCol ? empIdCol.key : statusCol.key,
+      filters: [{ column: statusCol.key, op: 'eq', value: 'Đã nghỉ việc' }],
+      unit: 'nhân sự',
+      visualization_type: 'KPI_CARD',
+      status: 'AVAILABLE',
+    });
+
+    // 4. Maternity Leave Status (REQ-04)
+    requirements.push({
+      id: 'req_status_maternity',
+      requirement_id: 'REQ-04',
+      original_user_request: 'Số lượng và tỷ lệ nhân viên thai sản',
+      title: 'Thai sản',
+      type: 'METRIC',
+      func: 'COUNT',
+      column: empIdCol ? empIdCol.key : statusCol.key,
+      filters: [{ column: statusCol.key, op: 'eq', value: 'Thai sản' }],
+      unit: 'nhân sự',
+      visualization_type: 'KPI_CARD',
+      status: 'AVAILABLE',
+    });
+
+    // 5. Lowest Active Ratio Department (REQ-05)
+    if (
+      hasWordOrPhrase(promptNorm, 'thap nhat') ||
+      hasWordOrPhrase(promptNorm, 'ty le') ||
+      hasWordOrPhrase(promptNorm, 'dang lam viec thap nhat') ||
+      hasWordOrPhrase(promptNorm, 'xac dinh phong ban')
+    ) {
+      requirements.push({
+        id: 'req_lowest_active_dept',
+        requirement_id: 'REQ-05',
+        original_user_request: 'Xác định phòng ban có tỷ lệ nhân viên đang làm việc thấp nhất',
+        title: 'Tỷ lệ đang làm việc thấp nhất',
+        type: 'METRIC',
+        unit: '%',
+        visualization_type: 'KPI_CARD',
+        status: (deptCol && statusCol) ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        reason: (deptCol && statusCol) ? null : 'Thiếu cột phòng ban hoặc trạng thái để tính tỷ lệ.',
+      });
+    }
+
+    // 6. Status Breakdown Pie Chart (REQ-06)
+    requirements.push({
+      id: 'req_status_pie',
+      requirement_id: 'REQ-06',
+      original_user_request: 'Cơ cấu nhân sự theo trạng thái (Pie Chart)',
+      title: 'Cơ cấu nhân sự theo trạng thái',
+      type: 'GROUP_BY',
+      groupBy: [statusCol.key],
+      dimension: statusCol.key,
+      column: empIdCol ? empIdCol.key : statusCol.key,
+      func: 'COUNT',
+      alias: 'so_luong',
+      unit: 'nhân sự',
+      visualization_type: 'PIE',
+      status: 'AVAILABLE',
+    });
+
+    // 7. Department Status Breakdown Bar Chart (REQ-07)
+    if (
+      hasWordOrPhrase(promptNorm, 'theo phong ban') ||
+      hasWordOrPhrase(promptNorm, 'co cau trang thai theo phong ban') ||
+      hasWordOrPhrase(promptNorm, 'phong ban') ||
+      hasWordOrPhrase(promptNorm, 'bar chart')
+    ) {
+      requirements.push({
+        id: 'req_dept_status_bar',
+        requirement_id: 'REQ-07',
+        original_user_request: 'Cơ cấu trạng thái và tỷ lệ đang làm việc theo phòng ban (Bar Chart)',
+        title: 'Cơ cấu trạng thái và tỷ lệ đang làm việc theo phòng ban',
+        type: 'DEPT_STATUS_ANALYSIS',
+        dimension: deptCol.key,
+        status_col: statusCol.key,
+        visualization_type: 'BAR',
+        status: (deptCol && statusCol) ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+        reason: (deptCol && statusCol) ? null : 'Thiếu cột phòng ban hoặc trạng thái.',
+      });
+    }
+
+    return requirements;
+  }
+
   // CASE A: TRAINING & PERFORMANCE (HR)
   if (isTrainingAsked && (isCompositeStructure || hasWordOrPhrase(promptNorm, 'khoa dao tao'))) {
     const trainingCol = columns.find((c) =>
@@ -829,7 +983,19 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
       hasWordOrPhrase(promptNorm, 'cao nhat')
     ));
 
-  if (isPayrollAsked && (isCompositeStructure || hasWordOrPhrase(promptNorm, 'phan tich') || hasWordOrPhrase(promptNorm, 'quy luong') || hasWordOrPhrase(promptNorm, 'nhom muc luong') || hasWordOrPhrase(promptNorm, 'nhom luong') || hasWordOrPhrase(promptNorm, 'phan loai'))) {
+  const isMultiBreakdownStatusDept = (hasWordOrPhrase(promptNorm, 'trang thai') || hasWordOrPhrase(promptNorm, 'tinh trang')) &&
+    (hasWordOrPhrase(promptNorm, 'phong ban') || hasWordOrPhrase(promptNorm, 'bo phan')) &&
+    (hasWordOrPhrase(promptNorm, 'pie') || hasWordOrPhrase(promptNorm, 'tron') || hasWordOrPhrase(promptNorm, 'tong quan'));
+
+  const isDeptComparisonMultiMetric = hasWordOrPhrase(promptNorm, 'so sanh') &&
+    (hasWordOrPhrase(promptNorm, 'phong ban') || hasWordOrPhrase(promptNorm, 'bo phan')) &&
+    !hasWordOrPhrase(promptNorm, 'nhom muc luong') &&
+    !hasWordOrPhrase(promptNorm, 'nhom luong') &&
+    !hasWordOrPhrase(promptNorm, 'top 10') &&
+    !hasWordOrPhrase(promptNorm, 'phan tich quy luong') &&
+    !hasWordOrPhrase(promptNorm, 'bang xep hang');
+
+  if (!isMultiBreakdownStatusDept && !isDeptComparisonMultiMetric && isPayrollAsked && (isCompositeStructure || hasWordOrPhrase(promptNorm, 'phan tich') || hasWordOrPhrase(promptNorm, 'quy luong') || hasWordOrPhrase(promptNorm, 'nhom muc luong') || hasWordOrPhrase(promptNorm, 'nhom luong') || hasWordOrPhrase(promptNorm, 'phan loai'))) {
     const salCol = columns.find((c) =>
       /(luong.*co.*ban|luong|salary|thu.*nhap)/i.test(c.key) ||
       /(luong.*co.*ban|luong|thu.*nhap)/i.test(normalizeText(c.name))
@@ -1382,11 +1548,35 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
     const targetMeta = columns.find(c => c.key === targetCol);
     const isTargetNumeric = targetMeta && (targetMeta.type === 'INTEGER' || targetMeta.type === 'FLOAT');
     const targetFunc = primaryReq.func || (isTargetNumeric ? 'SUM' : 'COUNT');
-    const aggregations = [{
-      column: targetCol,
-      func: targetFunc,
-      alias: primaryReq.alias || `${targetFunc.toLowerCase()}_${targetCol}`,
-    }];
+    
+    // Multi-metric synchronization: collect all metrics requested by user & requirements
+    const aggregations = [];
+    const multiResult = detectMultipleMetrics(promptNorm, colProfile, columns);
+    if (multiResult.metrics && multiResult.metrics.length > 0) {
+      for (const m of multiResult.metrics) {
+        if (!aggregations.some(a => a.column === m.column && a.func === m.func)) {
+          aggregations.push(m);
+        }
+      }
+    }
+    for (const r of compositeRequirements) {
+      if ((r.type === 'METRIC' || r.type === 'AGGREGATION' || r.type === 'GROUP_BY') && r.column && r.func) {
+        if (!aggregations.some(a => a.column === r.column && a.func === r.func)) {
+          aggregations.push({
+            column: r.column,
+            func: r.func,
+            alias: r.alias || `${r.func.toLowerCase()}_${r.column}`,
+          });
+        }
+      }
+    }
+    if (aggregations.length === 0) {
+      aggregations.push({
+        column: targetCol,
+        func: targetFunc,
+        alias: primaryReq.alias || `${targetFunc.toLowerCase()}_${targetCol}`,
+      });
+    }
     const chartPref = compositeRequirements.some(r => r.type === 'GROUP_BY' || r.type === 'CORRELATION_BREAKDOWN' || r.type === 'DISTRIBUTION') ? 'BAR' : 'NONE';
 
     return {
@@ -2157,7 +2347,55 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
     hasWordOrPhrase(promptNorm, 'duong');
 
   let chartPreference = 'BAR';
-  if (dateTrunc || hasWordOrPhrase(promptNorm, 'xu huong') || hasWordOrPhrase(promptNorm, 'duong') || hasWordOrPhrase(promptNorm, 'line')) {
+  if (hasWordOrPhrase(promptNorm, 'radar') || hasWordOrPhrase(promptNorm, 'mang nhen')) {
+    chartPreference = 'RADAR';
+  } else if (hasWordOrPhrase(promptNorm, 'funnel') || hasWordOrPhrase(promptNorm, 'pheu')) {
+    chartPreference = 'FUNNEL';
+  } else if (hasWordOrPhrase(promptNorm, 'bubble') || hasWordOrPhrase(promptNorm, 'bong bong')) {
+    chartPreference = 'BUBBLE';
+  } else if (hasWordOrPhrase(promptNorm, 'scatter') || hasWordOrPhrase(promptNorm, 'phan tan')) {
+    chartPreference = 'SCATTER';
+  } else if (hasWordOrPhrase(promptNorm, 'heatmap') || hasWordOrPhrase(promptNorm, 'ban do nhiet')) {
+    chartPreference = 'HEATMAP';
+  } else if (hasWordOrPhrase(promptNorm, 'pareto') || hasWordOrPhrase(promptNorm, '80/20') || hasWordOrPhrase(promptNorm, '80 20')) {
+    chartPreference = 'PARETO';
+  } else if (hasWordOrPhrase(promptNorm, 'cot ngang') || hasWordOrPhrase(promptNorm, 'horizontal bar')) {
+    chartPreference = 'HORIZONTAL_BAR';
+  } else if (hasWordOrPhrase(promptNorm, 'cot nhom') || hasWordOrPhrase(promptNorm, 'grouped bar')) {
+    chartPreference = 'GROUPED_BAR';
+  } else if (hasWordOrPhrase(promptNorm, 'cot chong 100') || hasWordOrPhrase(promptNorm, '100% stacked bar') || hasWordOrPhrase(promptNorm, 'percent stacked bar')) {
+    chartPreference = 'PERCENT_STACKED_BAR';
+  } else if (hasWordOrPhrase(promptNorm, 'cot chong') || hasWordOrPhrase(promptNorm, 'stacked bar')) {
+    chartPreference = 'STACKED_BAR';
+  } else if (hasWordOrPhrase(promptNorm, 'lollipop') || hasWordOrPhrase(promptNorm, 'keo mut')) {
+    chartPreference = 'LOLLIPOP';
+  } else if (hasWordOrPhrase(promptNorm, 'sankey') || hasWordOrPhrase(promptNorm, 'luong luu chuyen') || hasWordOrPhrase(promptNorm, 'dong chuyen dich')) {
+    chartPreference = 'SANKEY';
+  } else if (hasWordOrPhrase(promptNorm, 'histogram') || hasWordOrPhrase(promptNorm, 'tan suat')) {
+    chartPreference = 'HISTOGRAM';
+  } else if (hasWordOrPhrase(promptNorm, 'gauge') || hasWordOrPhrase(promptNorm, 'dong ho')) {
+    chartPreference = 'GAUGE';
+  } else if (hasWordOrPhrase(promptNorm, 'waterfall') || hasWordOrPhrase(promptNorm, 'thac nuoc')) {
+    chartPreference = 'WATERFALL';
+  } else if (hasWordOrPhrase(promptNorm, 'boxplot') || hasWordOrPhrase(promptNorm, 'bieu do hop') || hasWordOrPhrase(promptNorm, 'hop va rau')) {
+    chartPreference = 'BOXPLOT';
+  } else if (hasWordOrPhrase(promptNorm, 'donut') || hasWordOrPhrase(promptNorm, 'vanh khuyen')) {
+    chartPreference = 'DONUT';
+  } else if (hasWordOrPhrase(promptNorm, 'treemap') || hasWordOrPhrase(promptNorm, 'cay phan cap')) {
+    chartPreference = 'TREEMAP';
+  } else if (hasWordOrPhrase(promptNorm, 'vung chong') || hasWordOrPhrase(promptNorm, 'stacked area')) {
+    chartPreference = 'STACKED_AREA';
+  } else if (hasWordOrPhrase(promptNorm, 'vung') || hasWordOrPhrase(promptNorm, 'area')) {
+    chartPreference = 'AREA';
+  } else if (hasWordOrPhrase(promptNorm, 'bac thang') || hasWordOrPhrase(promptNorm, 'step line')) {
+    chartPreference = 'STEP_LINE';
+  } else if (hasWordOrPhrase(promptNorm, 'da duong') || hasWordOrPhrase(promptNorm, 'multi line')) {
+    chartPreference = 'MULTI_LINE';
+  } else if (hasWordOrPhrase(promptNorm, 'combo') || (hasWordOrPhrase(promptNorm, 'duong') && hasWordOrPhrase(promptNorm, 'cot'))) {
+    chartPreference = 'COMBO';
+  } else if (hasWordOrPhrase(promptNorm, 'pivot') || hasWordOrPhrase(promptNorm, 'tong hop cheo')) {
+    chartPreference = 'PIVOT_TABLE';
+  } else if (dateTrunc || hasWordOrPhrase(promptNorm, 'xu huong') || hasWordOrPhrase(promptNorm, 'duong') || hasWordOrPhrase(promptNorm, 'line')) {
     chartPreference = 'LINE';
   } else if (hasPieAndBar) {
     chartPreference = 'BAR';
@@ -2291,9 +2529,15 @@ function planFollowUpQuery(prompt, previousPlan, datasetProfile) {
     isFollowUp = true;
   }
 
-  // 4. Chart Preference adjustment: "Đổi sang biểu đồ tròn / đường / cột"
-  if (hasWordOrPhrase(promptNorm, 'bieu do tron') || hasWordOrPhrase(promptNorm, 'pie')) {
-    clonedPlan.chart_preference = 'PIE';
+  // 4. Chart Preference adjustment: "Đổi sang biểu đồ tròn / đường / cột / donut / funnel / v.v."
+  if (hasWordOrPhrase(promptNorm, 'bieu do tron') || hasWordOrPhrase(promptNorm, 'hinh tron') || hasWordOrPhrase(promptNorm, 'pie')) {
+    const hasMultipleDisparateMetrics = clonedPlan.aggregations && clonedPlan.aggregations.length > 1;
+    if (hasMultipleDisparateMetrics) {
+      clonedPlan.chart_preference = 'GROUPED_BAR';
+      clonedPlan.chart_preference_explanation = 'Biểu đồ tròn chỉ hỗ trợ cơ cấu tỷ trọng của 1 chỉ số thành phần (part-to-whole). Không thể gộp nhiều chỉ tiêu có bản chất khác nhau (như Tổng và Trung bình) vào chung một biểu đồ tròn; hệ thống chuyển sang Biểu đồ Cột Nhóm.';
+    } else {
+      clonedPlan.chart_preference = 'PIE';
+    }
     isFollowUp = true;
   } else if (hasWordOrPhrase(promptNorm, 'bieu do duong') || hasWordOrPhrase(promptNorm, 'line')) {
     clonedPlan.chart_preference = 'LINE';
@@ -2301,6 +2545,66 @@ function planFollowUpQuery(prompt, previousPlan, datasetProfile) {
   } else if (hasWordOrPhrase(promptNorm, 'bieu do cot') || hasWordOrPhrase(promptNorm, 'bar')) {
     clonedPlan.chart_preference = 'BAR';
     isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'donut') || hasWordOrPhrase(promptNorm, 'vanh khuyen')) {
+    const hasMultipleDisparateMetrics = clonedPlan.aggregations && clonedPlan.aggregations.length > 1;
+    if (hasMultipleDisparateMetrics) {
+      clonedPlan.chart_preference = 'GROUPED_BAR';
+      clonedPlan.chart_preference_explanation = 'Biểu đồ Donut chỉ hỗ trợ cơ cấu tỷ trọng của 1 chỉ số thành phần (part-to-whole); tự động chuyển sang Biểu đồ Cột Nhóm.';
+    } else {
+      clonedPlan.chart_preference = 'DONUT';
+    }
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'funnel') || hasWordOrPhrase(promptNorm, 'pheu')) {
+    clonedPlan.chart_preference = 'FUNNEL';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'radar') || hasWordOrPhrase(promptNorm, 'mang nhen')) {
+    clonedPlan.chart_preference = 'RADAR';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'scatter') || hasWordOrPhrase(promptNorm, 'phan tan')) {
+    clonedPlan.chart_preference = 'SCATTER';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'bubble') || hasWordOrPhrase(promptNorm, 'bong bong')) {
+    clonedPlan.chart_preference = 'BUBBLE';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'heatmap') || hasWordOrPhrase(promptNorm, 'ban do nhiet')) {
+    clonedPlan.chart_preference = 'HEATMAP';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'pareto') || hasWordOrPhrase(promptNorm, '80/20') || hasWordOrPhrase(promptNorm, '80 20')) {
+    clonedPlan.chart_preference = 'PARETO';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'histogram') || hasWordOrPhrase(promptNorm, 'tan suat')) {
+    clonedPlan.chart_preference = 'HISTOGRAM';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'boxplot') || hasWordOrPhrase(promptNorm, 'bieu do hop')) {
+    clonedPlan.chart_preference = 'BOXPLOT';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'gauge') || hasWordOrPhrase(promptNorm, 'dong ho')) {
+    clonedPlan.chart_preference = 'GAUGE';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'cot ngang') || hasWordOrPhrase(promptNorm, 'horizontal bar')) {
+    clonedPlan.chart_preference = 'HORIZONTAL_BAR';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'sankey') || hasWordOrPhrase(promptNorm, 'luong luu chuyen')) {
+    clonedPlan.chart_preference = 'SANKEY';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'treemap') || hasWordOrPhrase(promptNorm, 'cay phan cap')) {
+    clonedPlan.chart_preference = 'TREEMAP';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'waterfall') || hasWordOrPhrase(promptNorm, 'thac nuoc')) {
+    clonedPlan.chart_preference = 'WATERFALL';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'lollipop') || hasWordOrPhrase(promptNorm, 'keo mut')) {
+    clonedPlan.chart_preference = 'LOLLIPOP';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'combo') || hasWordOrPhrase(promptNorm, 'ket hop')) {
+    clonedPlan.chart_preference = 'COMBO';
+    isFollowUp = true;
+  } else if (hasWordOrPhrase(promptNorm, 'vung') || hasWordOrPhrase(promptNorm, 'area')) {
+    clonedPlan.chart_preference = 'AREA';
+    isFollowUp = true;
+  }
+  if (isFollowUp && clonedPlan.visualizations && clonedPlan.visualizations[0] && clonedPlan.chart_preference) {
+    clonedPlan.visualizations[0].chart_type = clonedPlan.chart_preference;
   }
 
   // 5. Sorting adjustment: "Sắp xếp tăng dần / giảm dần"

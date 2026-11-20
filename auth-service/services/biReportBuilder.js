@@ -4,6 +4,7 @@ const { sanitizeBiData } = require('./biPrivacy');
 const { assertValidDashboardPayload, MAX_ROWS_PER_DATASET } = require('./biDashboardSchemaValidator');
 const { signReport } = require('./biExportToken');
 const { normalizeText } = require('./biQueryPlanner');
+const { ALL_CHART_TYPE_KEYS, recommendChart } = require('./biChartRegistry');
 
 function primaryMetric(aggregation, result) {
   const alias = aggregation.alias || `${aggregation.func.toLowerCase()}_${aggregation.column}`;
@@ -126,7 +127,7 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
           format: 'NUMBER',
           unit: req.unit || '',
           status: isUnavailable ? 'DATA_UNAVAILABLE' : 'AVAILABLE',
-          subtext: isUnavailable ? (req.reason || res?.reason || 'Chưa đủ dữ liệu để tính chỉ tiêu này.') : (req.subtext || 'Tính trên toàn bộ tập dữ liệu phù hợp.'),
+          subtext: isUnavailable ? (req.reason || res?.reason || 'Chưa đủ dữ liệu để tính chỉ tiêu này.') : (res?.subtext || req.subtext || 'Tính trên toàn bộ tập dữ liệu phù hợp.'),
         });
       } else if (req.type === 'GROUP_BY') {
         const groupData = res?.data || [];
@@ -134,7 +135,7 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
         dataStore[groupDataRef] = groupData;
         const catCol = req.groupBy ? (typeof req.groupBy[0] === 'string' ? req.groupBy[0] : req.groupBy[0]?.column) : 'phong_ban';
         const valCol = req.alias || (groupData[0] ? Object.keys(groupData[0]).find(k => typeof groupData[0][k] === 'number' && k !== 'count_rows') : 'value');
-        const chartType = (req.visualization_type && ['BAR', 'PIE', 'LINE', 'DONUT', 'AREA', 'STACKED_BAR'].includes(String(req.visualization_type).toUpperCase()))
+        const chartType = (req.visualization_type && ALL_CHART_TYPE_KEYS.includes(String(req.visualization_type).toUpperCase()))
           ? String(req.visualization_type).toUpperCase()
           : (req.title?.toLowerCase().includes('tỷ trọng') ? 'PIE' : 'BAR');
 
@@ -164,7 +165,7 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
         const distDataRef = `dataset_${req.id}`;
         dataStore[distDataRef] = distData;
         const catCol = req.dimension || 'nhom_muc_luong';
-        const chartType = (req.visualization_type && ['BAR', 'PIE', 'DONUT'].includes(String(req.visualization_type).toUpperCase()))
+        const chartType = (req.visualization_type && ALL_CHART_TYPE_KEYS.includes(String(req.visualization_type).toUpperCase()))
           ? String(req.visualization_type).toUpperCase()
           : 'BAR';
 
@@ -291,6 +292,101 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
           ],
           pagination: { page_size: 10, total_rows: ratioData.length },
         });
+      } else if (req.type === 'DEPT_STATUS_ANALYSIS') {
+        const deptData = res?.data || [];
+        const deptDataRef = `dataset_${req.id}`;
+        dataStore[deptDataRef] = deptData;
+        visualizations.push({
+          id: `viz_${req.id}`,
+          title: req.title,
+          chart_type: 'BAR',
+          data_ref: deptDataRef,
+          mapping: { category: req.dimension || 'phong_ban', value: 'ty_le_dang_lam_viec_pct' },
+          interactions: { selectable: true, filterable: true, drilldown: false },
+          drill_dimensions: [req.dimension || 'phong_ban'],
+          grid_col_span: 6,
+        });
+        dataTables.push({
+          id: `tbl_${req.id}`,
+          title: req.title,
+          data_ref: deptDataRef,
+          columns: [
+            { key: req.dimension || 'phong_ban', label: getFriendlyColumnLabel(req.dimension || 'phong_ban'), type: 'string' },
+            { key: 'tong_nhan_su', label: 'Tổng Nhân Sự', type: 'number' },
+            { key: 'dang_lam_viec', label: 'Đang Làm Việc', type: 'number' },
+            { key: 'da_nghi_viec', label: 'Đã Nghỉ Việc', type: 'number' },
+            { key: 'thai_san', label: 'Thai Sản', type: 'number' },
+            { key: 'ty_le_dang_lam_viec_pct', label: 'Tỷ Lệ Đang Làm Việc (%)', type: 'number' },
+          ],
+          pagination: { page_size: 10, total_rows: deptData.length },
+        });
+      } else if (req.type === 'SCATTER') {
+        const scatterData = res?.data || [];
+        const scatterRef = `dataset_${req.id}`;
+        dataStore[scatterRef] = scatterData;
+        const xK = req.xMetric || Object.keys(scatterData[0] || {})[0];
+        const yK = req.yMetric || Object.keys(scatterData[0] || {})[1];
+        visualizations.push({
+          id: `viz_${req.id}`,
+          title: req.title,
+          chart_type: 'SCATTER',
+          data_ref: scatterRef,
+          mapping: { x: xK, y: yK },
+          interactions: { selectable: true, filterable: true, zoom: true },
+          grid_col_span: 6,
+        });
+      } else if (req.type === 'FUNNEL') {
+        const funnelData = res?.data || [];
+        const funnelRef = `dataset_${req.id}`;
+        dataStore[funnelRef] = funnelData;
+        visualizations.push({
+          id: `viz_${req.id}`,
+          title: req.title,
+          chart_type: 'FUNNEL',
+          data_ref: funnelRef,
+          mapping: { category: req.dimension || 'stage', value: req.metric || 'count' },
+          interactions: { selectable: true, filterable: true },
+          grid_col_span: 6,
+        });
+      } else if (req.type === 'PARETO') {
+        const paretoData = res?.data || [];
+        const paretoRef = `dataset_${req.id}`;
+        dataStore[paretoRef] = paretoData;
+        visualizations.push({
+          id: `viz_${req.id}`,
+          title: req.title,
+          chart_type: 'PARETO',
+          data_ref: paretoRef,
+          mapping: { category: req.dimension, value: [req.metric, 'cumulative_pct'] },
+          interactions: { selectable: true, filterable: true },
+          grid_col_span: 12,
+        });
+      } else if (req.type === 'RADAR') {
+        const radarData = res?.data || [];
+        const radarRef = `dataset_${req.id}`;
+        dataStore[radarRef] = radarData;
+        visualizations.push({
+          id: `viz_${req.id}`,
+          title: req.title,
+          chart_type: 'RADAR',
+          data_ref: radarRef,
+          mapping: { category: req.dimension, value: req.metrics || [] },
+          interactions: { selectable: true, filterable: true },
+          grid_col_span: 6,
+        });
+      } else if (req.type === 'HEATMAP') {
+        const heatData = res?.data || [];
+        const heatRef = `dataset_${req.id}`;
+        dataStore[heatRef] = heatData;
+        visualizations.push({
+          id: `viz_${req.id}`,
+          title: req.title,
+          chart_type: 'HEATMAP',
+          data_ref: heatRef,
+          mapping: { x: req.xDimension, y: req.yDimension, value: req.metric },
+          interactions: { selectable: true, filterable: true },
+          grid_col_span: 6,
+        });
       }
     }
 
@@ -376,8 +472,10 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
 
   // Enrich with Matching Rows and Distinct Headcount cards if not already present
   if (hasRealRows) {
+    const isMatchingRowsAsked = /(so dong|dong phu hop|ban ghi)/i.test(queryPlan.prompt || '');
+    const hasExplicitDomainKpi = kpis.length > 0;
     const hasMatchingRowsKpi = kpis.some(k => k.kpi_code === 'FILE_COUNT_*' || k.metric_alias === 'count_rows' || k.id === 'kpi_file_matching');
-    if (!hasMatchingRowsKpi) {
+    if (!hasMatchingRowsKpi && (isMatchingRowsAsked || !hasExplicitDomainKpi)) {
       kpis.push({
         id: 'kpi_file_matching',
         metric_alias: 'matching_rows',
@@ -408,8 +506,10 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
       });
     }
 
+    const isSalaryExplicitlyAsked = /(luong|salary|thu_nhap|quy_luong)/i.test(queryPlan.prompt || '') || aggregations.some(a => /(luong|salary)/i.test(a.column));
+    const isGenericDeptCount = Boolean(queryPlan.prompt && /(theo tung phong ban|theo phong ban)/i.test(queryPlan.prompt) && !/(trang thai|tinh trang)/i.test(queryPlan.prompt));
     const hasSalaryKpi = kpis.some(k => k.metric_alias?.includes('luong') || k.metric_alias?.includes('salary') || k.id === 'kpi_file_salary');
-    if (!hasSalaryKpi && salaryCol && totalSalaryValue !== null) {
+    if (!hasSalaryKpi && salaryCol && totalSalaryValue !== null && (isSalaryExplicitlyAsked || isGenericDeptCount)) {
       kpis.push({
         id: 'kpi_file_salary',
         metric_alias: 'sum_salary',
@@ -442,7 +542,7 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
   };
   const visualizations = [];
   const preferred = String(queryPlan.chart_preference || 'BAR').toUpperCase();
-  const primaryChartType = ['BAR', 'LINE', 'PIE', 'DONUT', 'AREA', 'STACKED_BAR', 'TREEMAP'].includes(preferred) ? preferred : 'BAR';
+  const primaryChartType = ALL_CHART_TYPE_KEYS.includes(preferred) ? preferred : 'BAR';
 
   // Primary Visual from User Plan
   const aliases = aggregations.map(a => a.alias || `${a.func.toLowerCase()}_${a.column}`);

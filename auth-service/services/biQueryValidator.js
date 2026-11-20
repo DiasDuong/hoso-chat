@@ -32,6 +32,12 @@ const ALLOWED_FUNCTIONS = Object.freeze([
   'MAX',
   'MEDIAN',
   'DISTINCT_COUNT',
+  'PERCENTILE',
+  'STDDEV',
+  'STDEV',
+  'STANDARD_DEVIATION',
+  'VAR',
+  'VARIANCE',
 ]);
 
 const ALLOWED_OPERATORS = Object.freeze([
@@ -49,7 +55,14 @@ const ALLOWED_OPERATORS = Object.freeze([
 ]);
 
 const ALLOWED_DATE_TRUNC = Object.freeze(['day', 'month', 'quarter', 'year']);
-const ALLOWED_COMPUTATIONS = Object.freeze(['PERCENTAGE', 'GROWTH_RATE']);
+const ALLOWED_COMPUTATIONS = Object.freeze([
+  'PERCENTAGE',
+  'GROWTH_RATE',
+  'CUMULATIVE_TOTAL',
+  'RUNNING_TOTAL',
+  'MOVING_AVERAGE',
+  'CONTRIBUTION',
+]);
 
 // SQL keywords to block in any custom field
 const SQL_INJECTION_PATTERN = /\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|CREATE|EXEC|EXECUTE|GRANT|REVOKE|TRUNCATE)\b/i;
@@ -283,7 +296,7 @@ function validateQueryPlan(queryPlan, dataset, userContext) {
     }
 
     // Mathematical type compatibility check
-    if (['SUM', 'AVG', 'MEDIAN'].includes(func)) {
+    if (['SUM', 'AVG', 'MEDIAN', 'PERCENTILE', 'STDDEV', 'STDEV', 'STANDARD_DEVIATION', 'VAR', 'VARIANCE'].includes(func)) {
       if (colMeta.type !== 'INTEGER' && colMeta.type !== 'FLOAT') {
         throw new QueryValidationError(
           `Không thể thực hiện phép tính ${func} trên cột "${colMeta.name}" vì cột này có kiểu dữ liệu là ${colMeta.type}. Phép tính số học chỉ áp dụng cho cột kiểu INTEGER hoặc FLOAT.`,

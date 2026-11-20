@@ -14077,10 +14077,253 @@ function renderEChartInstance(chartDom, vizConfig, dataStore) {
     };
   } else if (chartType === 'TREEMAP') {
     option = { tooltip: { formatter: p => `${esc(p.name)}: ${displayValue(p.value)}` }, series: [{ type: 'treemap', roam: false, nodeClick: false, breadcrumb: { show: false }, data: rows.map(r => ({ name: String(r[catKey] || ''), value: numericValue(r[valKey]) })) }] };
-  } else if (chartType === 'LINE' || chartType === 'AREA') {
+  } else if (chartType === 'HORIZONTAL_BAR') {
     const categories = rows.map((r) => String(r[catKey] || ''));
     const values = rows.map((r) => numericValue(r[valKey]));
-    const isArea = chartType === 'AREA';
+    option = {
+      color: palette,
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `<strong>${esc(p[0].axisValue)}</strong><br/>${esc(p[0].seriesName)}: ${displayValue(p[0].value)}` },
+      grid: { left: '4%', right: '8%', bottom: '8%', top: '8%', containLabel: true },
+      xAxis: { type: 'value', axisLabel: { fontSize: 10, color: '#64748b' }, splitLine: { lineStyle: { color: '#f1f5f9' } } },
+      yAxis: { type: 'category', data: categories, inverse: true, axisLabel: { fontSize: 10, color: '#64748b' }, axisLine: { lineStyle: { color: '#cbd5e1' } } },
+      series: [{
+        name: vizConfig.title || 'Số lượng',
+        type: 'bar',
+        data: values,
+        itemStyle: { borderRadius: [0, 4, 4, 0], color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#0284c7' }, { offset: 1, color: '#2563eb' }]) },
+      }],
+    };
+  } else if (chartType === 'GROUPED_BAR') {
+    const categories = rows.map((r) => String(r[catKey] || ''));
+    const valFields = Array.isArray(valKey) ? valKey : [valKey];
+    option = {
+      color: palette,
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: { bottom: 0, textStyle: { fontSize: 10, color: '#475569' } },
+      grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
+      xAxis: { type: 'category', data: categories, axisLabel: { fontSize: 10, color: '#64748b' } },
+      yAxis: { type: 'value', splitLine: { lineStyle: { color: '#f1f5f9' } } },
+      series: valFields.map(f => ({ name: f, type: 'bar', data: rows.map(r => numericValue(r[f])), itemStyle: { borderRadius: [4, 4, 0, 0] } })),
+    };
+  } else if (chartType === 'PERCENT_STACKED_BAR') {
+    const categories = rows.map((r) => String(r[catKey] || ''));
+    const valFields = Array.isArray(valKey) ? valKey : [valKey];
+    option = {
+      color: palette,
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: { bottom: 0, textStyle: { fontSize: 10, color: '#475569' } },
+      grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
+      xAxis: { type: 'category', data: categories, axisLabel: { fontSize: 10, color: '#64748b' } },
+      yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' }, splitLine: { lineStyle: { color: '#f1f5f9' } } },
+      series: valFields.map(f => ({ name: f, type: 'bar', stack: 'total', data: rows.map(r => numericValue(r[f])) })),
+    };
+  } else if (chartType === 'FUNNEL') {
+    option = {
+      color: palette,
+      tooltip: { trigger: 'item', formatter: p => `<strong>${esc(p.name)}</strong>: ${displayValue(p.value)} (${p.percent || 0}%)` },
+      series: [{
+        type: 'funnel',
+        left: '10%',
+        width: '80%',
+        sort: 'descending',
+        gap: 2,
+        label: { show: true, position: 'inside', fontSize: 10, color: '#ffffff' },
+        itemStyle: { borderColor: '#fff', borderWidth: 1 },
+        data: rows.map(r => ({ name: String(r[catKey] || ''), value: numericValue(r[valKey]) })),
+      }],
+    };
+  } else if (chartType === 'RADAR') {
+    const indicators = Object.keys(rows[0] || {}).filter(k => k !== catKey && typeof rows[0][k] === 'number').map(k => ({ name: k }));
+    option = {
+      color: palette,
+      tooltip: { trigger: 'item' },
+      legend: { bottom: 0, textStyle: { fontSize: 10, color: '#475569' } },
+      radar: { indicator: indicators.length > 0 ? indicators : [{ name: 'Chỉ số', max: 100 }] },
+      series: [{
+        type: 'radar',
+        data: rows.map(r => ({ name: String(r[catKey] || ''), value: indicators.map(ind => numericValue(r[ind.name])) })),
+      }],
+    };
+  } else if (chartType === 'GAUGE') {
+    const val = numericValue(rows[0] ? rows[0][valKey] : 0) || 0;
+    option = {
+      series: [{
+        type: 'gauge',
+        progress: { show: true, width: 14 },
+        axisLine: { lineStyle: { width: 14 } },
+        axisTick: { show: false },
+        splitLine: { length: 10, lineStyle: { width: 2, color: '#999' } },
+        axisLabel: { distance: 18, color: '#999', fontSize: 10 },
+        anchor: { show: true, showAbove: true, size: 14, itemStyle: { borderWidth: 8 } },
+        title: { show: true, fontSize: 12, offsetCenter: [0, '70%'] },
+        detail: { valueAnimation: true, fontSize: 20, offsetCenter: [0, '40%'], formatter: '{value}%' },
+        data: [{ value: val, name: vizConfig.title || 'Tỷ lệ' }],
+      }],
+    };
+  } else if (chartType === 'SCATTER' || chartType === 'BUBBLE') {
+    const xK = mapping.x || Object.keys(rows[0] || {})[0];
+    const yK = mapping.y || Object.keys(rows[0] || {})[1];
+    const sizeK = mapping.size || Object.keys(rows[0] || {})[2];
+    option = {
+      color: palette,
+      tooltip: { trigger: 'item', formatter: p => `(${p.value[0]}, ${p.value[1]})` },
+      grid: { left: '5%', right: '5%', bottom: '12%', top: '10%', containLabel: true },
+      xAxis: { type: 'value', splitLine: { lineStyle: { color: '#f1f5f9' } } },
+      yAxis: { type: 'value', splitLine: { lineStyle: { color: '#f1f5f9' } } },
+      series: [{
+        type: 'scatter',
+        symbolSize: p => sizeK && p[2] ? Math.max(8, Math.min(40, Number(p[2]))) : 12,
+        data: rows.map(r => [numericValue(r[xK]), numericValue(r[yK]), sizeK ? numericValue(r[sizeK]) : 10]),
+        itemStyle: { color: '#0284c7', opacity: 0.8 },
+      }],
+    };
+  } else if (chartType === 'COMBO' || chartType === 'PARETO') {
+    const categories = rows.map((r) => String(r[catKey] || ''));
+    const valFields = Array.isArray(valKey) ? valKey : [valKey, Object.keys(rows[0] || {})[2]].filter(Boolean);
+    const barField = valFields[0];
+    const lineField = valFields[1] || barField;
+    option = {
+      color: palette,
+      tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+      legend: { bottom: 0, textStyle: { fontSize: 10, color: '#475569' } },
+      grid: { left: '4%', right: '5%', bottom: '15%', top: '10%', containLabel: true },
+      xAxis: { type: 'category', data: categories, axisLabel: { fontSize: 10, color: '#64748b' } },
+      yAxis: [
+        { type: 'value', name: barField, axisLabel: { fontSize: 10, color: '#64748b' }, splitLine: { lineStyle: { color: '#f1f5f9' } } },
+        { type: 'value', name: lineField, max: chartType === 'PARETO' ? 100 : undefined, axisLabel: { fontSize: 10, color: '#64748b' }, splitLine: { show: false } },
+      ],
+      series: [
+        { name: barField, type: 'bar', yAxisIndex: 0, data: rows.map(r => numericValue(r[barField])), itemStyle: { borderRadius: [4, 4, 0, 0] } },
+        { name: lineField, type: 'line', yAxisIndex: 1, data: rows.map(r => numericValue(r[lineField])), smooth: true, itemStyle: { color: '#f59e0b' } },
+      ],
+    };
+  } else if (chartType === 'HEATMAP') {
+    const xK = mapping.x || Object.keys(rows[0] || {})[0];
+    const yK = mapping.y || Object.keys(rows[0] || {})[1];
+    const vK = mapping.value || Object.keys(rows[0] || {})[2];
+    const xVals = [...new Set(rows.map(r => String(r[xK] || '')))];
+    const yVals = [...new Set(rows.map(r => String(r[yK] || '')))];
+    const data = rows.map(r => [xVals.indexOf(String(r[xK] || '')), yVals.indexOf(String(r[yK] || '')), numericValue(r[vK])]);
+    const maxVal = Math.max(...rows.map(r => numericValue(r[vK]) || 0), 10);
+    option = {
+      tooltip: { position: 'top', formatter: p => `${xVals[p.value[0]]} x ${yVals[p.value[1]]}: ${p.value[2]}` },
+      grid: { left: '5%', right: '5%', bottom: '15%', top: '10%', containLabel: true },
+      xAxis: { type: 'category', data: xVals, splitArea: { show: true } },
+      yAxis: { type: 'category', data: yVals, splitArea: { show: true } },
+      visualMap: { min: 0, max: maxVal, calculable: true, orient: 'horizontal', left: 'center', bottom: '0%' },
+      series: [{ type: 'heatmap', data, label: { show: true }, emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' } } }],
+    };
+  } else if (chartType === 'BOXPLOT') {
+    const categories = rows.map((r) => String(r[catKey] || ''));
+    const boxData = rows.map(r => [
+      numericValue(r.min || r.q1 || 0),
+      numericValue(r.q1 || 0),
+      numericValue(r.median || 0),
+      numericValue(r.q3 || 0),
+      numericValue(r.max || r.q3 || 0),
+    ]);
+    option = {
+      tooltip: { trigger: 'item', axisPointer: { type: 'shadow' } },
+      grid: { left: '5%', right: '5%', bottom: '12%', top: '10%', containLabel: true },
+      xAxis: { type: 'category', data: categories, axisLabel: { fontSize: 10, color: '#64748b' } },
+      yAxis: { type: 'value', splitLine: { lineStyle: { color: '#f1f5f9' } } },
+      series: [{ name: 'Boxplot', type: 'boxplot', data: boxData, itemStyle: { color: '#0284c7' } }],
+    };
+  } else if (chartType === 'HISTOGRAM') {
+    const categories = rows.map((r) => String(r.bin || r[catKey] || ''));
+    const values = rows.map((r) => numericValue(r.count !== undefined ? r.count : r[valKey]));
+    option = {
+      color: palette,
+      tooltip: { trigger: 'axis', formatter: p => `<strong>Khoảng: ${esc(p[0].axisValue)}</strong><br/>Tần suất: ${displayValue(p[0].value)}` },
+      grid: { left: '4%', right: '4%', bottom: '12%', top: '10%', containLabel: true },
+      xAxis: { type: 'category', data: categories, axisLabel: { fontSize: 10, color: '#64748b' } },
+      yAxis: { type: 'value', splitLine: { lineStyle: { color: '#f1f5f9' } } },
+      series: [{
+        name: vizConfig.title || 'Tần suất',
+        type: 'bar',
+        barCategoryGap: '1%',
+        data: values,
+        itemStyle: { color: '#0284c7', borderColor: '#ffffff', borderWidth: 1 },
+      }],
+    };
+  } else if (chartType === 'WATERFALL') {
+    const categories = rows.map((r) => String(r[catKey] || ''));
+    const values = rows.map((r) => numericValue(r[valKey]) || 0);
+    const base = [];
+    const change = [];
+    let acc = 0;
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i];
+      if (i === 0 || i === values.length - 1) {
+        base.push(0);
+        change.push(v);
+        acc = v;
+      } else {
+        if (v >= 0) {
+          base.push(acc);
+          change.push(v);
+          acc += v;
+        } else {
+          acc += v;
+          base.push(acc);
+          change.push(Math.abs(v));
+        }
+      }
+    }
+    option = {
+      color: palette,
+      tooltip: { trigger: 'axis', formatter: p => `<strong>${esc(p[0].axisValue)}</strong>: ${displayValue(p[1]?.value ?? p[0]?.value)}` },
+      grid: { left: '4%', right: '4%', bottom: '12%', top: '10%', containLabel: true },
+      xAxis: { type: 'category', data: categories, axisLabel: { fontSize: 10, color: '#64748b' } },
+      yAxis: { type: 'value', splitLine: { lineStyle: { color: '#f1f5f9' } } },
+      series: [
+        { name: 'Base', type: 'bar', stack: 'all', itemStyle: { borderColor: 'transparent', color: 'transparent' }, emphasis: { itemStyle: { borderColor: 'transparent', color: 'transparent' } }, data: base },
+        { name: 'Biến động', type: 'bar', stack: 'all', data: change, itemStyle: { borderRadius: 4, color: p => p.dataIndex === 0 || p.dataIndex === values.length - 1 ? '#0284c7' : (values[p.dataIndex] >= 0 ? '#10b981' : '#ef4444') } },
+      ],
+    };
+  } else if (chartType === 'LOLLIPOP') {
+    const categories = rows.map((r) => String(r[catKey] || ''));
+    const values = rows.map((r) => numericValue(r[valKey]));
+    option = {
+      color: palette,
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: '4%', right: '4%', bottom: '12%', top: '10%', containLabel: true },
+      xAxis: { type: 'category', data: categories, axisLabel: { fontSize: 10, color: '#64748b' } },
+      yAxis: { type: 'value', splitLine: { lineStyle: { color: '#f1f5f9' } } },
+      series: [
+        { name: vizConfig.title || 'Số lượng', type: 'bar', barWidth: 3, data: values, itemStyle: { color: '#0284c7' } },
+        { name: vizConfig.title || 'Số lượng', type: 'scatter', symbolSize: 12, data: values, itemStyle: { color: '#2563eb' } },
+      ],
+    };
+  } else if (chartType === 'SANKEY') {
+    const nodes = [];
+    const nodeSet = new Set();
+    const links = [];
+    for (const r of rows) {
+      const src = String(r.source || r.from || r[catKey] || '');
+      const tgt = String(r.target || r.to || r[valKey] || '');
+      const val = numericValue(r.value || r.count || r.weight || 1) || 1;
+      if (src && tgt) {
+        if (!nodeSet.has(src)) { nodeSet.add(src); nodes.push({ name: src }); }
+        if (!nodeSet.has(tgt)) { nodeSet.add(tgt); nodes.push({ name: tgt }); }
+        links.push({ source: src, target: tgt, value: val });
+      }
+    }
+    option = {
+      tooltip: { trigger: 'item', triggerOn: 'mousemove' },
+      series: [{
+        type: 'sankey',
+        data: nodes.length > 0 ? nodes : [{ name: 'Nguồn' }, { name: 'Đích' }],
+        links: links.length > 0 ? links : [{ source: 'Nguồn', target: 'Đích', value: 1 }],
+        emphasis: { focus: 'adjacency' },
+        lineStyle: { color: 'gradient', curveness: 0.5 },
+      }],
+    };
+  } else if (chartType === 'LINE' || chartType === 'AREA' || chartType === 'STEP_LINE' || chartType === 'MULTI_LINE' || chartType === 'STACKED_AREA') {
+    const categories = rows.map((r) => String(r[catKey] || ''));
+    const isArea = chartType === 'AREA' || chartType === 'STACKED_AREA';
+    const isStep = chartType === 'STEP_LINE';
+    const valFields = Array.isArray(valKey) ? valKey : [valKey];
 
     option = {
       color: palette,
@@ -14091,6 +14334,7 @@ function renderEChartInstance(chartDom, vizConfig, dataStore) {
           return `<strong>${esc(item.axisValue)}</strong><br/>${esc(item.seriesName)}: ${Number(item.value || 0).toLocaleString('vi-VN')}`;
         },
       },
+      legend: valFields.length > 1 ? { bottom: 0, textStyle: { fontSize: 10, color: '#475569' } } : undefined,
       grid: {
         left: '3%',
         right: '4%',
@@ -14114,19 +14358,18 @@ function renderEChartInstance(chartDom, vizConfig, dataStore) {
         axisLabel: { fontSize: 10, color: '#64748b' },
         splitLine: { lineStyle: { color: '#f1f5f9' } },
       },
-      series: [
-        {
-          name: vizConfig.title || 'Số lượng',
-          type: 'line',
-          data: values,
-          smooth: true,
-          symbol: 'circle',
-          symbolSize: 6,
-          itemStyle: { color: '#0284c7' },
-          lineStyle: { width: 3 },
-          areaStyle: isArea ? { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(2,132,199,0.35)' }, { offset: 1, color: 'rgba(2,132,199,0.02)' }]) } : null,
-        },
-      ],
+      series: valFields.map((f, i) => ({
+        name: f || vizConfig.title || 'Số lượng',
+        type: 'line',
+        step: isStep ? 'middle' : false,
+        stack: chartType === 'STACKED_AREA' ? 'total' : undefined,
+        data: rows.map(r => numericValue(r[f])),
+        smooth: !isStep,
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: { width: 3 },
+        areaStyle: isArea ? { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(2,132,199,0.35)' }, { offset: 1, color: 'rgba(2,132,199,0.02)' }]) } : null,
+      })),
     };
   } else if (chartType === 'STACKED_BAR') {
     const categories = rows.map((r) => String(r[catKey] || ''));
@@ -14166,6 +14409,27 @@ function renderEChartInstance(chartDom, vizConfig, dataStore) {
         itemStyle: { borderRadius: i === valFields.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0] },
       })),
     };
+  } else if (chartType === 'PIVOT_TABLE') {
+    chart.dispose();
+    const cols = Object.keys(rows[0] || {});
+    let tableHtml = '<div style="overflow:auto;max-height:100%;width:100%;padding:4px;"><table style="width:100%;border-collapse:collapse;font-size:11px;">';
+    tableHtml += '<thead><tr>';
+    for (const c of cols) {
+      tableHtml += `<th style="background:#f8fafc;padding:6px 10px;border:1px solid #cbd5e1;text-align:left;font-weight:600;color:#334155;">${esc(c)}</th>`;
+    }
+    tableHtml += '</tr></thead><tbody>';
+    for (const r of rows) {
+      tableHtml += '<tr>';
+      for (const c of cols) {
+        const val = r[c];
+        const isNum = typeof val === 'number';
+        tableHtml += `<td style="padding:5px 10px;border:1px solid #e2e8f0;text-align:${isNum ? 'right' : 'left'};color:#1e293b;">${isNum ? val.toLocaleString('vi-VN') : esc(String(val ?? ''))}</td>`;
+      }
+      tableHtml += '</tr>';
+    }
+    tableHtml += '</tbody></table></div>';
+    chartDom.innerHTML = tableHtml;
+    return null;
   } else {
     // Default: BAR chart
     const categories = rows.map((r) => String(r[catKey] || ''));

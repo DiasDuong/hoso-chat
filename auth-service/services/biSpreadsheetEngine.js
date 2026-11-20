@@ -863,6 +863,22 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
             const mid = Math.floor(nums.length / 2);
             outRow[targetAlias] =
               nums.length % 2 !== 0 ? nums[mid] : Number(((nums[mid - 1] + nums[mid]) / 2).toFixed(2));
+          } else if (upperFunc === 'PERCENTILE' || upperFunc.startsWith('P')) {
+            nums.sort((a, b) => a - b);
+            const p = agg.percentile !== undefined ? Number(agg.percentile) : (upperFunc === 'P75' ? 75 : (upperFunc === 'P25' ? 25 : (upperFunc === 'P90' ? 90 : 50)));
+            const idx = (p / 100) * (nums.length - 1);
+            const low = Math.floor(idx);
+            const high = Math.ceil(idx);
+            const weight = idx - low;
+            outRow[targetAlias] = Number((nums[low] * (1 - weight) + nums[high] * weight).toFixed(2));
+          } else if (upperFunc === 'STDDEV' || upperFunc === 'STDEV' || upperFunc === 'STANDARD_DEVIATION') {
+            const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+            const variance = nums.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (nums.length > 1 ? nums.length - 1 : 1);
+            outRow[targetAlias] = Number(Math.sqrt(variance).toFixed(2));
+          } else if (upperFunc === 'VAR' || upperFunc === 'VARIANCE') {
+            const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+            const variance = nums.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (nums.length > 1 ? nums.length - 1 : 1);
+            outRow[targetAlias] = Number(variance.toFixed(2));
           }
         }
       }
@@ -920,6 +936,22 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
       values.sort((a, b) => a - b);
       const mid = Math.floor(values.length / 2);
       summary[alias] = values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
+    } else if (func === 'PERCENTILE' || func.startsWith('P')) {
+      values.sort((a, b) => a - b);
+      const p = agg.percentile !== undefined ? Number(agg.percentile) : (func === 'P75' ? 75 : (func === 'P25' ? 25 : (func === 'P90' ? 90 : 50)));
+      const idx = (p / 100) * (values.length - 1);
+      const low = Math.floor(idx);
+      const high = Math.ceil(idx);
+      const weight = idx - low;
+      summary[alias] = Number((values[low] * (1 - weight) + values[high] * weight).toFixed(2));
+    } else if (func === 'STDDEV' || func === 'STDEV' || func === 'STANDARD_DEVIATION') {
+      const mean = values.reduce((a, b) => a + b, 0) / values.length;
+      const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (values.length > 1 ? values.length - 1 : 1);
+      summary[alias] = Number(Math.sqrt(variance).toFixed(2));
+    } else if (func === 'VAR' || func === 'VARIANCE') {
+      const mean = values.reduce((a, b) => a + b, 0) / values.length;
+      const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (values.length > 1 ? values.length - 1 : 1);
+      summary[alias] = Number(variance.toFixed(2));
     }
     if (typeof summary[alias] === 'number') summary[alias] = Number(summary[alias].toFixed(2));
   }
@@ -971,6 +1003,29 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
               prev !== null && curr !== null && prev !== 0 ? Number((((curr - prev) / Math.abs(prev)) * 100).toFixed(2)) : null;
           }
           previousBySeries.set(series, resultRows[i]);
+        }
+      } else if (type === 'CUMULATIVE_TOTAL' || type === 'RUNNING_TOTAL') {
+        let runningTotal = 0;
+        for (const row of resultRows) {
+          const val = parseNumericValue(row[source_alias]) || 0;
+          runningTotal += val;
+          row[target_alias] = Number(runningTotal.toFixed(2));
+        }
+      } else if (type === 'MOVING_AVERAGE') {
+        const windowSize = comp.window || 3;
+        const windowVals = [];
+        for (const row of resultRows) {
+          const val = parseNumericValue(row[source_alias]) || 0;
+          windowVals.push(val);
+          if (windowVals.length > windowSize) windowVals.shift();
+          const avg = windowVals.reduce((a, b) => a + b, 0) / windowVals.length;
+          row[target_alias] = Number(avg.toFixed(2));
+        }
+      } else if (type === 'CONTRIBUTION') {
+        const totalSum = resultRows.reduce((acc, r) => acc + (parseNumericValue(r[source_alias]) || 0), 0);
+        for (const row of resultRows) {
+          const val = parseNumericValue(row[source_alias]);
+          row[target_alias] = (val !== null && totalSum > 0) ? Number(((val / totalSum) * 100).toFixed(2)) : 0;
         }
       }
     }
@@ -1083,7 +1138,44 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
         const func = String(req.func || 'SUM').toUpperCase();
         const col = req.column;
         let metricVal = null;
-        if (func === 'COUNT') {
+        let subtext = req.subtext || null;
+
+        if (req.id === 'req_lowest_active_dept') {
+          const deptCol = columns.find((c) => /(phong|dept|bo_phan)/i.test(c.key));
+          const statusCol = columns.find((c) => /(trang_thai|status|tinh_trang)/i.test(c.key));
+          if (deptCol && statusCol) {
+            const dMap = new Map();
+            for (const r of rows) {
+              const d = String(r[deptCol.key] || 'Khác').trim() || 'Khác';
+              if (!dMap.has(d)) dMap.set(d, { total: 0, active: 0 });
+              const item = dMap.get(d);
+              item.total++;
+              const st = String(r[statusCol.key] || '').trim().toLowerCase();
+              if (st.includes('đang làm việc') || st.includes('dang lam viec') || st === 'active') {
+                item.active++;
+              }
+            }
+            let minDept = null;
+            let minRatio = Infinity;
+            let minActive = 0;
+            let minTotal = 0;
+            for (const [dept, data] of dMap.entries()) {
+              if (data.total > 0) {
+                const ratio = Number(((data.active / data.total) * 100).toFixed(2));
+                if (ratio < minRatio) {
+                  minRatio = ratio;
+                  minDept = dept;
+                  minActive = data.active;
+                  minTotal = data.total;
+                }
+              }
+            }
+            if (minDept !== null) {
+              metricVal = minRatio;
+              subtext = `Phòng ${minDept}: ${minActive}/${minTotal} nhân sự (${minRatio.toString().replace('.', ',')}%)`;
+            }
+          }
+        } else if (func === 'COUNT') {
           metricVal = targetRows.length;
         } else if (func === 'DISTINCT_COUNT') {
           const s = new Set(targetRows.map((r) => r[col]).filter((v) => v !== null && v !== undefined && v !== ''));
@@ -1097,6 +1189,12 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
             else if (func === 'MAX') metricVal = Math.max(...nums);
           }
         }
+
+        if (req.id.startsWith('req_status_') && req.id !== 'req_status_total_headcount' && rows.length > 0 && metricVal !== null) {
+          const pct = ((metricVal / rows.length) * 100).toFixed(2).replace('.', ',');
+          subtext = `Chiếm ${pct}% (${metricVal}/${rows.length} nhân sự)`;
+        }
+
         resultsByRequirement[req.id] = {
           id: req.id,
           title: req.title,
@@ -1105,6 +1203,7 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
           column: col,
           value: metricVal,
           unit: req.unit || '',
+          subtext,
           sample_size: targetRows.length,
           status: 'AVAILABLE',
         };
@@ -1453,6 +1552,51 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
           data: ratioResults,
           status: 'AVAILABLE',
         };
+      } else if (req.type === 'DEPT_STATUS_ANALYSIS') {
+        const dimCol = req.dimension || 'phong_ban';
+        const stCol = req.status_col || 'trang_thai';
+        const dMap = new Map();
+
+        for (const r of targetRows) {
+          const d = String(r[dimCol] || 'Khác').trim() || 'Khác';
+          if (!dMap.has(d)) {
+            dMap.set(d, {
+              [dimCol]: d,
+              tong_nhan_su: 0,
+              dang_lam_viec: 0,
+              da_nghi_viec: 0,
+              thai_san: 0,
+            });
+          }
+          const item = dMap.get(d);
+          item.tong_nhan_su++;
+          const s = String(r[stCol] || '').trim().toLowerCase();
+          if (s.includes('đang làm việc') || s.includes('dang lam viec') || s === 'active') {
+            item.dang_lam_viec++;
+          } else if (s.includes('nghỉ việc') || s.includes('nghi viec') || s.includes('resigned')) {
+            item.da_nghi_viec++;
+          } else if (s.includes('thai sản') || s.includes('thai san') || s.includes('maternity')) {
+            item.thai_san++;
+          }
+        }
+
+        const deptAnalysis = Array.from(dMap.values()).map((item) => {
+          const ratio = item.tong_nhan_su > 0 ? Number(((item.dang_lam_viec / item.tong_nhan_su) * 100).toFixed(2)) : 0;
+          return {
+            ...item,
+            ty_le_dang_lam_viec_pct: ratio,
+          };
+        }).sort((a, b) => a.ty_le_dang_lam_viec_pct - b.ty_le_dang_lam_viec_pct);
+
+        resultsByRequirement[req.id] = {
+          id: req.id,
+          requirement_id: req.requirement_id || req.id,
+          title: req.title,
+          type: 'DEPT_STATUS_ANALYSIS',
+          dimension: dimCol,
+          data: deptAnalysis,
+          status: 'AVAILABLE',
+        };
       }
     }
 
@@ -1679,6 +1823,157 @@ async function getDatasetForSheet(dataset, sheetName) {
   return { ...dataset, columns: selected.columns, profile: selected.profile };
 }
 
+/**
+ * Compute Pearson correlation coefficient r between two numeric columns
+ */
+function computeCorrelation(rows, col1, col2) {
+  if (!Array.isArray(rows) || rows.length < 2) return 0;
+  const pairs = rows
+    .map(r => [parseNumericValue(r[col1]), parseNumericValue(r[col2])])
+    .filter(([x, y]) => x !== null && y !== null);
+  if (pairs.length < 2) return 0;
+  const n = pairs.length;
+  const sumX = pairs.reduce((acc, [x]) => acc + x, 0);
+  const sumY = pairs.reduce((acc, [, y]) => acc + y, 0);
+  const meanX = sumX / n;
+  const meanY = sumY / n;
+  let num = 0;
+  let denX = 0;
+  let denY = 0;
+  for (const [x, y] of pairs) {
+    const dx = x - meanX;
+    const dy = y - meanY;
+    num += dx * dy;
+    denX += dx * dx;
+    denY += dy * dy;
+  }
+  const den = Math.sqrt(denX * denY);
+  return den === 0 ? 0 : Number((num / den).toFixed(4));
+}
+
+/**
+ * Compute Histogram Bins for continuous metric
+ */
+function computeHistogramBins(rows, col, binCount = 5) {
+  if (!Array.isArray(rows)) return [];
+  const vals = rows.map(r => parseNumericValue(r[col])).filter(n => n !== null).sort((a, b) => a - b);
+  if (vals.length === 0) return [];
+  const min = vals[0];
+  const max = vals[vals.length - 1];
+  if (min === max) {
+    return [{ bin: `${min}`, count: vals.length, pct: 100 }];
+  }
+  const step = (max - min) / binCount;
+  const bins = [];
+  for (let i = 0; i < binCount; i++) {
+    const bMin = min + i * step;
+    const bMax = (i === binCount - 1) ? max : min + (i + 1) * step;
+    bins.push({
+      bin: `${Number(bMin.toFixed(1))} - ${Number(bMax.toFixed(1))}`,
+      min: bMin,
+      max: bMax,
+      count: 0,
+      pct: 0,
+    });
+  }
+  for (const v of vals) {
+    const idx = Math.min(Math.floor((v - min) / step), binCount - 1);
+    bins[idx].count++;
+  }
+  for (const b of bins) {
+    b.pct = Number(((b.count / vals.length) * 100).toFixed(2));
+  }
+  return bins;
+}
+
+/**
+ * Compute Boxplot 5-number summary (min, Q1, median, Q3, max) and IQR outliers
+ */
+function computeBoxplotStats(rows, col) {
+  if (!Array.isArray(rows)) return null;
+  const vals = rows.map(r => parseNumericValue(r[col])).filter(n => n !== null).sort((a, b) => a - b);
+  if (vals.length === 0) return null;
+  const getP = (p) => {
+    const idx = (p / 100) * (vals.length - 1);
+    const low = Math.floor(idx);
+    const high = Math.ceil(idx);
+    return vals[low] * (1 - (idx - low)) + vals[high] * (idx - low);
+  };
+  const min = vals[0];
+  const q1 = Number(getP(25).toFixed(2));
+  const median = Number(getP(50).toFixed(2));
+  const q3 = Number(getP(75).toFixed(2));
+  const max = vals[vals.length - 1];
+  const iqr = Number((q3 - q1).toFixed(2));
+  const lowerFence = Number((q1 - 1.5 * iqr).toFixed(2));
+  const upperFence = Number((q3 + 1.5 * iqr).toFixed(2));
+  const outliers = vals.filter(v => v < lowerFence || v > upperFence);
+  return { min, q1, median, q3, max, iqr, lowerFence, upperFence, outliers, count: vals.length };
+}
+
+/**
+ * Compute Pareto 80/20 Analysis (ranked descending + cumulative percentage)
+ */
+function computeParetoAnalysis(rows, catCol, valCol) {
+  if (!Array.isArray(rows)) return [];
+  const sorted = [...rows].map(r => ({
+    [catCol]: String(r[catCol] || ''),
+    [valCol]: parseNumericValue(r[valCol]) || 0,
+  })).sort((a, b) => b[valCol] - a[valCol]);
+  const total = sorted.reduce((acc, r) => acc + r[valCol], 0);
+  let running = 0;
+  return sorted.map(r => {
+    running += r[valCol];
+    const cumPct = total > 0 ? Number(((running / total) * 100).toFixed(2)) : 0;
+    return {
+      [catCol]: r[catCol],
+      [valCol]: r[valCol],
+      cumulative_total: Number(running.toFixed(2)),
+      cumulative_pct: cumPct,
+      is_top_80: cumPct <= 80,
+    };
+  });
+}
+
+/**
+ * Compute 2D Pivot Table Cross-Tabulation Matrix
+ */
+function computePivotTable(rows, rowDim, colDim, valCol, aggFunc = 'SUM') {
+  if (!Array.isArray(rows)) return { rowValues: [], colValues: [], matrix: [] };
+  const rowValues = [...new Set(rows.map(r => String(r[rowDim] || '')))];
+  const colValues = [...new Set(rows.map(r => String(r[colDim] || '')))];
+  const grid = new Map();
+  for (const r of rows) {
+    const rKey = String(r[rowDim] || '');
+    const cKey = String(r[colDim] || '');
+    const v = parseNumericValue(r[valCol]) || 0;
+    const key = `${rKey}:::${cKey}`;
+    if (!grid.has(key)) grid.set(key, []);
+    grid.get(key).push(v);
+  }
+  const matrix = [];
+  for (const rKey of rowValues) {
+    const rowObj = { [rowDim]: rKey };
+    let rowTotal = 0;
+    for (const cKey of colValues) {
+      const nums = grid.get(`${rKey}:::${cKey}`) || [];
+      let cellVal = 0;
+      if (nums.length > 0) {
+        if (aggFunc === 'SUM') cellVal = nums.reduce((a, b) => a + b, 0);
+        else if (aggFunc === 'AVG') cellVal = nums.reduce((a, b) => a + b, 0) / nums.length;
+        else if (aggFunc === 'COUNT') cellVal = nums.length;
+        else if (aggFunc === 'MIN') cellVal = Math.min(...nums);
+        else if (aggFunc === 'MAX') cellVal = Math.max(...nums);
+      }
+      rowObj[cKey] = Number(cellVal.toFixed(2));
+      rowTotal += cellVal;
+    }
+    rowObj['total'] = Number(rowTotal.toFixed(2));
+    matrix.push(rowObj);
+  }
+  return { rowValues, colValues, matrix };
+}
+
 module.exports = {
   getDatasetForSheet,
   processAndProfileDataset,
@@ -1691,6 +1986,11 @@ module.exports = {
   parseDateValue,
   truncateDate,
   normalizeHeaderKey,
+  computeCorrelation,
+  computeHistogramBins,
+  computeBoxplotStats,
+  computeParetoAnalysis,
+  computePivotTable,
   MAX_SHEETS,
   MAX_ROWS,
   MAX_COLUMNS,

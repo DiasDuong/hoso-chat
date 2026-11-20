@@ -24,7 +24,14 @@ const MAX_ROWS_PER_DATASET = 500;
 // P1.0 Invariant: HYBRID is reserved for Unified BI (Phase P2.0+) and strictly rejected in P1.0/P1.1
 const ALLOWED_SOURCE_TYPES = Object.freeze(['INTERNAL_SYSTEM', 'FILE_DATASET']);
 const RESERVED_FUTURE_SOURCE_TYPES = Object.freeze(['HYBRID']);
-const ALLOWED_CHART_TYPES = Object.freeze(['BAR', 'LINE', 'PIE', 'DONUT', 'STACKED_BAR', 'AREA', 'TREEMAP']);
+let allowedChartTypesList = ['BAR', 'LINE', 'PIE', 'DONUT', 'STACKED_BAR', 'AREA', 'TREEMAP'];
+try {
+  const { ALL_CHART_TYPE_KEYS } = require('./biChartRegistry');
+  if (Array.isArray(ALL_CHART_TYPE_KEYS) && ALL_CHART_TYPE_KEYS.length > 0) {
+    allowedChartTypesList = ALL_CHART_TYPE_KEYS;
+  }
+} catch (_) {}
+const ALLOWED_CHART_TYPES = Object.freeze(allowedChartTypesList);
 const ALLOWED_KPI_STATUSES = Object.freeze(['AVAILABLE', 'CONDITIONAL', 'BLOCKED', 'DATA_UNAVAILABLE']);
 const ALLOWED_FORMATS = Object.freeze(['NUMBER', 'CURRENCY', 'PERCENTAGE', 'TEXT']);
 const ALLOWED_COMPARISON_TYPES = Object.freeze(['ABSOLUTE_DELTA', 'PERCENTAGE_POINT_DELTA', 'RELATIVE_PERCENTAGE_CHANGE']);

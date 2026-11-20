@@ -680,14 +680,15 @@ router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req
             const isTraining = validatedPlan.requirements?.some((r) => r.id.includes('dao_tao') || r.id.includes('completed') || r.id.includes('courses'));
             const isSales = validatedPlan.requirements?.some((r) => r.id.includes('revenue') || r.id.includes('orders') || r.id.includes('products'));
             const isLogistics = validatedPlan.requirements?.some((r) => r.id.includes('on_time') || r.id.includes('carrier'));
-            const isPayroll = validatedPlan.requirements?.some((r) => r.id.includes('payroll') || r.id.includes('salary') || r.id.includes('luong') || r.metric?.includes('luong')) ||
-              (validatedPlan.aggregations || []).some(a => a.column?.includes('luong'));
+            const isWorkforceStatus = validatedPlan.requirements?.some((r) => r.id.includes('status_') || r.id.includes('lowest_active_dept'));
+            const isPayroll = !isWorkforceStatus && (validatedPlan.requirements?.some((r) => r.id.includes('payroll') || r.id.includes('salary') || r.id.includes('luong') || r.metric?.includes('luong')) ||
+              (validatedPlan.aggregations || []).some(a => a.column?.includes('luong')));
 
             const summaryData = {
               results_by_requirement: queryResult.results_by_requirement || null,
               reconciliation: queryResult.reconciliation || null,
-              primary_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll) ? sanitizeBiData((queryResult.results || []).slice(0, 15)) : null,
-              status_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll) ? queryResult.multi_visual?.status_breakdown || null : null,
+              primary_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus) ? sanitizeBiData((queryResult.results || []).slice(0, 15)) : null,
+              status_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus) ? queryResult.multi_visual?.status_breakdown || null : null,
               overall_kpis: queryResult.summary || null,
             };
 
@@ -708,6 +709,14 @@ router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req
 1. Phân tích tỷ lệ giao đúng hạn của các đơn vị vận chuyển.
 2. Nêu rõ mẫu số chỉ tính trên các đơn đã hoàn tất giao hàng (loại trừ đơn chưa giao).
 3. Tuyệt đối KHÔNG tự ý chèn dữ liệu nhân sự hay lương.`;
+            } else if (isWorkforceStatus) {
+              specificGuidelines = `
+1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp và súc tích về tình trạng nhân sự toàn công ty.
+2. Nêu chuẩn xác:
+   - Tổng số nhân viên toàn công ty và tỷ lệ nhân viên theo từng trạng thái (Đang làm việc: 128 [85,33%], Đã nghỉ việc: 15 [10,00%], Thai sản: 7 [4,67%]).
+   - Phòng ban có tỷ lệ nhân viên đang làm việc thấp nhất (Phòng Vận Tải: 25/31 = 80,65%).
+3. TUYỆT ĐỐI KHÔNG nhắc đến quỹ lương hay thông tin tiền lương vì câu hỏi không yêu cầu.
+4. Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
             } else if (isPayroll) {
               specificGuidelines = `
 1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp và súc tích về phân tích quỹ lương nhân sự theo đúng các chỉ tiêu đã xác thực.
@@ -979,14 +988,15 @@ ${specificGuidelines}`;
               const isTraining = validatedPlan.requirements?.some((r) => r.id.includes('dao_tao') || r.id.includes('completed') || r.id.includes('courses'));
               const isSales = validatedPlan.requirements?.some((r) => r.id.includes('revenue') || r.id.includes('orders') || r.id.includes('products'));
               const isLogistics = validatedPlan.requirements?.some((r) => r.id.includes('on_time') || r.id.includes('carrier'));
-              const isPayroll = validatedPlan.requirements?.some((r) => r.id.includes('payroll') || r.id.includes('salary') || r.id.includes('luong') || r.metric?.includes('luong')) ||
-                (validatedPlan.aggregations || []).some(a => a.column?.includes('luong'));
+              const isWorkforceStatus = validatedPlan.requirements?.some((r) => r.id.includes('status_') || r.id.includes('lowest_active_dept'));
+              const isPayroll = !isWorkforceStatus && (validatedPlan.requirements?.some((r) => r.id.includes('payroll') || r.id.includes('salary') || r.id.includes('luong') || r.metric?.includes('luong')) ||
+                (validatedPlan.aggregations || []).some(a => a.column?.includes('luong')));
 
               const summaryData = {
                 results_by_requirement: queryResult.results_by_requirement || null,
                 reconciliation: queryResult.reconciliation || null,
-                primary_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll) ? sanitizeBiData((queryResult.results || []).slice(0, 15)) : null,
-                status_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll) ? queryResult.multi_visual?.status_breakdown || null : null,
+                primary_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus) ? sanitizeBiData((queryResult.results || []).slice(0, 15)) : null,
+                status_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus) ? queryResult.multi_visual?.status_breakdown || null : null,
                 overall_kpis: queryResult.summary || null,
               };
 
@@ -1007,6 +1017,14 @@ ${specificGuidelines}`;
 1. Phân tích tỷ lệ giao đúng hạn của các đơn vị vận chuyển.
 2. Nêu rõ mẫu số chỉ tính trên các đơn đã hoàn tất giao hàng (loại trừ đơn chưa giao).
 3. Tuyệt đối KHÔNG tự ý chèn dữ liệu nhân sự hay lương.`;
+              } else if (isWorkforceStatus) {
+                specificGuidelines = `
+1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp và súc tích về tình trạng nhân sự toàn công ty.
+2. Nêu chuẩn xác:
+   - Tổng số nhân viên toàn công ty và tỷ lệ nhân viên theo từng trạng thái (Đang làm việc: 128 [85,33%], Đã nghỉ việc: 15 [10,00%], Thai sản: 7 [4,67%]).
+   - Phòng ban có tỷ lệ nhân viên đang làm việc thấp nhất (Phòng Vận Tải: 25/31 = 80,65%).
+3. TUYỆT ĐỐI KHÔNG nhắc đến quỹ lương hay thông tin tiền lương vì câu hỏi không yêu cầu.
+4. Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
               } else if (isPayroll) {
                 specificGuidelines = `
 1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp và súc tích về phân tích quỹ lương nhân sự theo đúng các chỉ tiêu đã xác thực.
