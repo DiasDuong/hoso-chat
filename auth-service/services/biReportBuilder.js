@@ -467,6 +467,57 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
           interactions: { selectable: true, filterable: true },
           grid_col_span: 6,
         });
+      } else if (req.type === 'GROWTH_RATE') {
+        const growthData = res?.data || [];
+        const growthRef = `dataset_${req.id}`;
+        dataStore[growthRef] = growthData;
+        visualizations.push({
+          id: `viz_${req.id}`,
+          title: req.title,
+          chart_type: 'LINE',
+          data_ref: growthRef,
+          mapping: { category: 'thoi_gian', value: 'toc_do_tang_truong_pct' },
+          interactions: { selectable: true, filterable: true },
+          grid_col_span: 6,
+        });
+        dataTables.push({
+          id: `tbl_${req.id}`,
+          title: req.title,
+          data_ref: growthRef,
+          columns: [
+            { key: 'thoi_gian', label: 'Thời Gian', type: 'string' },
+            { key: 'gia_tri_hien_tai', label: 'Giá Trị Kỳ Này', type: 'number' },
+            { key: 'gia_tri_ky_truoc', label: 'Giá Trị Kỳ Trước', type: 'number' },
+            { key: 'toc_do_tang_truong_pct', label: 'Tăng Trưởng (%)', type: 'number' },
+          ],
+          pagination: { page_size: 10, total_rows: growthData.length },
+        });
+      } else if (req.type === 'COMPLETION_RATE' || req.type === 'ON_TIME_RATE' || req.type === 'EFFICIENCY' || req.type === 'DELTA') {
+        const val = res?.value !== undefined ? res.value : null;
+        const isUnavailable = req.status === 'DATA_UNAVAILABLE' || res?.status === 'DATA_UNAVAILABLE' || val === null;
+        kpis.push({
+          id: `kpi_req_${kpiIdx++}`,
+          metric_alias: req.id,
+          kpi_code: `REQ_${req.id}`.toUpperCase().replace(/[^A-Z0-9_]/g, '_'),
+          title: req.title,
+          primary_value: isUnavailable ? null : val,
+          format: 'NUMBER',
+          unit: req.unit || '',
+          status: isUnavailable ? 'DATA_UNAVAILABLE' : 'AVAILABLE',
+          subtext: isUnavailable ? (req.reason || res?.reason || 'Chưa đủ dữ liệu.') : (res?.subtext || req.subtext || 'Tính trên toàn bộ tập dữ liệu.'),
+        });
+      } else if (req.type === 'TABLE') {
+        const tblData = res?.data || [];
+        const tblRef = `dataset_${req.id}`;
+        dataStore[tblRef] = tblData;
+        const colKeys = tblData[0] ? Object.keys(tblData[0]).slice(0, 8) : ['id'];
+        dataTables.push({
+          id: `tbl_${req.id}`,
+          title: req.title,
+          data_ref: tblRef,
+          columns: colKeys.map(k => ({ key: k, label: getFriendlyColumnLabel(k), type: typeof (tblData[0] || {})[k] === 'number' ? 'number' : 'string' })),
+          pagination: { page_size: 15, total_rows: tblData.length },
+        });
       }
     }
 
@@ -547,6 +598,31 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
       visualizations,
       data_tables: dataTables,
       data_store: dataStore,
+    };
+
+    const presentedReqIds = new Set();
+    for (const k of kpis) if (k.metric_alias) presentedReqIds.add(k.metric_alias);
+    for (const v of visualizations) if (v.id) presentedReqIds.add(v.id.replace(/^viz_/, ''));
+    for (const t of dataTables) if (t.id) presentedReqIds.add(t.id.replace(/^tbl_/, ''));
+
+    const activeReqs = Array.isArray(queryPlan.requirements)
+      ? queryPlan.requirements.filter((r) => r.status === 'RESOLVED' || r.status === 'AVAILABLE')
+      : [];
+    const missingPresentation = activeReqs.filter((r) => !presentedReqIds.has(r.id)).map((r) => r.id);
+    const presentationCoverage = {
+      isComplete: activeReqs.length > 0 ? missingPresentation.length === 0 : true,
+      total_active_requirements: activeReqs.length,
+      presented_requirements: activeReqs.length - missingPresentation.length,
+      missing_presentation: missingPresentation,
+    };
+    payload.presentation_coverage = presentationCoverage;
+    payload.completeness_contract = {
+      stage_a_planning: queryPlan.metric_coverage || null,
+      stage_b_execution: result.execution_coverage || null,
+      stage_c_presentation: presentationCoverage,
+      isFullyComplete: (queryPlan.metric_coverage?.isComplete !== false) &&
+                       (result.execution_coverage?.isComplete !== false) &&
+                       presentationCoverage.isComplete,
     };
 
     assertValidDashboardPayload(payload, userContext);

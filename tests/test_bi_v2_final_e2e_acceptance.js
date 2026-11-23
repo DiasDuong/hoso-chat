@@ -19,7 +19,7 @@ const assert = require('assert');
 const XLSX = require('../auth-service/node_modules/xlsx');
 const { chromium } = require('../auth-service/node_modules/playwright-core');
 
-const { planAnalyticalQuery } = require('../auth-service/services/biQueryPlanner');
+const { planAnalyticalQuery, planFollowUpQuery } = require('../auth-service/services/biQueryPlanner');
 const { validateQueryPlan } = require('../auth-service/services/biQueryValidator');
 const {
   processAndProfileDataset,
@@ -707,6 +707,196 @@ Sử dụng Line Chart, Bar Chart và bảng thống kê.`;
   const maliciousFormula = '=cmd|"/C calc"!A0';
   const sanitizedFormula = sanitizeFormulaInjection(maliciousFormula);
   check('TASK-7', 'SEC-FORMULA-INJECTION', 'Ký tự công thức (=, +, -) được tự động thêm dấu nháy đơn bảo vệ', sanitizedFormula.sanitized.startsWith("'") && sanitizedFormula.wasFormula === true);
+
+  // ============================================================================
+  // TASK 8: UNIVERSAL MULTI-DOMAIN REQUIREMENT COMPLETENESS VALIDATION (10 DOMAINS)
+  // ============================================================================
+  console.log('\n--- [TASK 8] UNIVERSAL MULTI-DOMAIN REQUIREMENT COMPLETENESS VALIDATION ---');
+
+  // DOMAIN 1: HR STATUS
+  const p1 = 'Báo cáo tình trạng nhân viên: 1. Đang làm việc, 2. Đã nghỉ việc, 3. Thai sản, 4. Tỷ lệ theo từng trạng thái, 5. Phân bổ trạng thái theo phòng ban';
+  const plan1 = planAnalyticalQuery(p1, tenureDataset.profile);
+  check('TASK-8', 'D1-HR-STATUS-DECOMPOSE', `Domain 1 HR Status bóc tách đủ >= 5 yêu cầu (thực tế: ${plan1.requirements?.length})`, plan1.requirements?.length >= 5);
+  const val1 = validateQueryPlan(plan1, tenureDataset, authUser);
+  const exec1 = executeAnalyticalQuery(tenureDataset, val1);
+  check('TASK-8', 'D1-HR-STATUS-EXEC', 'Domain 1 Stage B Execution Complete', exec1.execution_coverage.isComplete === true);
+  const dash1 = buildDatasetDashboard(val1, exec1, tenureDataset, authUser);
+  check('TASK-8', 'D1-HR-STATUS-STAGE-C', 'Domain 1 Stage C Presentation Complete', dash1.completeness_contract.isFullyComplete === true);
+
+  // DOMAIN 2: RECRUITMENT & TENURE
+  const p2 = 'Báo cáo tuyển dụng và thâm niên nhân sự: 1. Số lượng nhân viên theo năm vào làm, 2. Số lượng theo từng giai đoạn thâm niên, 3. Thâm niên trung bình, 4. Phòng ban có nhiều nhân viên lâu năm nhất, 5. So sánh KPI giữa nhân viên mới và lâu năm, 6. Phân tích cơ cấu nhân sự theo thời gian làm việc';
+  const plan2 = planAnalyticalQuery(p2, tenureDataset.profile);
+  check('TASK-8', 'D2-TENURE-DECOMPOSE', `Domain 2 Tuyển dụng & Thâm niên bóc tách đủ 6 yêu cầu (thực tế: ${plan2.requirements?.length})`, plan2.requirements?.length === 6);
+  const val2 = validateQueryPlan(plan2, tenureDataset, authUser);
+  const exec2 = executeAnalyticalQuery(tenureDataset, val2);
+  check('TASK-8', 'D2-TENURE-EXEC', 'Domain 2 Stage B Execution Complete', exec2.execution_coverage.isComplete === true);
+  const dash2 = buildDatasetDashboard(val2, exec2, tenureDataset, authUser);
+  check('TASK-8', 'D2-TENURE-STAGE-C', 'Domain 2 Stage C Presentation Complete', dash2.completeness_contract.isFullyComplete === true);
+
+  // DOMAIN 3: SALARY ANALYSIS
+  const p3 = 'Báo cáo phân tích quỹ lương và thu nhập nhân sự: 1. Tổng quỹ lương cơ bản, 2. Lương cơ bản trung bình, 3. Lương cao nhất và thấp nhất, 4. Phân bổ quỹ lương theo phòng ban, 5. So sánh lương trung bình giữa các chức vụ, 6. Cơ cấu thu nhập theo nhóm mức lương, 7. Tỷ trọng chi phí lương theo bộ phận, 8. Top 10 nhân viên có lương cao nhất';
+  const plan3 = planAnalyticalQuery(p3, tenureDataset.profile);
+  check('TASK-8', 'D3-SALARY-DECOMPOSE', `Domain 3 Quỹ lương bóc tách đủ 8+ yêu cầu (thực tế: ${plan3.requirements?.length})`, plan3.requirements?.length >= 8);
+  const val3 = validateQueryPlan(plan3, tenureDataset, authUser);
+  const exec3 = executeAnalyticalQuery(tenureDataset, val3);
+  check('TASK-8', 'D3-SALARY-EXEC', 'Domain 3 Stage B Execution Complete', exec3.execution_coverage.isComplete === true);
+  const dash3 = buildDatasetDashboard(val3, exec3, tenureDataset, authUser);
+  check('TASK-8', 'D3-SALARY-STAGE-C', 'Domain 3 Stage C Presentation Complete', dash3.completeness_contract.isFullyComplete === true);
+
+  // DOMAIN 4: TRAINING & PERFORMANCE
+  const p4 = 'Báo cáo tình hình đào tạo nhân sự: 1. Tổng số khóa hoàn thành, 2. Số khóa bình quân mỗi nhân viên, 3. Tỷ lệ nhân viên chưa hoàn thành khóa nào, 4. Phân bổ số khóa đào tạo theo phòng ban, 5. So sánh điểm KPI giữa nhóm học nhiều và học ít';
+  const plan4 = planAnalyticalQuery(p4, tenureDataset.profile);
+  check('TASK-8', 'D4-TRAINING-DECOMPOSE', `Domain 4 Đào tạo & KPI bóc tách đủ 5 yêu cầu (thực tế: ${plan4.requirements?.length})`, plan4.requirements?.length === 5);
+  const val4 = validateQueryPlan(plan4, tenureDataset, authUser);
+  const exec4 = executeAnalyticalQuery(tenureDataset, val4);
+  check('TASK-8', 'D4-TRAINING-EXEC', 'Domain 4 Stage B Execution Complete', exec4.execution_coverage.isComplete === true);
+  const dash4 = buildDatasetDashboard(val4, exec4, tenureDataset, authUser);
+  check('TASK-8', 'D4-TRAINING-STAGE-C', 'Domain 4 Stage C Presentation Complete', dash4.completeness_contract.isFullyComplete === true);
+
+  // DOMAIN 5: FINANCE
+  const financeRows = [
+    { ma_giao_dich: 'TX01', ky_ke_toan: '2026-01', khoan_muc: 'Chi phí kho bãi', so_tien: 120000000, trang_thai: 'Hoàn tất' },
+    { ma_giao_dich: 'TX02', ky_ke_toan: '2026-02', khoan_muc: 'Nhiên liệu', so_tien: 250000000, trang_thai: 'Hoàn tất' },
+    { ma_giao_dich: 'TX03', ky_ke_toan: '2026-02', khoan_muc: 'Bảo trì xe', so_tien: 45000000, trang_thai: 'Hoàn tất' },
+    { ma_giao_dich: 'TX04', ky_ke_toan: '2026-03', khoan_muc: 'Bảo hiểm hàng hóa', so_tien: 80000000, trang_thai: 'Đang xử lý' },
+  ];
+  const finDataset = {
+    file_id: 'ds_finance_golden',
+    original_filename: 'tai_chinh_chi_phi.xlsx',
+    uploaded_by: authUser.user_id,
+    company_id: 'ALL',
+    profile: {
+      active_sheet: 'Sheet1',
+      grain: 'TRANSACTION',
+      row_count: financeRows.length,
+      columns: [
+        { key: 'ma_giao_dich', name: 'Mã Giao Dịch', type: 'STRING' },
+        { key: 'ky_ke_toan', name: 'Kỳ Kế Toán', type: 'STRING' },
+        { key: 'khoan_muc', name: 'Khoản Mục Chi Phí', type: 'STRING' },
+        { key: 'so_tien', name: 'Số Tiền', type: 'INTEGER' },
+        { key: 'trang_thai', name: 'Trạng Thái', type: 'STRING' },
+      ],
+    },
+    rows: financeRows,
+  };
+  const p5 = 'Báo cáo chi phí tài chính: 1. Tổng chi phí, 2. Chi phí trung bình mỗi giao dịch, 3. Chi phí lớn nhất, 4. Phân bổ chi phí theo khoản mục, 5. Top 5 giao dịch lớn nhất';
+  const plan5 = planAnalyticalQuery(p5, finDataset.profile);
+  check('TASK-8', 'D5-FINANCE-DECOMPOSE', `Domain 5 Finance bóc tách đủ 5 yêu cầu (thực tế: ${plan5.requirements?.length})`, plan5.requirements?.length === 5);
+  const val5 = validateQueryPlan(plan5, finDataset, authUser);
+  const exec5 = executeAnalyticalQuery(finDataset, val5);
+  check('TASK-8', 'D5-FINANCE-EXEC', 'Domain 5 Stage B Execution Complete', exec5.execution_coverage.isComplete === true);
+  const dash5 = buildDatasetDashboard(val5, exec5, finDataset, authUser);
+  check('TASK-8', 'D5-FINANCE-STAGE-C', 'Domain 5 Stage C Presentation Complete', dash5.completeness_contract.isFullyComplete === true);
+
+  // DOMAIN 6: SALES & ORDERS
+  const salesRows = [
+    { ma_don: 'ORD-01', ngay_dat: '2026-01-15', kenh_ban: 'B2B Sotrans', doanh_thu: 500000000, so_luong: 100 },
+    { ma_don: 'ORD-02', ngay_dat: '2026-02-10', kenh_ban: 'B2C Đại lý', doanh_thu: 150000000, so_luong: 40 },
+    { ma_don: 'ORD-03', ngay_dat: '2026-02-20', kenh_ban: 'B2B Sotrans', doanh_thu: 300000000, so_luong: 60 },
+    { ma_don: 'ORD-04', ngay_dat: '2026-03-05', kenh_ban: 'Quốc tế', doanh_thu: 800000000, so_luong: 150 },
+  ];
+  const salesDataset = {
+    file_id: 'ds_sales_golden',
+    original_filename: 'don_hang_sales.xlsx',
+    uploaded_by: authUser.user_id,
+    company_id: 'ALL',
+    profile: {
+      active_sheet: 'Sheet1',
+      grain: 'ORDER',
+      row_count: salesRows.length,
+      columns: [
+        { key: 'ma_don', name: 'Mã Đơn', type: 'STRING' },
+        { key: 'ngay_dat', name: 'Ngày Đặt', type: 'DATE' },
+        { key: 'kenh_ban', name: 'Kênh Bán', type: 'STRING' },
+        { key: 'doanh_thu', name: 'Doanh Thu', type: 'INTEGER' },
+        { key: 'so_luong', name: 'Số Lượng', type: 'INTEGER' },
+      ],
+    },
+    rows: salesRows,
+  };
+  const p6 = 'Phân tích doanh số bán hàng: 1. Tổng doanh thu, 2. Doanh thu trung bình mỗi đơn, 3. Tốc độ tăng trưởng doanh thu theo tháng, 4. Phân bổ doanh số theo kênh bán, 5. Top đơn hàng có doanh thu lớn nhất';
+  const plan6 = planAnalyticalQuery(p6, salesDataset.profile);
+  check('TASK-8', 'D6-SALES-DECOMPOSE', `Domain 6 Sales bóc tách đủ 5 yêu cầu (thực tế: ${plan6.requirements?.length})`, plan6.requirements?.length === 5);
+  const val6 = validateQueryPlan(plan6, salesDataset, authUser);
+  const exec6 = executeAnalyticalQuery(salesDataset, val6);
+  check('TASK-8', 'D6-SALES-EXEC', 'Domain 6 Stage B Execution Complete', exec6.execution_coverage.isComplete === true);
+  const dash6 = buildDatasetDashboard(val6, exec6, salesDataset, authUser);
+  check('TASK-8', 'D6-SALES-STAGE-C', 'Domain 6 Stage C Presentation Complete', dash6.completeness_contract.isFullyComplete === true);
+
+  // DOMAIN 7: LOGISTICS & SHIPPING
+  const logRows = [
+    { ma_chuyen: 'SHP-01', don_vi_van_chuyen: 'Đội xe Sotrans', ngay_cam_ket: '2026-03-01', ngay_giao_thuc_te: '2026-03-01', chi_phi_vc: 15000000 },
+    { ma_chuyen: 'SHP-02', don_vi_van_chuyen: 'Đội xe Sotrans', ngay_cam_ket: '2026-03-02', ngay_giao_thuc_te: '2026-03-02', chi_phi_vc: 18000000 },
+    { ma_chuyen: 'SHP-03', don_vi_van_chuyen: 'Đối tác Phương Trang', ngay_cam_ket: '2026-03-03', ngay_giao_thuc_te: '2026-03-05', chi_phi_vc: 22000000 },
+    { ma_chuyen: 'SHP-04', don_vi_van_chuyen: 'Đội xe Sotrans', ngay_cam_ket: '2026-03-04', ngay_giao_thuc_te: '2026-03-04', chi_phi_vc: 12000000 },
+  ];
+  const logDataset = {
+    file_id: 'ds_logistics_golden',
+    original_filename: 'van_chuyen_logistics.xlsx',
+    uploaded_by: authUser.user_id,
+    company_id: 'ALL',
+    profile: {
+      active_sheet: 'Sheet1',
+      grain: 'SHIPMENT',
+      row_count: logRows.length,
+      columns: [
+        { key: 'ma_chuyen', name: 'Mã Chuyến', type: 'STRING' },
+        { key: 'don_vi_van_chuyen', name: 'Đơn Vị Vận Chuyển', type: 'STRING' },
+        { key: 'ngay_cam_ket', name: 'Ngày Giao Cam Kết', type: 'DATE' },
+        { key: 'ngay_giao_thuc_te', name: 'Ngày Giao Thực Tế', type: 'DATE' },
+        { key: 'chi_phi_vc', name: 'Chi Phí Vận Chuyển', type: 'INTEGER' },
+      ],
+    },
+    rows: logRows,
+  };
+  const p7 = 'Báo cáo hiệu quả vận tải: 1. Tổng số chuyến xe, 2. Tổng chi phí vận chuyển, 3. Chi phí trung bình mỗi chuyến xe, 4. Tỷ lệ giao hàng đúng hạn, 5. Phân bổ chi phí theo đơn vị vận chuyển';
+  const plan7 = planAnalyticalQuery(p7, logDataset.profile);
+  check('TASK-8', 'D7-LOGISTICS-DECOMPOSE', `Domain 7 Logistics bóc tách đủ 5 yêu cầu (thực tế: ${plan7.requirements?.length})`, plan7.requirements?.length === 5);
+  const val7 = validateQueryPlan(plan7, logDataset, authUser);
+  const exec7 = executeAnalyticalQuery(logDataset, val7);
+  check('TASK-8', 'D7-LOGISTICS-EXEC', 'Domain 7 Stage B Execution Complete', exec7.execution_coverage.isComplete === true);
+  const dash7 = buildDatasetDashboard(val7, exec7, logDataset, authUser);
+  check('TASK-8', 'D7-LOGISTICS-STAGE-C', 'Domain 7 Stage C Presentation Complete', dash7.completeness_contract.isFullyComplete === true);
+
+  // DOMAIN 8: MULTI-DIMENSIONAL ANALYSIS
+  const p8 = 'Phân tích đa chiều nhân sự: 1. Tổng quỹ lương theo phòng ban và chức vụ, 2. Điểm KPI trung bình theo phòng ban và chức vụ, 3. Số lượng nhân sự theo phòng ban';
+  const plan8 = planAnalyticalQuery(p8, tenureDataset.profile);
+  check('TASK-8', 'D8-MULTIDIM-DECOMPOSE', `Domain 8 Đa chiều bóc tách đủ 3 yêu cầu (thực tế: ${plan8.requirements?.length})`, plan8.requirements?.length >= 3);
+  const val8 = validateQueryPlan(plan8, tenureDataset, authUser);
+  const exec8 = executeAnalyticalQuery(tenureDataset, val8);
+  check('TASK-8', 'D8-MULTIDIM-EXEC', 'Domain 8 Stage B Execution Complete', exec8.execution_coverage.isComplete === true);
+  const multiRes = exec8.results_by_requirement[plan8.requirements[0].id]?.data;
+  check('TASK-8', 'D8-MULTIDIM-DATA', 'Domain 8 Kết quả chứa đủ 2 chiều phòng ban & chức vụ', Boolean(multiRes && multiRes[0]?.phong_ban && multiRes[0]?.chuc_vu));
+  const dash8 = buildDatasetDashboard(val8, exec8, tenureDataset, authUser);
+  check('TASK-8', 'D8-MULTIDIM-STAGE-C', 'Domain 8 Stage C Presentation Complete', dash8.completeness_contract.isFullyComplete === true);
+
+  // DOMAIN 9: LONG COMPOSITE BI REQUESTS (8+ REQS)
+  const p9 = [
+    'Báo cáo quản trị nhân sự tổng hợp:',
+    '1. Tổng quỹ lương cơ bản',
+    '2. Lương cơ bản trung bình',
+    '3. Lương cao nhất và thấp nhất',
+    '4. Điểm KPI trung bình toàn công ty',
+    '5. Thâm niên trung bình toàn công ty',
+    '6. Phân bổ quỹ lương theo phòng ban',
+    '7. Phân bổ nhân sự theo giai đoạn thâm niên',
+    '8. Top 10 nhân sự có điểm KPI cao nhất'
+  ].join('\n');
+  const plan9 = planAnalyticalQuery(p9, tenureDataset.profile);
+  check('TASK-8', 'D9-LONG-COMPOSITE-DECOMPOSE', `Domain 9 Báo cáo dài bóc tách đủ 8+ yêu cầu (thực tế: ${plan9.requirements?.length})`, plan9.requirements?.length >= 8);
+  const val9 = validateQueryPlan(plan9, tenureDataset, authUser);
+  const exec9 = executeAnalyticalQuery(tenureDataset, val9);
+  check('TASK-8', 'D9-LONG-COMPOSITE-EXEC', 'Domain 9 Stage B Execution Complete', exec9.execution_coverage.isComplete === true);
+  const dash9 = buildDatasetDashboard(val9, exec9, tenureDataset, authUser);
+  check('TASK-8', 'D9-LONG-COMPOSITE-STAGE-C', 'Domain 9 Stage C Presentation Complete', dash9.completeness_contract.isFullyComplete === true);
+
+  // DOMAIN 10: CONVERSATIONAL FOLLOW-UP
+  const basePlan = planAnalyticalQuery('Phân tích lương theo phòng ban', tenureDataset.profile);
+  const followUpPrompt = 'Chỉ lọc riêng Vận Tải và đổi sang biểu đồ tròn';
+  const followUpPlan = planFollowUpQuery(followUpPrompt, basePlan, tenureDataset.profile);
+  check('TASK-8', 'D10-FOLLOWUP-INTENT', 'Domain 10 Nhận diện câu hỏi follow-up ngữ cảnh', Boolean(followUpPlan));
+  check('TASK-8', 'D10-FOLLOWUP-FILTER', 'Domain 10 Áp dụng filter phòng ban Vận Tải', followUpPlan?.filters?.some(f => f.value === 'Vận Tải'));
+  check('TASK-8', 'D10-FOLLOWUP-CHART', 'Domain 10 Chuyển visual preference sang PIE', followUpPlan?.chart_preference === 'PIE');
 
   // Close browser cleanly
   await browser.close();

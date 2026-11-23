@@ -727,6 +727,27 @@ function formatAnalyticalResultMarkdown(queryPlan, queryResult, dataset, explana
           lines.push(`| **${escapeMarkdown(String(row[catCol]))}** | ${typeof row[valCol] === 'number' ? row[valCol].toLocaleString('vi-VN') : row[valCol]} |`);
         }
         lines.push('');
+      } else if (req.type === 'GROWTH_RATE') {
+        lines.push(`### 📋 ${req.title}`);
+        lines.push('');
+        const headers = ['Thời Gian', 'Giá Trị Kỳ Này', 'Giá Trị Kỳ Trước', 'Tăng Trưởng (%)'];
+        lines.push(`| ${headers.join(' | ')} |`);
+        lines.push(`| :---: | :---: | :---: | :---: |`);
+        for (const row of res.data) {
+          lines.push(`| **${escapeMarkdown(String(row.thoi_gian))}** | ${row.gia_tri_hien_tai?.toLocaleString('vi-VN')} | ${row.gia_tri_ky_truoc ? row.gia_tri_ky_truoc.toLocaleString('vi-VN') : '—'} | **${row.toc_do_tang_truong_pct}%** |`);
+        }
+        lines.push('');
+      } else if (req.type === 'TABLE') {
+        lines.push(`### 📋 ${req.title}`);
+        lines.push('');
+        const colKeys = res.data[0] ? Object.keys(res.data[0]).slice(0, 6) : [];
+        const headers = colKeys.map(k => getFriendlyColumnLabel(k));
+        lines.push(`| ${headers.join(' | ')} |`);
+        lines.push(`| ${headers.map(() => ':---').join(' | ')} |`);
+        for (const row of res.data.slice(0, 10)) {
+          lines.push(`| ${colKeys.map(k => escapeMarkdown(String(row[k] ?? '—'))).join(' | ')} |`);
+        }
+        lines.push('');
       }
     }
 

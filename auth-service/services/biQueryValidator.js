@@ -411,7 +411,9 @@ function validateQueryPlan(queryPlan, dataset, userContext) {
   let validatedRequirements = null;
   const virtualCols = [
     'tham_nien_nam', 'giai_doan_tham_nien', 'nhom_tham_nien',
-    'nhom_nhan_vien', 'nhom_muc_luong', 'salary_band', 'nhom_chi_tieu'
+    'nhom_nhan_vien', 'nhom_muc_luong', 'salary_band', 'nhom_chi_tieu',
+    'growth_rate', 'completion_rate', 'on_time_rate', 'per_capita',
+    'delta', 'profit', 'gross_margin', 'ratio', 'value'
   ];
 
   if (Array.isArray(queryPlan.requirements) && queryPlan.requirements.length > 0) {
