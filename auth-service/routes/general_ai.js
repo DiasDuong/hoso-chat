@@ -215,6 +215,10 @@ QUY TẮC TIẾNG VIỆT, UNICODE & TRÌNH BÀY KÝ TỰ:
 - Khi viết các phép tính hoặc ký hiệu kỹ thuật, ưu tiên dùng các ký hiệu số học chuẩn (×, ÷, ≈, ±, ≤, ≥, °C) để câu trả lời vừa đẹp mắt vừa dễ đọc trên mọi thiết bị.
 - Đối với số tiền và đơn vị tiền tệ, trình bày rõ ràng (ví dụ: '2.589.020 VND' hoặc '100 USD'), không bao bọc số tiền vào dấu dollar của math block.
 
+QUY TẮC TRỰC QUAN HÓA & BIỂU ĐỒ (VISUALIZATION INTEGRITY):
+- TUYỆT ĐỐI KHÔNG vẽ biểu đồ bằng các ký tự ASCII art, không dùng code block text (\`\`\`text, \`\`\`ascii...) chứa các ký tự '/', '\\', '-', '|', '+' để mô phỏng biểu đồ đường, biểu đồ cột, biểu đồ tròn hay bất kỳ dạng trực quan hóa nào.
+- Hệ thống GeneralAI sở hữu công cụ trực quan hóa tương tác Apache ECharts tự động tích hợp. Khi phân tích dữ liệu, các biểu đồ sẽ được dựng bởi BI Engine. Bạn chỉ cung cấp nhận định điều hành, phân tích số liệu thực tế bằng văn bản rõ ràng, bảng biểu Markdown chuẩn (table), TUYỆT ĐỐI KHÔNG giả lập hình vẽ biểu đồ bằng ký tự.
+
 QUY TẮC ĐỊNH DẠNG VÀ PHẢN HỒI:
 - Trả lời đúng trọng tâm ngay từ đầu, cấu trúc mạch lạc với tiêu đề (h2, h3), gạch đầu dòng hoặc bảng biểu khoa học.
 - Mọi đoạn mã lập trình BẮT BUỘC phải đặt trong code block có chỉ định ngôn ngữ rõ ràng (\`\`\`python, \`\`\`javascript, \`\`\`sql...).
@@ -734,7 +738,8 @@ router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req
 1. Viết 2-3 câu nhận xét điều hành ngắn gọn, trực diện và chuẩn xác theo đúng các chỉ tiêu người dùng hỏi.
 2. Bám sát 100% các kết quả đã được xác thực trong results_by_requirement hoặc bảng tổng hợp.
 3. TUYỆT ĐỐI KHÔNG diễn giải giá trị trung bình nhóm thành cực trị cá nhân.
-4. TUYỆT ĐỐI KHÔNG tự ý chèn các chỉ tiêu ngoài phạm vi yêu cầu.`;
+4. TUYỆT ĐỐI KHÔNG tự ý chèn các chỉ tiêu ngoài phạm vi yêu cầu.
+5. TUYỆT ĐỐI KHÔNG vẽ biểu đồ bằng ký tự ASCII, không dùng code block text mô phỏng biểu đồ đường/cột.`;
             }
 
             const insightPrompt = `Dưới đây là kết quả phân tích số liệu thực tế từ tệp bảng tính ${metadata.original_filename}:
@@ -896,6 +901,23 @@ ${specificGuidelines}`;
   if (uploadedFiles.length === 0 && userMessage && req.user) {
     let activeDataset = null;
     let previousQueryPlan = null;
+    const targetDatasetId = req.body.active_dataset_id || req.body.activeDatasetId || req.body.dataset_id || req.body.file_id || req.body.fileId;
+    if (targetDatasetId) {
+      const ds = getDataset(targetDatasetId);
+      if (ds) {
+        const access = canUserAccessDataset(ds, req.user, 'query');
+        if (access.allowed) {
+          activeDataset = ds;
+        } else {
+          return res.status(403).json({
+            success: false,
+            error: access.reason || 'Bạn không có quyền truy vấn bộ dữ liệu này.',
+            code: 'FORBIDDEN',
+          });
+        }
+      }
+    }
+
     const isUuid = conversationId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conversationId);
     if (isUuid) {
       try {
@@ -907,36 +929,19 @@ ${specificGuidelines}`;
         );
         if (lastFileMsg.rows.length > 0 && lastFileMsg.rows[0].metadata) {
           const fileId = lastFileMsg.rows[0].metadata.file_id;
-          const ds = getDataset(fileId);
-          if (ds) {
-            // MANDATORY RE-AUTHENTICATION CHECK
-            const access = canUserAccessDataset(ds, req.user, 'query');
-            if (access.allowed) {
-              activeDataset = ds;
-              previousQueryPlan = lastFileMsg.rows[0].metadata.query_plan || null;
+          previousQueryPlan = lastFileMsg.rows[0].metadata.query_plan || null;
+          if (!activeDataset) {
+            const ds = getDataset(fileId);
+            if (ds) {
+              // MANDATORY RE-AUTHENTICATION CHECK
+              const access = canUserAccessDataset(ds, req.user, 'query');
+              if (access.allowed) {
+                activeDataset = ds;
+              }
             }
           }
         }
       } catch (_) {}
-    }
-
-    if (!activeDataset) {
-      const targetDatasetId = req.body.active_dataset_id || req.body.activeDatasetId || req.body.dataset_id || req.body.file_id || req.body.fileId;
-      if (targetDatasetId) {
-        const ds = getDataset(targetDatasetId);
-        if (ds) {
-          const access = canUserAccessDataset(ds, req.user, 'query');
-          if (access.allowed) {
-            activeDataset = ds;
-          } else {
-            return res.status(403).json({
-              success: false,
-              error: access.reason || 'Bạn không có quyền truy vấn bộ dữ liệu này.',
-              code: 'FORBIDDEN',
-            });
-          }
-        }
-      }
     }
 
     if (activeDataset) {
@@ -961,7 +966,7 @@ ${specificGuidelines}`;
         Boolean(req.body.active_dataset_id || req.body.activeDatasetId) ||
         mentionsFile ||
         mentionsCol ||
-        /(chi lay|loc|top \d+|bieu do|doanh so|doanh thu|luong|phong ban|so sanh|tang dan|giam dan|ty trong|tong|trung binh|ve|bieu|chart|table|bang|kpi|card|the|thong ke|phan tich|xem)/i.test(
+        /(chi lay|loc|top \d+|bieu do|doanh so|doanh thu|luong|phong ban|so sanh|tang dan|giam dan|ty trong|tong|trung binh|ve|bieu|chart|table|bang|kpi|card|the|thong ke|phan tich|xem|truc quan|visual|line|bar|pie|cot|duong|tron)/i.test(
           msgNorm
         );
 
@@ -1042,7 +1047,8 @@ ${specificGuidelines}`;
 1. Viết 2-3 câu nhận xét điều hành ngắn gọn, trực diện và chuẩn xác theo đúng các chỉ tiêu người dùng hỏi.
 2. Bám sát 100% các kết quả đã được xác thực trong results_by_requirement hoặc bảng tổng hợp.
 3. TUYỆT ĐỐI KHÔNG diễn giải giá trị trung bình nhóm thành cực trị cá nhân.
-4. TUYỆT ĐỐI KHÔNG tự ý chèn các chỉ tiêu ngoài phạm vi yêu cầu.`;
+4. TUYỆT ĐỐI KHÔNG tự ý chèn các chỉ tiêu ngoài phạm vi yêu cầu.
+5. TUYỆT ĐỐI KHÔNG vẽ biểu đồ bằng ký tự ASCII, không dùng code block text mô phỏng biểu đồ đường/cột.`;
               }
 
               const insightPrompt = `Dưới đây là kết quả phân tích số liệu thực tế từ tệp bảng tính ${activeDataset.original_filename}:

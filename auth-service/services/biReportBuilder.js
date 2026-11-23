@@ -604,12 +604,43 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
         });
       }
     } else {
+      let finalChartType = primaryChartType;
+      let chartMapping = { category: dimension, value: aliases[0] || Object.keys(rows[0]).find(k => typeof rows[0][k] === 'number') || dimension };
+      let chartTitle = `${aliases[0] || 'Số lượng'} theo ${dimension}`;
+
+      if (groups.length >= 2) {
+        if (finalChartType === 'BAR') finalChartType = 'GROUPED_BAR';
+        chartMapping = {
+          category: groups[0],
+          series: groups[1],
+          value: aliases[0] || Object.keys(rows[0]).find(k => typeof rows[0][k] === 'number') || 'value',
+        };
+        const metricName = getFriendlyMetricTitle(aggregations[0]) || 'Số lượng nhân sự';
+        const dim1Name = getFriendlyColumnLabel(groups[0]);
+        const dim2Name = getFriendlyColumnLabel(groups[1]);
+        chartTitle = `${metricName} theo ${dim1Name} và ${dim2Name}`;
+      } else if (finalChartType === 'LINE') {
+        const metricName = getFriendlyMetricTitle(aggregations[0]) || 'Số lượng nhân sự';
+        const dimName = getFriendlyColumnLabel(dimension);
+        chartTitle = /(?:tuyen\s*dung|vao\s*lam)/i.test(queryPlan.prompt || '')
+          ? `Xu hướng tuyển dụng theo ${dimName}`
+          : `Xu hướng ${metricName} theo ${dimName}`;
+        if (dimension) {
+          rows.sort((a, b) => String(a[dimension] || '').localeCompare(String(b[dimension] || ''), undefined, { numeric: true }));
+          dataStore[dataRef] = rows;
+        }
+      } else {
+        const metricName = getFriendlyMetricTitle(aggregations[0]) || 'Số lượng nhân sự';
+        const dimName = getFriendlyColumnLabel(dimension);
+        chartTitle = `${metricName} theo ${dimName}`;
+      }
+
       visualizations.push({
         id: 'viz_file_main',
-        title: `${aliases[0] || 'Số lượng'} theo ${dimension}`,
-        chart_type: primaryChartType,
+        title: chartTitle,
+        chart_type: finalChartType,
         data_ref: dataRef,
-        mapping: { category: dimension, value: aliases[0] || Object.keys(rows[0]).find(k => typeof rows[0][k] === 'number') || dimension },
+        mapping: chartMapping,
         interactions: { selectable: true, filterable: true, drilldown: groups.length > 1 },
         drill_dimensions: groups.length > 1 ? groups : (deptCol && branchCol ? [branchCol.key, deptCol.key] : [dimension]),
         grid_col_span: hasRealRows ? 6 : (aliases.length > 1 ? 6 : 12),

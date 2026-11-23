@@ -10574,8 +10574,12 @@ async function loadMessages(convId) {
       });
 
       processedMessages.forEach(m => {
+        if (m.role === 'assistant') {
+          checkAndBindBiDatasetFromReply(m.content);
+        }
         renderMessageBubble(m.role, m.content, m.metadata, m.id);
       });
+      setTimeout(() => mountBIDashboardsInElement(container), 80);
 
       if (pInfo) {
         const lastMsg = data.messages[data.messages.length - 1];
@@ -12118,8 +12122,26 @@ async function deleteActiveBiDataset() {
 
 function checkAndBindBiDatasetFromReply(text) {
   if (!text) return;
-  // Match bi-file-report or bi-dataset-widget
-  const matchReport = text.match(/<!-- bi-file-report:\s*(\{[\s\S]*?\})\s*-->/);
+  // 1. Match bi-dashboard-v2
+  const matchDash = text.match(/<!--\s*bi-dashboard-v2:\s*([\s\S]*?)\s*-->/);
+  if (matchDash) {
+    try {
+      const cleanJson = matchDash[1].replace(/--\\u003e/g, '-->').replace(/\\u003c!--/g, '<!--');
+      const parsed = JSON.parse(cleanJson);
+      const fileId = parsed.provenance?.file_id || parsed.query_context?.file_id;
+      if (fileId) {
+        setActiveBiDataset({
+          file_id: fileId,
+          original_filename: parsed.provenance?.original_filename || parsed.title?.replace('Báo Cáo Phân Tích: ', '') || 'Bảng tính',
+          row_count: parsed.provenance?.total_rows || (parsed.data_store?.file_dataset_results || []).length || 0,
+        });
+        return;
+      }
+    } catch (_) {}
+  }
+
+  // 2. Match bi-file-report or bi-dataset-widget
+  const matchReport = text.match(/<!--\s*bi-file-report:\s*(\{[\s\S]*?\})\s*-->/);
   if (matchReport) {
     try {
       const parsed = JSON.parse(matchReport[1]);
@@ -12134,7 +12156,7 @@ function checkAndBindBiDatasetFromReply(text) {
     } catch (_) {}
   }
 
-  const matchWidget = text.match(/<!-- bi-dataset-widget:\s*(\{[\s\S]*?\})\s*-->/);
+  const matchWidget = text.match(/<!--\s*bi-dataset-widget:\s*(\{[\s\S]*?\})\s*-->/);
   if (matchWidget) {
     try {
       const parsed = JSON.parse(matchWidget[1]);
@@ -14093,30 +14115,123 @@ function renderEChartInstance(chartDom, vizConfig, dataStore) {
         itemStyle: { borderRadius: [0, 4, 4, 0], color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#0284c7' }, { offset: 1, color: '#2563eb' }]) },
       }],
     };
-  } else if (chartType === 'GROUPED_BAR') {
-    const categories = rows.map((r) => String(r[catKey] || ''));
-    const valFields = Array.isArray(valKey) ? valKey : [valKey];
-    option = {
-      color: palette,
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      legend: { bottom: 0, textStyle: { fontSize: 10, color: '#475569' } },
-      grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
-      xAxis: { type: 'category', data: categories, axisLabel: { fontSize: 10, color: '#64748b' } },
-      yAxis: { type: 'value', splitLine: { lineStyle: { color: '#f1f5f9' } } },
-      series: valFields.map(f => ({ name: f, type: 'bar', data: rows.map(r => numericValue(r[f])), itemStyle: { borderRadius: [4, 4, 0, 0] } })),
-    };
-  } else if (chartType === 'PERCENT_STACKED_BAR') {
-    const categories = rows.map((r) => String(r[catKey] || ''));
-    const valFields = Array.isArray(valKey) ? valKey : [valKey];
-    option = {
-      color: palette,
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      legend: { bottom: 0, textStyle: { fontSize: 10, color: '#475569' } },
-      grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
-      xAxis: { type: 'category', data: categories, axisLabel: { fontSize: 10, color: '#64748b' } },
-      yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' }, splitLine: { lineStyle: { color: '#f1f5f9' } } },
-      series: valFields.map(f => ({ name: f, type: 'bar', stack: 'total', data: rows.map(r => numericValue(r[f])) })),
-    };
+  } else if (chartType === 'GROUPED_BAR' || chartType === 'STACKED_BAR' || chartType === 'PERCENT_STACKED_BAR') {
+    const isStacked = chartType === 'STACKED_BAR' || chartType === 'PERCENT_STACKED_BAR';
+    const isPercent = chartType === 'PERCENT_STACKED_BAR';
+    const seriesKey = mapping.series;
+
+    if (seriesKey) {
+      // 2D Cross-Tab breakdown: X-axis = Categories, Legend = Series, Value = Metric
+      const uniqueCategories = [];
+      const catSeen = new Set();
+      for (const r of rows) {
+        const catVal = String(r[catKey] !== undefined ? r[catKey] : '');
+        if (!catSeen.has(catVal)) {
+          catSeen.add(catVal);
+          uniqueCategories.push(catVal);
+        }
+      }
+
+      const uniqueSeries = [];
+      const serSeen = new Set();
+      for (const r of rows) {
+        const serVal = String(r[seriesKey] !== undefined ? r[seriesKey] : '');
+        if (!serSeen.has(serVal)) {
+          serSeen.add(serVal);
+          uniqueSeries.push(serVal);
+        }
+      }
+      uniqueSeries.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+      // Build data matrix: valueLookup[category][series]
+      const valueLookup = new Map();
+      for (const r of rows) {
+        const c = String(r[catKey] !== undefined ? r[catKey] : '');
+        const s = String(r[seriesKey] !== undefined ? r[seriesKey] : '');
+        const v = numericValue(r[valKey]);
+        if (!valueLookup.has(c)) valueLookup.set(c, new Map());
+        valueLookup.get(c).set(s, v);
+      }
+
+      const seriesList = uniqueSeries.map((s) => {
+        const data = uniqueCategories.map(c => {
+          const m = valueLookup.get(c);
+          return (m && m.has(s)) ? m.get(s) : 0;
+        });
+        return {
+          name: s,
+          type: 'bar',
+          stack: isStacked ? 'total' : undefined,
+          itemStyle: isStacked ? undefined : { borderRadius: [4, 4, 0, 0] },
+          data,
+        };
+      });
+
+      option = {
+        color: palette,
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          formatter: function (params) {
+            if (!params || !params.length) return '';
+            let html = `<strong>${esc(params[0].axisValue)}</strong><br/>`;
+            params.forEach(p => {
+              if (p.value !== null && p.value !== undefined && p.value > 0) {
+                html += `${p.marker} ${esc(p.seriesName)}: <strong>${Number(p.value).toLocaleString('vi-VN')}</strong> nhân sự<br/>`;
+              }
+            });
+            return html;
+          },
+        },
+        legend: {
+          bottom: 0,
+          type: 'scroll',
+          textStyle: { fontSize: 10, color: '#475569' },
+        },
+        grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: uniqueCategories,
+          axisLabel: {
+            fontSize: 10,
+            color: '#64748b',
+            interval: 0,
+            rotate: uniqueCategories.length > 5 ? 20 : 0,
+          },
+        },
+        yAxis: {
+          type: 'value',
+          max: isPercent ? 100 : undefined,
+          axisLabel: isPercent ? { formatter: '{value}%' } : undefined,
+          splitLine: { lineStyle: { color: '#f1f5f9' } },
+        },
+        series: seriesList,
+      };
+    } else {
+      // 1D multi-metric breakdown: multiple metric columns on flat row
+      const categories = rows.map((r) => String(r[catKey] || ''));
+      const valFields = Array.isArray(valKey) ? valKey : [valKey];
+      option = {
+        color: palette,
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        legend: { bottom: 0, textStyle: { fontSize: 10, color: '#475569' } },
+        grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
+        xAxis: { type: 'category', data: categories, axisLabel: { fontSize: 10, color: '#64748b' } },
+        yAxis: {
+          type: 'value',
+          max: isPercent ? 100 : undefined,
+          axisLabel: isPercent ? { formatter: '{value}%' } : undefined,
+          splitLine: { lineStyle: { color: '#f1f5f9' } },
+        },
+        series: valFields.map(f => ({
+          name: f,
+          type: 'bar',
+          stack: isStacked ? 'total' : undefined,
+          data: rows.map(r => numericValue(r[f])),
+          itemStyle: isStacked ? undefined : { borderRadius: [4, 4, 0, 0] },
+        })),
+      };
+    }
   } else if (chartType === 'FUNNEL') {
     option = {
       color: palette,
@@ -14320,18 +14435,30 @@ function renderEChartInstance(chartDom, vizConfig, dataStore) {
       }],
     };
   } else if (chartType === 'LINE' || chartType === 'AREA' || chartType === 'STEP_LINE' || chartType === 'MULTI_LINE' || chartType === 'STACKED_AREA') {
-    const categories = rows.map((r) => String(r[catKey] || ''));
     const isArea = chartType === 'AREA' || chartType === 'STACKED_AREA';
     const isStep = chartType === 'STEP_LINE';
     const valFields = Array.isArray(valKey) ? valKey : [valKey];
+
+    // Sort chronologically ascending if category is date or year
+    const sortedRows = [...rows].sort((a, b) => {
+      const va = String(a[catKey] || '');
+      const vb = String(b[catKey] || '');
+      return va.localeCompare(vb, undefined, { numeric: true });
+    });
+    const categories = sortedRows.map((r) => String(r[catKey] || ''));
 
     option = {
       color: palette,
       tooltip: {
         trigger: 'axis',
         formatter: function (params) {
-          const item = params[0];
-          return `<strong>${esc(item.axisValue)}</strong><br/>${esc(item.seriesName)}: ${Number(item.value || 0).toLocaleString('vi-VN')}`;
+          if (!params || !params.length) return '';
+          let html = `<strong>${esc(params[0].axisValue)}</strong><br/>`;
+          params.forEach(p => {
+            const seriesLabel = esc(vizConfig.title || p.seriesName || 'Số lượng');
+            html += `${p.marker} ${seriesLabel}: <strong>${Number(p.value || 0).toLocaleString('vi-VN')}</strong><br/>`;
+          });
+          return html;
         },
       },
       legend: valFields.length > 1 ? { bottom: 0, textStyle: { fontSize: 10, color: '#475569' } } : undefined,
@@ -14363,50 +14490,12 @@ function renderEChartInstance(chartDom, vizConfig, dataStore) {
         type: 'line',
         step: isStep ? 'middle' : false,
         stack: chartType === 'STACKED_AREA' ? 'total' : undefined,
-        data: rows.map(r => numericValue(r[f])),
+        data: sortedRows.map(r => numericValue(r[f])),
         smooth: !isStep,
         symbol: 'circle',
         symbolSize: 6,
         lineStyle: { width: 3 },
         areaStyle: isArea ? { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(2,132,199,0.35)' }, { offset: 1, color: 'rgba(2,132,199,0.02)' }]) } : null,
-      })),
-    };
-  } else if (chartType === 'STACKED_BAR') {
-    const categories = rows.map((r) => String(r[catKey] || ''));
-    const valFields = Array.isArray(valKey) ? valKey : [valKey];
-
-    option = {
-      color: palette,
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' },
-      },
-      legend: {
-        bottom: 0,
-        textStyle: { fontSize: 10, color: '#475569' },
-      },
-      grid: {
-        left: '3%',
-        right: '4%',
-        bottom: '15%',
-        top: '10%',
-        containLabel: true,
-      },
-      xAxis: {
-        type: 'category',
-        data: categories,
-        axisLabel: { fontSize: 10, color: '#64748b' },
-      },
-      yAxis: {
-        type: 'value',
-        splitLine: { lineStyle: { color: '#f1f5f9' } },
-      },
-      series: valFields.map((f, i) => ({
-        name: f,
-        type: 'bar',
-        stack: 'total',
-        data: rows.map(r => numericValue(r[f])),
-        itemStyle: { borderRadius: i === valFields.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0] },
       })),
     };
   } else if (chartType === 'PIVOT_TABLE') {
@@ -14605,6 +14694,19 @@ function parseMarkdown(md, isStreaming = false) {
       raw = raw.replace(/###\s*📋\s*Bảng Số Liệu Chi Tiết[\s\S]*?(?=\n###|\n@@@BIDASHBLOCK|\n<!--|$)/gi, '');
     }
   }
+
+  // Loại bỏ hoàn toàn các khối mã ASCII art mô phỏng biểu đồ
+  raw = raw.replace(/```(?:text|ascii|markdown)?\s*[\r\n]+([\s\S]*?)```/gi, (match, inner) => {
+    const isAsciiChart = (
+      /(\||\+|\/|\\|[-_]{3,}){3,}/.test(inner) &&
+      /(?:chart|bieu\s*do|line|bar|cot|duong|nam|\d{4}|y\s*axis|x\s*axis)/i.test(inner)
+    ) || (
+      /[/\\]{2,}/.test(inner) && /[-_]{3,}/.test(inner)
+    );
+    if (isAsciiChart) return '';
+    return match;
+  });
+  raw = raw.replace(/^(?:###?\s*(?:Biểu đồ|Chart)[^\n]*\n)(?:[ \t]*\n)*(?:```[\s\S]*?```)?/gmi, '');
 
   // Nếu đang streaming, tự động cân bằng các thẻ chưa đóng để hiển thị mượt mà không giật
   if (isStreaming) {

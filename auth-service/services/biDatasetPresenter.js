@@ -315,6 +315,30 @@ function formatDatasetProfileMarkdown(profile) {
 }
 
 /**
+ * Clean AI explanation text by stripping any ASCII art / text code block chart simulations
+ * @param {string} text - Raw AI interpretation
+ * @returns {string} Cleaned explanation text
+ */
+function cleanExplanationText(text) {
+  if (!text || typeof text !== 'string') return '';
+  // 1. Strip any code blocks containing ASCII chart drawings or text diagrams
+  let cleaned = text.replace(/```(?:text|ascii|markdown)?\s*[\r\n]+([\s\S]*?)```/gi, (match, inner) => {
+    if (/[/\\|+-]{3,}/.test(inner) || /(?:line\s*chart|bar\s*chart|bieu\s*do|trend|truc\s*x|truc\s*y)/i.test(inner)) {
+      return '';
+    }
+    return match;
+  });
+
+  // 2. Strip any standalone lines that simulate ASCII charts
+  cleaned = cleaned.replace(/^(?:[ \t]*[/\\|+-]{3,}[ \t]*)+$/gm, '');
+
+  // 3. Remove chart section headers that were accompanied by ASCII art
+  cleaned = cleaned.replace(/^(?:###?\s*(?:Biểu đồ|Chart)[^\n]*\n)(?:[ \t]*\n)*(?:```[\s\S]*?```)?/gmi, '');
+
+  return cleaned.trim();
+}
+
+/**
  * Format Analytical Query Results into Executive Presentation
  * @param {Object} queryPlan - Validated plan
  * @param {Object} queryResult - Result from executeAnalyticalQuery
@@ -323,6 +347,7 @@ function formatDatasetProfileMarkdown(profile) {
  * @returns {string} Formatted Markdown text
  */
 function formatAnalyticalResultMarkdown(queryPlan, queryResult, dataset, explanationText = '', userContext = null) {
+  explanationText = cleanExplanationText(explanationText);
   queryResult = { ...queryResult, results: sanitizeBiData(queryResult.results || []) };
   const lines = [];
 
@@ -1006,4 +1031,5 @@ module.exports = {
   generateLineChartSvg,
   generatePieChartSvg,
   escapeMarkdown,
+  cleanExplanationText,
 };

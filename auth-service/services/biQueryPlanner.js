@@ -1910,43 +1910,59 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
     /\bquy\s*[1-4]\b/i.test(cleanPromptForDate) ||
     /\bhang\s+quy\b/i.test(cleanPromptForDate);
 
+  const dateColMatch = colProfile.dates.find(d => {
+    const k = normalizeText(d.key || '');
+    const n = normalizeText(d.name || '');
+    return (n && hasWordOrPhrase(cleanPromptForDate, n)) ||
+           (k && hasWordOrPhrase(cleanPromptForDate, k)) ||
+           (hasWordOrPhrase(cleanPromptForDate, 'nam vao lam') && (k.includes('vao_lam') || n.includes('vao lam'))) ||
+           (hasWordOrPhrase(cleanPromptForDate, 'ngay vao lam') && (k.includes('vao_lam') || n.includes('vao lam')));
+  });
+
   const isDateGroupingIntent =
     isQuarterDate ||
+    Boolean(dateColMatch) ||
     hasWordOrPhrase(cleanPromptForDate, 'theo thang') ||
     hasWordOrPhrase(cleanPromptForDate, 'tung thang') ||
     hasWordOrPhrase(cleanPromptForDate, 'cac thang') ||
     hasWordOrPhrase(cleanPromptForDate, 'moi thang') ||
     hasWordOrPhrase(cleanPromptForDate, 'hang thang') ||
     hasWordOrPhrase(cleanPromptForDate, 'qua cac thang') ||
+    hasWordOrPhrase(cleanPromptForDate, 'va thang') ||
     hasWordOrPhrase(cleanPromptForDate, 'theo nam') ||
     hasWordOrPhrase(cleanPromptForDate, 'tung nam') ||
     hasWordOrPhrase(cleanPromptForDate, 'cac nam') ||
     hasWordOrPhrase(cleanPromptForDate, 'moi nam') ||
     hasWordOrPhrase(cleanPromptForDate, 'hang nam') ||
     hasWordOrPhrase(cleanPromptForDate, 'qua cac nam') ||
+    hasWordOrPhrase(cleanPromptForDate, 'va nam') ||
+    hasWordOrPhrase(cleanPromptForDate, 'nam vao lam') ||
+    hasWordOrPhrase(cleanPromptForDate, 'thoi gian vao lam') ||
     hasWordOrPhrase(cleanPromptForDate, 'theo ngay') ||
     hasWordOrPhrase(cleanPromptForDate, 'tung ngay') ||
     hasWordOrPhrase(cleanPromptForDate, 'cac ngay') ||
     hasWordOrPhrase(cleanPromptForDate, 'moi ngay') ||
     hasWordOrPhrase(cleanPromptForDate, 'hang ngay') ||
+    hasWordOrPhrase(cleanPromptForDate, 'va ngay') ||
     hasWordOrPhrase(cleanPromptForDate, 'theo thoi gian') ||
     (hasWordOrPhrase(cleanPromptForDate, 'xu huong') && (hasWordOrPhrase(cleanPromptForDate, 'thang') || hasWordOrPhrase(cleanPromptForDate, 'nam') || hasWordOrPhrase(cleanPromptForDate, 'ngay') || hasWordOrPhrase(cleanPromptForDate, 'thoi gian')));
 
+  let dateGroupItem = null;
   if (colProfile.dates.length > 0 && isDateGroupingIntent) {
-    const targetDateCol = colProfile.dates[0];
+    const targetDateCol = dateColMatch || colProfile.dates[0];
     if (isQuarterDate) {
       dateTrunc = 'quarter';
-    } else if (hasWordOrPhrase(cleanPromptForDate, 'nam')) {
+    } else if (hasWordOrPhrase(cleanPromptForDate, 'nam') || hasWordOrPhrase(cleanPromptForDate, 'nam vao lam')) {
       dateTrunc = 'year';
     } else if (hasWordOrPhrase(cleanPromptForDate, 'ngay')) {
       dateTrunc = 'day';
     } else {
       dateTrunc = 'month'; // Default date truncation
     }
-    groupBy.push({
+    dateGroupItem = {
       column: targetDateCol.key,
       date_trunc: dateTrunc,
-    });
+    };
   }
 
   // B. Categorical Dimension Grouping with Strict Prepositions
@@ -2029,8 +2045,19 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
   let chartMapping = {};
 
   if (matchedDimensions.length === 1) {
-    if (!groupBy.some((g) => (typeof g === 'string' ? g : g.column) === matchedDimensions[0])) {
-      groupBy.push(matchedDimensions[0]);
+    const dim = matchedDimensions[0];
+    if (dateGroupItem) {
+      const dimIdx = promptNorm.indexOf(dim) !== -1 ? promptNorm.indexOf(dim) : 0;
+      const dateIdx = promptNorm.indexOf('nam') !== -1 ? promptNorm.indexOf('nam') : promptNorm.indexOf('ngay');
+      if (dimIdx !== -1 && dateIdx !== -1 && dimIdx < dateIdx) {
+        groupBy.push(dim);
+        groupBy.push(dateGroupItem);
+      } else {
+        groupBy.push(dateGroupItem);
+        groupBy.push(dim);
+      }
+    } else {
+      groupBy.push(dim);
     }
   } else if (matchedDimensions.length > 1) {
     // Check if user specifically requested a 2-dimensional cross-tab or combined grouping
@@ -2059,6 +2086,11 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
         chartMapping = { pie: statusDim, bar: deptDim };
       }
     }
+    if (dateGroupItem && !groupBy.some(g => typeof g === 'object' && g.column === dateGroupItem.column)) {
+      groupBy.push(dateGroupItem);
+    }
+  } else if (dateGroupItem) {
+    groupBy.push(dateGroupItem);
   }
 
   const isFindTopRecord =
@@ -2309,7 +2341,8 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
   // 6. Identify Sorting & Limits
   let orderBy = { column: aggregations[0]?.alias || alias, dir: 'DESC' };
   if (dateTrunc && !hasWordOrPhrase(promptNorm, 'giam dan') && !hasWordOrPhrase(promptNorm, 'top')) {
-    const dateColKey = typeof groupBy[0] === 'object' ? groupBy[0].column : groupBy[0];
+    const dateObj = groupBy.find(g => typeof g === 'object' && g.date_trunc);
+    const dateColKey = dateObj ? dateObj.column : (typeof groupBy[0] === 'object' ? groupBy[0].column : groupBy[0]);
     orderBy = { column: dateColKey, dir: 'ASC' };
   } else if (hasWordOrPhrase(promptNorm, 'tang dan') || hasWordOrPhrase(promptNorm, 'thap nhat') || hasWordOrPhrase(promptNorm, 'it nhat')) {
     orderBy = { column: aggregations[0]?.alias || alias, dir: 'ASC' };
@@ -2335,18 +2368,19 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
     (hasWordOrPhrase(promptNorm, 'pie') || hasWordOrPhrase(promptNorm, 'tron')) &&
     (hasWordOrPhrase(promptNorm, 'bar') || hasWordOrPhrase(promptNorm, 'cot'));
 
+  const isExplicitBar = hasWordOrPhrase(promptNorm, 'cot') || hasWordOrPhrase(promptNorm, 'bar');
+  const isExplicitLine = hasWordOrPhrase(promptNorm, 'duong') || hasWordOrPhrase(promptNorm, 'line') || hasWordOrPhrase(promptNorm, 'xu huong');
+
   const hasAnyChartExplicit =
     hasPieAndBar ||
+    isExplicitBar ||
+    isExplicitLine ||
     hasWordOrPhrase(promptNorm, 'pie') ||
-    hasWordOrPhrase(promptNorm, 'bar') ||
     hasWordOrPhrase(promptNorm, 'chart') ||
     hasWordOrPhrase(promptNorm, 'bieu do') ||
-    hasWordOrPhrase(promptNorm, 'tron') ||
-    hasWordOrPhrase(promptNorm, 'cot') ||
-    hasWordOrPhrase(promptNorm, 'line') ||
-    hasWordOrPhrase(promptNorm, 'duong');
+    hasWordOrPhrase(promptNorm, 'tron');
 
-  let chartPreference = 'BAR';
+  let chartPreference = groupBy.length > 1 ? 'GROUPED_BAR' : 'BAR';
   if (hasWordOrPhrase(promptNorm, 'radar') || hasWordOrPhrase(promptNorm, 'mang nhen')) {
     chartPreference = 'RADAR';
   } else if (hasWordOrPhrase(promptNorm, 'funnel') || hasWordOrPhrase(promptNorm, 'pheu')) {
@@ -2361,11 +2395,11 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
     chartPreference = 'PARETO';
   } else if (hasWordOrPhrase(promptNorm, 'cot ngang') || hasWordOrPhrase(promptNorm, 'horizontal bar')) {
     chartPreference = 'HORIZONTAL_BAR';
-  } else if (hasWordOrPhrase(promptNorm, 'cot nhom') || hasWordOrPhrase(promptNorm, 'grouped bar')) {
+  } else if (hasWordOrPhrase(promptNorm, 'cot nhom') || hasWordOrPhrase(promptNorm, 'grouped bar') || (isExplicitBar && groupBy.length > 1 && !hasWordOrPhrase(promptNorm, 'chong') && !hasWordOrPhrase(promptNorm, 'stacked'))) {
     chartPreference = 'GROUPED_BAR';
   } else if (hasWordOrPhrase(promptNorm, 'cot chong 100') || hasWordOrPhrase(promptNorm, '100% stacked bar') || hasWordOrPhrase(promptNorm, 'percent stacked bar')) {
     chartPreference = 'PERCENT_STACKED_BAR';
-  } else if (hasWordOrPhrase(promptNorm, 'cot chong') || hasWordOrPhrase(promptNorm, 'stacked bar')) {
+  } else if (hasWordOrPhrase(promptNorm, 'cot chong') || hasWordOrPhrase(promptNorm, 'stacked bar') || (isExplicitBar && groupBy.length > 1 && (hasWordOrPhrase(promptNorm, 'chong') || hasWordOrPhrase(promptNorm, 'stacked')))) {
     chartPreference = 'STACKED_BAR';
   } else if (hasWordOrPhrase(promptNorm, 'lollipop') || hasWordOrPhrase(promptNorm, 'keo mut')) {
     chartPreference = 'LOLLIPOP';
@@ -2395,7 +2429,10 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
     chartPreference = 'COMBO';
   } else if (hasWordOrPhrase(promptNorm, 'pivot') || hasWordOrPhrase(promptNorm, 'tong hop cheo')) {
     chartPreference = 'PIVOT_TABLE';
-  } else if (dateTrunc || hasWordOrPhrase(promptNorm, 'xu huong') || hasWordOrPhrase(promptNorm, 'duong') || hasWordOrPhrase(promptNorm, 'line')) {
+  } else if (!isExplicitBar && (dateTrunc || hasWordOrPhrase(promptNorm, 'xu huong') || hasWordOrPhrase(promptNorm, 'duong') || hasWordOrPhrase(promptNorm, 'line'))) {
+    chartPreference = 'LINE';
+  } else if (isExplicitBar) {
+    chartPreference = groupBy.length > 1 ? 'GROUPED_BAR' : 'BAR';
     chartPreference = 'LINE';
   } else if (hasPieAndBar) {
     chartPreference = 'BAR';
