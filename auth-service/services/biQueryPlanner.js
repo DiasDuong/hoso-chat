@@ -51,7 +51,9 @@ const COLUMN_SYNONYMS = {
   cong_ty: ['cong ty', 'chi nhanh', 'don vi thanh vien', 'company', 'branch'],
   ngay_tao: ['ngay tao', 'ngay', 'thoi gian', 'date', 'ngay thang', 'thang'],
   so_luong: ['so luong', 'sl', 'qty', 'quantity', 'san luong'],
-  chi_phi: ['chi phi', 'cost', 'expense', 'phi', 'tong chi'],
+  chi_phi: ['chi phi', 'cost', 'expense', 'phi', 'tong chi', 'so tien', 'tien'],
+  so_tien: ['so tien', 'tien', 'chi phi', 'gia tri', 'amount', 'thanh tien'],
+  tien: ['so tien', 'tien', 'chi phi', 'gia tri', 'amount', 'thanh tien'],
   khach_hang: ['khach hang', 'khach', 'doi tac', 'customer', 'client'],
   trang_thai: ['trang thai', 'tinh trang', 'status'],
   loai_ho_so: ['loai ho so', 'loai van ban', 'loai tai lieu', 'loai', 'loai hinh'],
@@ -520,6 +522,22 @@ function detectMultipleMetrics(promptNorm, colProfile, columns) {
   return { metrics, computations, empColKey: empCol ? empCol.key : null };
 }
 
+function estimatePromptClauseCount(promptRaw, promptNorm) {
+  const numbered = (promptRaw.match(/(?:^|\n|\s)\d+[.)]\s*/g) || []).length;
+  if (numbered >= 2) return numbered;
+  const bullets = (promptRaw.match(/(?:^|\n)\s*[-*•+]\s+/g) || []).length;
+  if (bullets >= 2) return bullets;
+  if (promptRaw.includes(';')) {
+    const semi = promptRaw.split(';').filter((p) => p.trim().length > 3).length;
+    if (semi >= 2) return semi;
+  }
+  const connectives = (promptRaw.match(/(?:đồng thời|dong thoi|song song đó|song song do|bên cạnh đó|ben canh do|ngoài ra|ngoai ra)/gi) || []).length;
+  if (connectives >= 1) return connectives + 1;
+  const commaParts = promptRaw.split(/(?:,\s*(?:và|va)\s*|,\s*|\s+(?:và|va)\s+)/i).filter((p) => p.trim().length > 3 && !/^(hãy|vui lòng|tạo|xây dựng|vẽ|sử dụng|hiển thị)\b/i.test(p.trim()));
+  if (commaParts.length >= 2) return commaParts.length;
+  return 1;
+}
+
 /**
  * Decompose composite/multi-intent analytical queries into individual verifiable requirements
  */
@@ -860,7 +878,7 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
       data_source_reference: hireDateCol.key,
     });
 
-    const structuredClauseCount = (promptRaw.match(/(?:^|\n|\s)\d+[.)]\s*/g) || []).length;
+    const structuredClauseCount = estimatePromptClauseCount(promptRaw, promptNorm);
     if (structuredClauseCount >= 2 && requirements.length < structuredClauseCount) {
       // User asked for more clauses than handled in this recruitment/tenure template; fall through to universal decomposition
     } else {
@@ -1098,7 +1116,7 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
       });
     }
 
-    const structuredClauseCountB = [...promptRaw.matchAll(/(?:^|\n|\s)(?:\d+[.)]|[-*•+])\s*(.+?)(?=\s*(?:[.,;]|\n)?\s*(?:\d+[.)]|[-*•+])|$)/gs)].length;
+    const structuredClauseCountB = estimatePromptClauseCount(promptRaw, promptNorm);
     if (requirements.length > 0 && (structuredClauseCountB <= 1 || requirements.length >= structuredClauseCountB)) {
       return requirements;
     }
@@ -1449,7 +1467,7 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
       });
     }
 
-    const structuredClauseCountD = (promptRaw.match(/(?:^|\n|\s)\d+[.)]\s*/g) || []).length;
+    const structuredClauseCountD = estimatePromptClauseCount(promptRaw, promptNorm);
     if (requirements.length > 0 && (structuredClauseCountD <= 1 || requirements.length >= structuredClauseCountD)) {
       return requirements;
     }
@@ -1493,13 +1511,13 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
     }
   }
 
-  // 5. Comma-separated or "và" lists following ":" or "gồm" or "yêu cầu"
-  if (extractedClauses.length < 2 && (promptRaw.includes(':') || hasWordOrPhrase(promptNorm, 'gom') || hasWordOrPhrase(promptNorm, 'yeu cau'))) {
+  // 5. Comma-separated or "và" lists (e.g. following ":", "gồm", "yêu cầu", or direct multi-comma / "và")
+  if (extractedClauses.length < 2 && (promptRaw.includes(':') || hasWordOrPhrase(promptNorm, 'gom') || hasWordOrPhrase(promptNorm, 'yeu cau') || promptRaw.includes(',') || /\s+(?:và|va)\s+/i.test(promptRaw))) {
     const colonIdx = promptRaw.indexOf(':');
     const contentToSplit = colonIdx !== -1 ? promptRaw.slice(colonIdx + 1) : promptRaw;
     const parts = contentToSplit
-      .split(/,\s*|\s+va\s+(?=[a-z0-9_])/i)
-      .map((p) => p.trim().replace(/^[.,;]+|[.,;]+$/g, ''))
+      .split(/(?:,\s*(?:và|va)\s*|,\s*|\s+(?:và|va)\s+)/i)
+      .map((p) => p.trim().replace(/(?:\r?\n|[.;]\s*)(?:Sử dụng|Hiển thị|Trình bày|Dùng|Format|Dạng|Bao gồm|Vẽ)(?:\s+|$)[\s\S]*$/i, '').replace(/^[.,;]+|[.,;]+$/g, ''))
       .filter((p) => p.length > 3);
     if (parts.length >= 2) {
       extractedClauses = parts;
@@ -1525,8 +1543,10 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
     let reqIndex = 1;
 
     for (const clauseRaw of extractedClauses) {
-      // Strip trailing UI directives glued to the clause (e.g. "Top 10...\nSử dụng KPI Cards, Bar Chart...")
-      const cleanedClauseRaw = clauseRaw.replace(/\r?\n\s*(?:Sử dụng|Hiển thị|Trình bày|Dùng|Format|Dạng|Bao gồm)\b[\s\S]*$/i, '').trim();
+      // Strip trailing UI directives glued to the clause (e.g. "Top 10...\nSử dụng KPI Cards, Bar Chart..." or "...nhóm hàng. Vẽ biểu đồ Bar Chart")
+      const cleanedClauseRaw = clauseRaw
+        .replace(/(?:\r?\n|[.;]\s*)(?:Sử dụng|Hiển thị|Trình bày|Dùng|Format|Dạng|Bao gồm|Vẽ)(?:\s+|$)[\s\S]*$/i, '')
+        .trim();
       const clauseNorm = normalizeText(cleanedClauseRaw);
 
       // Skip pure UI-only directives like "8. Hiển thị KPI Cards, Bar Chart..."
@@ -1563,8 +1583,10 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
       }
 
       // Token overlap matching for unknown/IoT domain measures
+      let hasSpecificMeasureTokens = false;
       if (!measureCol) {
-        const clauseTokens = clauseNorm.split(/[\s_]+/).filter((t) => t.length > 2 && !['bao', 'cao', 'tinh', 'tong', 'trung', 'binh', 'nhat', 'theo', 'cac'].includes(t));
+        const clauseTokens = clauseNorm.split(/[\s_]+/).filter((t) => t.length > 2 && !['bao', 'cao', 'tinh', 'tong', 'trung', 'binh', 'nhat', 'theo', 'cac', 'cua', 'cho', 'va'].includes(t));
+        hasSpecificMeasureTokens = clauseTokens.length > 0;
         let bestScore = 0;
         let bestCol = null;
         for (const col of colProfile.measures.concat(colProfile.quantities)) {
@@ -1579,6 +1601,9 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
           measureCol = bestCol;
         }
       }
+      if (!measureCol) {
+        measureCol = matchColumnFromText(clauseNorm, colProfile.measures.concat(colProfile.quantities));
+      }
       const isCountClause = !measureCol && (
         hasWordOrPhrase(clauseNorm, 'so luong') ||
         hasWordOrPhrase(clauseNorm, 'so don') ||
@@ -1590,7 +1615,13 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
       if (!measureCol && isCountClause) {
         measureCol = colProfile.identifiers[0] || colProfile.labels[0];
       }
-      if (!measureCol && colProfile.measures.length > 0) {
+      if (!measureCol && colProfile.measures.length === 1 && !isCountClause) {
+        const isForeign = hasWordOrPhrase(clauseNorm, 'ap suat') || hasWordOrPhrase(clauseNorm, 'buong dot') || hasWordOrPhrase(clauseNorm, 'dien nang') || hasWordOrPhrase(clauseNorm, 'nhiet do') || hasWordOrPhrase(clauseNorm, 'do rung');
+        if (!isForeign) {
+          measureCol = colProfile.measures[0];
+        }
+      }
+      if (!measureCol && colProfile.measures.length > 1 && !hasSpecificMeasureTokens) {
         measureCol = colProfile.measures[0];
       }
 
