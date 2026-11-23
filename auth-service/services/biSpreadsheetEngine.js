@@ -1140,7 +1140,65 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
         let metricVal = null;
         let subtext = req.subtext || null;
 
-        if (req.id === 'req_lowest_active_dept') {
+        if (req.id === 'req_avg_tenure' || req.derived_metric === 'tham_nien_nam') {
+          const dateCol = columns.find(c => /(ngay_vao_lam|hire_date|ngay_vao)/i.test(c.key)) || columns.find(c => ['DATE', 'DATETIME'].includes(c.type));
+          if (dateCol) {
+            const refDate = new Date();
+            let tenureSum = 0;
+            let tenureCount = 0;
+            for (const r of targetRows) {
+              const parsedDate = parseDateValue(r[dateCol.key]);
+              if (parsedDate) {
+                const d = new Date(parsedDate);
+                if (!isNaN(d.getTime())) {
+                  const years = Math.max(0, (refDate.getTime() - d.getTime()) / (365.25 * 24 * 3600 * 1000));
+                  tenureSum += years;
+                  tenureCount++;
+                }
+              }
+            }
+            metricVal = tenureCount > 0 ? Number((tenureSum / tenureCount).toFixed(2)) : 0;
+            subtext = `Tính trên toàn bộ ${tenureCount} nhân sự từ ngày vào làm đến hiện tại.`;
+          }
+        } else if (req.id === 'req_senior_department') {
+          const deptCol = columns.find(c => /(phong|dept|bo_phan)/i.test(c.key));
+          const dateCol = columns.find(c => /(ngay_vao_lam|hire_date|ngay_vao)/i.test(c.key)) || columns.find(c => ['DATE', 'DATETIME'].includes(c.type));
+          if (deptCol && dateCol) {
+            const refDate = new Date();
+            const dMap = new Map();
+            let totalSenior = 0;
+            for (const r of targetRows) {
+              const dName = String(r[deptCol.key] || 'Khác').trim() || 'Khác';
+              if (!dMap.has(dName)) dMap.set(dName, { dept: dName, seniorCount: 0, total: 0 });
+              const item = dMap.get(dName);
+              item.total++;
+              const parsedDate = parseDateValue(r[dateCol.key]);
+              if (parsedDate) {
+                const d = new Date(parsedDate);
+                if (!isNaN(d.getTime())) {
+                  const years = (refDate.getTime() - d.getTime()) / (365.25 * 24 * 3600 * 1000);
+                  if (years > (req.tenure_threshold || 5)) {
+                    item.seniorCount++;
+                    totalSenior++;
+                  }
+                }
+              }
+            }
+            let topDept = null;
+            let maxSenior = -1;
+            for (const item of dMap.values()) {
+              if (item.seniorCount > maxSenior) {
+                maxSenior = item.seniorCount;
+                topDept = item;
+              }
+            }
+            if (topDept) {
+              metricVal = maxSenior;
+              const pct = totalSenior > 0 ? ((maxSenior / totalSenior) * 100).toFixed(2).replace('.', ',') : '0';
+              subtext = `Phòng ${topDept.dept}: ${maxSenior} nhân sự thâm niên > 5 năm (chiếm ${pct}% tổng nhân sự lâu năm)`;
+            }
+          }
+        } else if (req.id === 'req_lowest_active_dept') {
           const deptCol = columns.find((c) => /(phong|dept|bo_phan)/i.test(c.key));
           const statusCol = columns.find((c) => /(trang_thai|status|tinh_trang)/i.test(c.key));
           if (deptCol && statusCol) {
@@ -1485,7 +1543,10 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
           }
           trendList.push({
             thoi_gian: period,
+            nam_vao_lam: period,
             period,
+            so_nhan_vien: periodVal,
+            distinct_count_ma_nhan_vien: periodVal,
             [req.alias || `${func.toLowerCase()}_${measureCol}`]: periodVal,
             count_rows: item.rows.length,
           });
@@ -1494,8 +1555,11 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
 
         resultsByRequirement[req.id] = {
           id: req.id,
+          requirement_id: req.requirement_id || req.id,
           title: req.title,
           type: 'TREND',
+          date_column: dateKey,
+          date_trunc: dateTruncType,
           data: trendList,
           status: 'AVAILABLE',
         };
@@ -1595,6 +1659,135 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
           type: 'DEPT_STATUS_ANALYSIS',
           dimension: dimCol,
           data: deptAnalysis,
+          status: 'AVAILABLE',
+        };
+      } else if (req.type === 'TENURE_DISTRIBUTION') {
+        const dateCol = columns.find(c => /(ngay_vao_lam|hire_date|ngay_vao)/i.test(c.key)) || columns.find(c => ['DATE', 'DATETIME'].includes(c.type));
+        const refDate = new Date();
+        const bands = [
+          { key: '< 1 năm', label: 'Dưới 1 năm (Mới)', check: (y) => y < 1 },
+          { key: '1 - 3 năm', label: '1 - 3 năm', check: (y) => y >= 1 && y <= 3 },
+          { key: '3 - 5 năm', label: '3 - 5 năm', check: (y) => y > 3 && y <= 5 },
+          { key: '> 5 năm', label: 'Trên 5 năm (Lâu năm)', check: (y) => y > 5 },
+        ];
+        const distData = bands.map((b) => {
+          let count = 0;
+          for (const r of targetRows) {
+            const parsedDate = parseDateValue(r[dateCol ? dateCol.key : 'ngay_vao_lam']);
+            if (parsedDate) {
+              const d = new Date(parsedDate);
+              if (!isNaN(d.getTime())) {
+                const years = Math.max(0, (refDate.getTime() - d.getTime()) / (365.25 * 24 * 3600 * 1000));
+                if (b.check(years)) count++;
+              }
+            }
+          }
+          const pct = targetRows.length > 0 ? Number(((count / targetRows.length) * 100).toFixed(2)) : 0;
+          return {
+            giai_doan_tham_nien: b.key,
+            label: b.label,
+            so_nhan_vien: count,
+            count_rows: count,
+            ty_trong_pct: pct,
+          };
+        });
+
+        resultsByRequirement[req.id] = {
+          id: req.id,
+          requirement_id: req.requirement_id || req.id,
+          title: req.title,
+          type: 'TENURE_DISTRIBUTION',
+          dimension: 'giai_doan_tham_nien',
+          data: distData,
+          total_count: targetRows.length,
+          status: 'AVAILABLE',
+        };
+      } else if (req.type === 'TENURE_KPI_COMPARISON') {
+        const dateCol = columns.find(c => /(ngay_vao_lam|hire_date|ngay_vao)/i.test(c.key)) || columns.find(c => ['DATE', 'DATETIME'].includes(c.type));
+        const kpiCol = columns.find(c => /kpi/i.test(c.key) || /kpi/i.test(c.name));
+        const refDate = new Date();
+
+        const groups = [
+          { key: 'Nhân viên mới (< 1 năm)', check: (y) => y < 1 },
+          { key: 'Nhân viên lâu năm (> 5 năm)', check: (y) => y > 5 },
+        ];
+        const compData = groups.map((g) => {
+          const matching = [];
+          for (const r of targetRows) {
+            const parsedDate = parseDateValue(r[dateCol ? dateCol.key : 'ngay_vao_lam']);
+            if (parsedDate) {
+              const d = new Date(parsedDate);
+              if (!isNaN(d.getTime())) {
+                const years = Math.max(0, (refDate.getTime() - d.getTime()) / (365.25 * 24 * 3600 * 1000));
+                if (g.check(years)) matching.push(r);
+              }
+            }
+          }
+          const kpis = matching.map(r => parseNumericValue(r[kpiCol ? kpiCol.key : 'diem_kpi'])).filter(n => n !== null);
+          const avgKpi = kpis.length > 0 ? Number((kpis.reduce((a, b) => a + b, 0) / kpis.length).toFixed(2)) : 0;
+          return {
+            nhom_nhan_vien: g.key,
+            so_nhan_vien: matching.length,
+            diem_kpi_tb: avgKpi,
+          };
+        });
+
+        resultsByRequirement[req.id] = {
+          id: req.id,
+          requirement_id: req.requirement_id || req.id,
+          title: req.title,
+          type: 'TENURE_KPI_COMPARISON',
+          dimension: 'nhom_nhan_vien',
+          data: compData,
+          status: 'AVAILABLE',
+        };
+      } else if (req.type === 'TENURE_COMPOSITION_TABLE') {
+        const dateCol = columns.find(c => /(ngay_vao_lam|hire_date|ngay_vao)/i.test(c.key)) || columns.find(c => ['DATE', 'DATETIME'].includes(c.type));
+        const kpiCol = columns.find(c => /kpi/i.test(c.key) || /kpi/i.test(c.name));
+        const salCol = columns.find(c => /(luong.*co.*ban|luong|salary)/i.test(c.key));
+        const refDate = new Date();
+
+        const bands = [
+          { key: '< 1 năm', label: 'Dưới 1 năm (Mới)', check: (y) => y < 1 },
+          { key: '1 - 3 năm', label: '1 - 3 năm', check: (y) => y >= 1 && y <= 3 },
+          { key: '3 - 5 năm', label: '3 - 5 năm', check: (y) => y > 3 && y <= 5 },
+          { key: '> 5 năm', label: 'Trên 5 năm (Lâu năm)', check: (y) => y > 5 },
+        ];
+
+        const compRows = bands.map((b) => {
+          const matching = [];
+          for (const r of targetRows) {
+            const parsedDate = parseDateValue(r[dateCol ? dateCol.key : 'ngay_vao_lam']);
+            if (parsedDate) {
+              const d = new Date(parsedDate);
+              if (!isNaN(d.getTime())) {
+                const years = Math.max(0, (refDate.getTime() - d.getTime()) / (365.25 * 24 * 3600 * 1000));
+                if (b.check(years)) matching.push(r);
+              }
+            }
+          }
+          const kpis = matching.map(r => parseNumericValue(r[kpiCol ? kpiCol.key : 'diem_kpi'])).filter(n => n !== null);
+          const avgKpi = kpis.length > 0 ? Number((kpis.reduce((a, b) => a + b, 0) / kpis.length).toFixed(2)) : 0;
+          const sals = matching.map(r => parseNumericValue(r[salCol ? salCol.key : 'luong_co_ban_vnd'])).filter(n => n !== null);
+          const avgSal = sals.length > 0 ? Math.round(sals.reduce((a, b) => a + b, 0) / sals.length) : 0;
+          const pct = targetRows.length > 0 ? Number(((matching.length / targetRows.length) * 100).toFixed(2)) : 0;
+          return {
+            giai_doan_tham_nien: b.key,
+            label: b.label,
+            so_nhan_vien: matching.length,
+            ty_trong_pct: pct,
+            diem_kpi_tb: avgKpi,
+            luong_tb: avgSal,
+          };
+        });
+
+        resultsByRequirement[req.id] = {
+          id: req.id,
+          requirement_id: req.requirement_id || req.id,
+          title: req.title,
+          type: 'TENURE_COMPOSITION_TABLE',
+          dimension: 'giai_doan_tham_nien',
+          data: compRows,
           status: 'AVAILABLE',
         };
       }

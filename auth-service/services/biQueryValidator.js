@@ -409,41 +409,75 @@ function validateQueryPlan(queryPlan, dataset, userContext) {
 
   // Validate composite requirements if present
   let validatedRequirements = null;
-  if (Array.isArray(queryPlan.requirements)) {
+  const virtualCols = [
+    'tham_nien_nam', 'giai_doan_tham_nien', 'nhom_tham_nien',
+    'nhom_nhan_vien', 'nhom_muc_luong', 'salary_band', 'nhom_chi_tieu'
+  ];
+
+  if (Array.isArray(queryPlan.requirements) && queryPlan.requirements.length > 0) {
     validatedRequirements = [];
     for (const req of queryPlan.requirements) {
-      if (req.status === 'DATA_UNAVAILABLE') {
-        validatedRequirements.push(req);
+      const vReq = { ...req };
+      if (vReq.status === 'DATA_UNAVAILABLE' || vReq.status === 'UNAVAILABLE_DATA') {
+        vReq.status = 'UNAVAILABLE_DATA';
+        validatedRequirements.push(vReq);
         continue;
       }
       // Check source column
-      if (req.column && req.column !== '*' && !colMap.has(req.column)) {
-        req.status = 'DATA_UNAVAILABLE';
-        req.reason = `Cột "${req.column}" không tồn tại trong bộ dữ liệu này.`;
+      if (vReq.column && vReq.column !== '*' && !colMap.has(vReq.column) && !virtualCols.includes(vReq.column)) {
+        vReq.status = 'UNAVAILABLE_DATA';
+        vReq.reason = `Cột "${vReq.column}" không tồn tại trong bộ dữ liệu này.`;
+      }
+      // Check date column
+      if (vReq.date_column && !colMap.has(vReq.date_column)) {
+        vReq.status = 'UNAVAILABLE_DATA';
+        vReq.reason = `Cột ngày "${vReq.date_column}" không tồn tại trong bộ dữ liệu này.`;
       }
       // Check groupBy columns
-      if (Array.isArray(req.groupBy)) {
-        for (const g of req.groupBy) {
+      if (Array.isArray(vReq.groupBy)) {
+        for (const g of vReq.groupBy) {
           const gKey = typeof g === 'string' ? g : g.column;
-          if (gKey && !colMap.has(gKey)) {
-            req.status = 'DATA_UNAVAILABLE';
-            req.reason = `Cột phân nhóm "${gKey}" không tồn tại trong bộ dữ liệu này.`;
+          if (gKey && !colMap.has(gKey) && !virtualCols.includes(gKey)) {
+            vReq.status = 'UNAVAILABLE_DATA';
+            vReq.reason = `Cột phân nhóm "${gKey}" không tồn tại trong bộ dữ liệu này.`;
             break;
           }
         }
       }
       // Check dimension if present and not a calculated bucket dimension
-      if (req.dimension && !colMap.has(req.dimension) && !['nhom_muc_luong', 'salary_band', 'nhom_chi_tieu'].includes(req.dimension) && !req.dimension.startsWith('nhom_')) {
-        req.status = 'DATA_UNAVAILABLE';
-        req.reason = `Cột phân nhóm "${req.dimension}" không tồn tại trong bộ dữ liệu này.`;
+      if (vReq.dimension && !colMap.has(vReq.dimension) && !virtualCols.includes(vReq.dimension) && !vReq.dimension.startsWith('nhom_')) {
+        vReq.status = 'UNAVAILABLE_DATA';
+        vReq.reason = `Cột phân nhóm "${vReq.dimension}" không tồn tại trong bộ dữ liệu này.`;
       }
-      validatedRequirements.push(req);
+      if (!vReq.status || vReq.status === 'AVAILABLE') {
+        vReq.status = 'RESOLVED';
+      }
+      validatedRequirements.push(vReq);
     }
   }
 
-  const totalReqs = validatedRequirements ? validatedRequirements.length : 0;
-  const unavailableReqs = validatedRequirements ? validatedRequirements.filter(r => r.status === 'DATA_UNAVAILABLE') : [];
-  const resolvedReqs = totalReqs - unavailableReqs.length;
+  let totalReqs = 0;
+  let resolvedReqs = 0;
+  let unavailableReqs = [];
+  let unsupportedReqs = [];
+  let failedReqs = [];
+  let ambiguousReqs = [];
+  let isComplete = false;
+
+  if (validatedRequirements) {
+    totalReqs = validatedRequirements.length;
+    unavailableReqs = validatedRequirements.filter(r => r.status === 'UNAVAILABLE_DATA' || r.status === 'DATA_UNAVAILABLE');
+    unsupportedReqs = validatedRequirements.filter(r => r.status === 'UNSUPPORTED');
+    failedReqs = validatedRequirements.filter(r => r.status === 'FAILED');
+    ambiguousReqs = validatedRequirements.filter(r => r.status === 'AMBIGUOUS');
+    resolvedReqs = validatedRequirements.filter(r => r.status === 'RESOLVED' || r.status === 'AVAILABLE').length;
+    isComplete = (totalReqs > 0) && (resolvedReqs === totalReqs);
+  } else {
+    // Single non-composite query
+    totalReqs = validatedAggs.length > 0 ? validatedAggs.length : 1;
+    resolvedReqs = totalReqs;
+    isComplete = true;
+  }
 
   return {
     file_id: dataset.file_id,
@@ -451,10 +485,13 @@ function validateQueryPlan(queryPlan, dataset, userContext) {
     intent: queryPlan.intent || 'AGGREGATION',
     requirements: validatedRequirements,
     metric_coverage: {
-      isComplete: unavailableReqs.length === 0,
+      isComplete,
       total_requirements: totalReqs,
       resolved_requirements: resolvedReqs,
       unavailable_requirements: unavailableReqs.length,
+      unsupported_requirements: unsupportedReqs.length,
+      failed_requirements: failedReqs.length,
+      ambiguous_requirements: ambiguousReqs.length,
       missing: unavailableReqs.map(r => r.title),
     },
     groupBy: validatedGroupBy,

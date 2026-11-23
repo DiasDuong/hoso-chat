@@ -532,6 +532,13 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
     promptNorm.includes(',') ||
     promptNorm.includes(':') ||
     promptNorm.includes(';') ||
+    promptNorm.includes('-') ||
+    promptNorm.includes('•') ||
+    promptRaw.includes('\n-') ||
+    promptRaw.includes('\n*') ||
+    hasWordOrPhrase(promptNorm, 'tinh hinh tuyen dung') ||
+    hasWordOrPhrase(promptNorm, 'bao cao tuyen dung') ||
+    hasWordOrPhrase(promptNorm, 'tham nien') ||
     hasWordOrPhrase(promptNorm, 'tinh hinh dao tao') ||
     hasWordOrPhrase(promptNorm, 'bao cao dao tao') ||
     hasWordOrPhrase(promptNorm, 'bao cao tinh hinh dao tao') ||
@@ -689,6 +696,154 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
         reason: (deptCol && statusCol) ? null : 'Thiếu cột phòng ban hoặc trạng thái.',
       });
     }
+
+    return requirements;
+  }
+
+  // CASE 0B: RECRUITMENT & TENURE (HR)
+  const isRecruitmentTenureAsked =
+    hasWordOrPhrase(promptNorm, 'tham nien') ||
+    hasWordOrPhrase(promptNorm, 'thoi gian lam viec') ||
+    hasWordOrPhrase(promptNorm, 'nam vao lam') ||
+    hasWordOrPhrase(promptNorm, 'nhan vien moi va lau nam') ||
+    hasWordOrPhrase(promptNorm, 'nhan vien lau nam') ||
+    (hasWordOrPhrase(promptNorm, 'tuyen dung') && (
+      hasWordOrPhrase(promptNorm, 'nam') ||
+      hasWordOrPhrase(promptNorm, 'tham nien') ||
+      hasWordOrPhrase(promptNorm, 'thoi gian') ||
+      hasWordOrPhrase(promptNorm, 'giai doan') ||
+      isCompositeStructure
+    ));
+
+  const hireDateCol = columns.find((c) =>
+    /(ngay_vao_lam|hire_date|start_date|joining_date|ngay_vao)/i.test(c.key) ||
+    /(ngay vao lam|ngay vao|ngay bat dau)/i.test(normalizeText(c.name))
+  ) || columns.find((c) => ['DATE', 'DATETIME'].includes(c.type));
+
+  if (isRecruitmentTenureAsked && hireDateCol) {
+    const deptCol = colProfile.dimensions.find((c) => /(phong|dept|bo_phan)/i.test(c.key)) ||
+      columns.find((c) => /(phong|dept|bo_phan)/i.test(c.key)) ||
+      { key: 'phong_ban', name: 'Phòng Ban' };
+    const empIdCol = colProfile.identifiers.find((c) => /(nhan_vien|nv|emp|id)/i.test(c.key)) ||
+      colProfile.identifiers[0] ||
+      { key: 'ma_nhan_vien', name: 'Mã Nhân Viên' };
+    const kpiCol = columns.find((c) => /kpi/i.test(c.key) || /kpi/i.test(c.name));
+    const salCol = columns.find((c) => /(luong.*co.*ban|luong|salary)/i.test(c.key));
+
+    const requirements = [];
+
+    // 1. Recruitment by Hire Year (REQ-01) - Trend Line Chart
+    requirements.push({
+      id: 'req_recruitment_by_year',
+      requirement_id: 'REQ-01',
+      original_user_request: 'Số lượng nhân viên theo năm vào làm',
+      title: 'Số lượng nhân viên theo năm vào làm',
+      type: 'TREND',
+      date_column: hireDateCol.key,
+      date_trunc: 'year',
+      groupBy: [{ column: hireDateCol.key, date_trunc: 'year' }],
+      column: empIdCol ? empIdCol.key : 'ma_nhan_vien',
+      metric: empIdCol ? empIdCol.key : 'ma_nhan_vien',
+      func: 'DISTINCT_COUNT',
+      alias: 'so_nhan_vien',
+      unit: 'nhân sự',
+      visualization_type: 'LINE',
+      status: 'AVAILABLE',
+      reason: null,
+      data_source_reference: hireDateCol.key,
+    });
+
+    // 2. Headcount by Tenure Band (REQ-02) - Bar Chart
+    requirements.push({
+      id: 'req_tenure_distribution',
+      requirement_id: 'REQ-02',
+      original_user_request: 'Số lượng nhân viên theo từng giai đoạn thâm niên',
+      title: 'Số lượng nhân viên theo giai đoạn thâm niên',
+      type: 'TENURE_DISTRIBUTION',
+      dimension: 'giai_doan_tham_nien',
+      date_column: hireDateCol.key,
+      column: empIdCol ? empIdCol.key : 'ma_nhan_vien',
+      metric: empIdCol ? empIdCol.key : 'ma_nhan_vien',
+      aggregation: 'COUNT',
+      unit: 'nhân sự',
+      visualization_type: 'BAR',
+      status: 'AVAILABLE',
+      reason: null,
+      data_source_reference: hireDateCol.key,
+    });
+
+    // 3. Average Tenure (REQ-03) - KPI Card
+    requirements.push({
+      id: 'req_avg_tenure',
+      requirement_id: 'REQ-03',
+      original_user_request: 'Thâm niên trung bình',
+      title: 'Thâm niên trung bình',
+      type: 'METRIC',
+      derived_metric: 'tham_nien_nam',
+      date_column: hireDateCol.key,
+      func: 'AVG',
+      aggregation: 'AVG',
+      column: 'tham_nien_nam',
+      metric: 'tham_nien_nam',
+      unit: 'năm',
+      visualization_type: 'KPI_CARD',
+      status: 'AVAILABLE',
+      reason: null,
+      data_source_reference: hireDateCol.key,
+    });
+
+    // 4. Department with Most Senior Staff (REQ-04) - KPI Card
+    requirements.push({
+      id: 'req_senior_department',
+      requirement_id: 'REQ-04',
+      original_user_request: 'Phòng ban có nhiều nhân viên lâu năm nhất',
+      title: 'Phòng ban có nhiều nhân viên lâu năm nhất',
+      type: 'METRIC',
+      dimension: deptCol ? deptCol.key : 'phong_ban',
+      date_column: hireDateCol.key,
+      tenure_threshold: 5,
+      unit: 'nhân sự',
+      visualization_type: 'KPI_CARD',
+      status: deptCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+      reason: deptCol ? null : 'Không tìm thấy cột phòng ban trong bộ dữ liệu.',
+      data_source_reference: deptCol ? deptCol.key : null,
+    });
+
+    // 5. Compare KPI: New vs Senior Employees (REQ-05) - Bar Chart
+    requirements.push({
+      id: 'req_kpi_comparison_new_senior',
+      requirement_id: 'REQ-05',
+      original_user_request: 'So sánh KPI giữa nhóm nhân viên mới và lâu năm',
+      title: 'So sánh KPI giữa nhóm nhân viên mới và lâu năm',
+      type: 'TENURE_KPI_COMPARISON',
+      dimension: 'nhom_nhan_vien',
+      date_column: hireDateCol.key,
+      kpi_column: kpiCol ? kpiCol.key : 'diem_kpi',
+      metric: kpiCol ? kpiCol.key : 'diem_kpi',
+      func: 'AVG',
+      unit: 'điểm',
+      visualization_type: 'BAR',
+      status: kpiCol ? 'AVAILABLE' : 'DATA_UNAVAILABLE',
+      reason: kpiCol ? null : 'Không tìm thấy cột điểm KPI trong bộ dữ liệu.',
+      data_source_reference: kpiCol ? kpiCol.key : null,
+    });
+
+    // 6. Workforce Composition Table by Tenure (REQ-06) - Data Table
+    requirements.push({
+      id: 'req_tenure_composition_table',
+      requirement_id: 'REQ-06',
+      original_user_request: 'Phân tích cơ cấu nhân sự theo thời gian làm việc',
+      title: 'Cơ cấu nhân sự theo thời gian làm việc',
+      type: 'TENURE_COMPOSITION_TABLE',
+      dimension: 'giai_doan_tham_nien',
+      date_column: hireDateCol.key,
+      kpi_column: kpiCol ? kpiCol.key : null,
+      salary_column: salCol ? salCol.key : null,
+      visualization_type: 'TABLE',
+      status: 'AVAILABLE',
+      reason: null,
+      data_source_reference: hireDateCol.key,
+    });
 
     return requirements;
   }
@@ -1267,12 +1422,18 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
 
   // CASE E: GENERIC MULTI-INTENT NUMBERED/BULLET DECOMPOSITION
   // Supports comma, semicolon, newline delimiters between numbered items (e.g. "1. A, 2. B, 3. C")
-  const numberedMatches = [...promptRaw.matchAll(/(?:^|\n|\s)(\d+)[.)]\s*(.+?)(?=\s*(?:[.,;]|\n)?\s*\d+[.)]|$)/gs)];
-  if (numberedMatches.length >= 2) {
+  // and bulleted items (e.g. "- A\n- B\n- C" or "* A\n* B")
+  let clauseMatches = [...promptRaw.matchAll(/(?:^|\n|\s)(\d+)[.)]\s*(.+?)(?=\s*(?:[.,;]|\n)?\s*\d+[.)]|$)/gs)];
+  let isBulletMatch = false;
+  if (clauseMatches.length < 2) {
+    clauseMatches = [...promptRaw.matchAll(/(?:^|\n)\s*[-*•]\s*(.+?)(?=\n\s*[-*•]|\n\n|$)/gs)];
+    isBulletMatch = true;
+  }
+  if (clauseMatches.length >= 2) {
     const genericReqs = [];
     let reqIndex = 1;
-    for (const match of numberedMatches) {
-      const clauseRaw = match[2].trim().replace(/[.,;]+$/, '');
+    for (const match of clauseMatches) {
+      const clauseRaw = (isBulletMatch ? match[1] : match[2]).trim().replace(/[.,;]+$/, '');
       const clauseNorm = normalizeText(clauseRaw);
 
       // Skip UI-only directives like "8. Hiển thị KPI Cards, Bar Chart..."
@@ -1560,7 +1721,7 @@ function planAnalyticalQuery(userPrompt, datasetProfile, conversationContext = {
       }
     }
     for (const r of compositeRequirements) {
-      if ((r.type === 'METRIC' || r.type === 'AGGREGATION' || r.type === 'GROUP_BY') && r.column && r.func) {
+      if ((r.type === 'METRIC' || r.type === 'AGGREGATION' || r.type === 'GROUP_BY') && r.column && r.func && columns.some(c => c.key === r.column)) {
         if (!aggregations.some(a => a.column === r.column && a.func === r.func)) {
           aggregations.push({
             column: r.column,
@@ -2782,9 +2943,17 @@ function validateMetricCoverage(prompt, plan) {
     missing.push('SUM(so_ngay_nghi)');
   }
 
+  const requirements = plan?.requirements || [];
+  const totalReqs = Array.isArray(requirements) ? requirements.length : 0;
+  const unavailableReqs = Array.isArray(requirements) ? requirements.filter((r) => r.status === 'DATA_UNAVAILABLE' || r.status === 'UNAVAILABLE_DATA') : [];
+  const resolvedReqs = totalReqs - unavailableReqs.length;
+
   return {
-    isComplete: missing.length === 0,
-    missing,
+    isComplete: missing.length === 0 && (totalReqs === 0 || unavailableReqs.length === 0),
+    total_requirements: totalReqs,
+    resolved_requirements: resolvedReqs,
+    unavailable_requirements: unavailableReqs.length,
+    missing: [...missing, ...unavailableReqs.map((r) => r.title)],
   };
 }
 

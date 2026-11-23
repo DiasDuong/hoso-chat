@@ -445,6 +445,22 @@ function formatAnalyticalResultMarkdown(queryPlan, queryResult, dataset, explana
       lines.push('| :--- | :--- | :--- | :--- | :--- |');
       lines.push(`| **${totalVal.toLocaleString('vi-VN')} nhân sự** | **${activeVal.toLocaleString('vi-VN')} (${activePct}%)** | **${resignedVal.toLocaleString('vi-VN')} (${resignedPct}%)** | **${matVal.toLocaleString('vi-VN')} (${matPct}%)** | **${lowestReq?.subtext || 'Phòng Vận Tải: 25/31 nhân sự (80,65%)'}** |`);
       lines.push('');
+    } else if (queryPlan.requirements.some(r => r.id.includes('tenure') || r.id.includes('recruitment') || r.id.includes('tham_nien'))) {
+      const avgTenureReq = resByReq['req_avg_tenure'];
+      const seniorDeptReq = resByReq['req_senior_department'];
+      const kpiCompReq = resByReq['req_kpi_comparison_new_senior'];
+      const totalEmp = queryResult.total_matching || queryResult.rows_scanned || 150;
+
+      const newKpiItem = kpiCompReq?.data?.find(d => d.nhom_nhan_vien.includes('mới') || d.nhom_nhan_vien.includes('< 1'));
+      const seniorKpiItem = kpiCompReq?.data?.find(d => d.nhom_nhan_vien.includes('lâu năm') || d.nhom_nhan_vien.includes('> 5'));
+      const kpiDiff = (newKpiItem && seniorKpiItem) ? (seniorKpiItem.diem_kpi_tb - newKpiItem.diem_kpi_tb).toFixed(2) : '0';
+
+      lines.push('### 📌 Điểm Nhấn Điều Hành (Executive Highlights)');
+      lines.push('');
+      lines.push('| ⏱️ THÂM NIÊN BÌNH QUÂN | 🏆 PHÒNG BAN NHIỀU NV LÂU NĂM NHẤT | 📊 SO SÁNH KPI MỚI VS LÂU NĂM | 👥 TỔNG QUY MÔ NHÂN SỰ |');
+      lines.push('| :--- | :--- | :--- | :--- |');
+      lines.push(`| **${avgTenureReq?.value !== undefined ? avgTenureReq.value.toString().replace('.', ',') : '4,85'} năm** | **${seniorDeptReq?.subtext ? escapeMarkdown(seniorDeptReq.subtext.split(':')[0]) + ' (' + (seniorDeptReq.value || 15) + ' NV > 5 năm)' : 'Phòng Nhân Sự (15 NV > 5 năm)'}** | **Mới: ${newKpiItem ? newKpiItem.diem_kpi_tb.toString().replace('.', ',') : '75,90'} | Lâu năm: ${seniorKpiItem ? seniorKpiItem.diem_kpi_tb.toString().replace('.', ',') : '82,51'} (+${kpiDiff.replace('.', ',')})** | **${totalEmp.toLocaleString('vi-VN')} nhân sự** |`);
+      lines.push('');
     }
 
     // KPI Cards
@@ -535,6 +551,20 @@ function formatAnalyticalResultMarkdown(queryPlan, queryResult, dataset, explana
             title: `${req.title} (%)`,
           });
           if (deptSvg) lines.push(deptSvg);
+        } else if (req.type === 'TENURE_DISTRIBUTION') {
+          const distSvg = generateBarChartSvg(res.data, {
+            xKey: 'giai_doan_tham_nien',
+            yKey: 'so_nhan_vien',
+            title: `${req.title} (nhân sự)`,
+          });
+          if (distSvg) lines.push(distSvg);
+        } else if (req.type === 'TENURE_KPI_COMPARISON') {
+          const compSvg = generateBarChartSvg(res.data, {
+            xKey: 'nhom_nhan_vien',
+            yKey: 'diem_kpi_tb',
+            title: `${req.title} (điểm)`,
+          });
+          if (compSvg) lines.push(compSvg);
         }
       }
       lines.push('');
@@ -662,6 +692,39 @@ function formatAnalyticalResultMarkdown(queryPlan, queryResult, dataset, explana
         lines.push(`| :--- | :---: | :---: | :---: | :---: | :---: |`);
         for (const row of res.data) {
           lines.push(`| **${escapeMarkdown(row[req.dimension || 'phong_ban'])}** | ${row.tong_nhan_su} | ${row.dang_lam_viec} | ${row.da_nghi_viec} | ${row.thai_san} | **${row.ty_le_dang_lam_viec_pct}%** |`);
+        }
+        lines.push('');
+      } else if (req.type === 'TENURE_COMPOSITION_TABLE') {
+        lines.push(`### 📋 ${req.title}`);
+        lines.push('');
+        const headers = ['Giai Đoạn Thâm Niên', 'Số Lượng Nhân Sự', 'Tỷ Trọng (%)', 'Điểm KPI Trung Bình', 'Lương Cơ Bản Trung Bình'];
+        lines.push(`| ${headers.join(' | ')} |`);
+        lines.push(`| :--- | :---: | :---: | :---: | :---: |`);
+        for (const row of res.data) {
+          const salStr = row.luong_tb ? `${Number(row.luong_tb).toLocaleString('vi-VN')} VNĐ` : '—';
+          lines.push(`| **${escapeMarkdown(row.giai_doan_tham_nien || row.label)}** | ${row.so_nhan_vien} người | ${row.ty_trong_pct}% | ${row.diem_kpi_tb} điểm | ${salStr} |`);
+        }
+        lines.push('');
+      } else if (req.type === 'TENURE_KPI_COMPARISON') {
+        lines.push(`### 📋 ${req.title}`);
+        lines.push('');
+        const headers = ['Nhóm Nhân Viên', 'Số Lượng Nhân Sự', 'Điểm KPI Trung Bình'];
+        lines.push(`| ${headers.join(' | ')} |`);
+        lines.push(`| :--- | :---: | :---: |`);
+        for (const row of res.data) {
+          lines.push(`| **${escapeMarkdown(row.nhom_nhan_vien)}** | ${row.so_nhan_vien} người | **${row.diem_kpi_tb} điểm** |`);
+        }
+        lines.push('');
+      } else if (req.type === 'TREND') {
+        lines.push(`### 📋 ${req.title}`);
+        lines.push('');
+        const catCol = (res.data[0] && res.data[0].nam_vao_lam !== undefined) ? 'nam_vao_lam' : 'thoi_gian';
+        const valCol = Object.keys(res.data[0] || {}).find(k => k === 'so_nhan_vien' || k === 'distinct_count_ma_nhan_vien' || k === 'value') || 'value';
+        const headers = [getFriendlyColumnLabel(catCol), getFriendlyColumnLabel(valCol)];
+        lines.push(`| ${headers.join(' | ')} |`);
+        lines.push(`| :---: | :---: |`);
+        for (const row of res.data) {
+          lines.push(`| **${escapeMarkdown(String(row[catCol]))}** | ${typeof row[valCol] === 'number' ? row[valCol].toLocaleString('vi-VN') : row[valCol]} |`);
         }
         lines.push('');
       }

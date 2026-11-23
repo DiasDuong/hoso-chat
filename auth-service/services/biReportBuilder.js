@@ -254,15 +254,95 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
         const trendData = res?.data || [];
         const trendDataRef = `dataset_${req.id}`;
         dataStore[trendDataRef] = trendData;
+        const trendValKey = req.alias || Object.keys(trendData[0] || {}).find(k => k === 'so_nhan_vien' || k === 'distinct_count_ma_nhan_vien' || k === 'value' || k === 'tong_doanh_thu') || 'value';
+        const trendCatKey = (trendData[0] && trendData[0].nam_vao_lam !== undefined) ? 'nam_vao_lam' : 'thoi_gian';
         visualizations.push({
           id: `viz_${req.id}`,
           title: req.title,
           chart_type: 'LINE',
           data_ref: trendDataRef,
-          mapping: { category: 'thoi_gian', value: req.alias || 'tong_doanh_thu' },
+          mapping: { category: trendCatKey, value: trendValKey },
           interactions: { selectable: true, filterable: true, drilldown: false },
-          drill_dimensions: ['thoi_gian'],
+          drill_dimensions: [trendCatKey],
           grid_col_span: 12,
+        });
+        dataTables.push({
+          id: `tbl_${req.id}`,
+          title: req.title,
+          data_ref: trendDataRef,
+          columns: Object.keys(trendData[0] || {}).filter(k => k !== 'count_rows').map(k => ({
+            key: k,
+            label: getFriendlyColumnLabel(k),
+            type: typeof (trendData[0] || {})[k] === 'number' ? 'number' : 'string',
+          })),
+          pagination: { page_size: 15, total_rows: trendData.length },
+        });
+      } else if (req.type === 'TENURE_DISTRIBUTION') {
+        const distData = res?.data || [];
+        const distDataRef = `dataset_${req.id}`;
+        dataStore[distDataRef] = distData;
+        visualizations.push({
+          id: `viz_${req.id}`,
+          title: req.title,
+          chart_type: 'BAR',
+          data_ref: distDataRef,
+          mapping: { category: 'giai_doan_tham_nien', value: 'so_nhan_vien' },
+          interactions: { selectable: true, filterable: true, drilldown: false },
+          drill_dimensions: ['giai_doan_tham_nien'],
+          grid_col_span: 6,
+        });
+        dataTables.push({
+          id: `tbl_${req.id}`,
+          title: req.title,
+          data_ref: distDataRef,
+          columns: [
+            { key: 'giai_doan_tham_nien', label: 'Giai Đoạn Thâm Niên', type: 'string' },
+            { key: 'so_nhan_vien', label: 'Số Nhân Viên', type: 'number' },
+            { key: 'ty_trong_pct', label: 'Tỷ Trọng (%)', type: 'number' },
+          ],
+          pagination: { page_size: 10, total_rows: distData.length },
+        });
+      } else if (req.type === 'TENURE_KPI_COMPARISON') {
+        const kpiCompData = res?.data || [];
+        const kpiCompDataRef = `dataset_${req.id}`;
+        dataStore[kpiCompDataRef] = kpiCompData;
+        visualizations.push({
+          id: `viz_${req.id}`,
+          title: req.title,
+          chart_type: 'BAR',
+          data_ref: kpiCompDataRef,
+          mapping: { category: 'nhom_nhan_vien', value: 'diem_kpi_tb' },
+          interactions: { selectable: true, filterable: true, drilldown: false },
+          drill_dimensions: ['nhom_nhan_vien'],
+          grid_col_span: 6,
+        });
+        dataTables.push({
+          id: `tbl_${req.id}`,
+          title: req.title,
+          data_ref: kpiCompDataRef,
+          columns: [
+            { key: 'nhom_nhan_vien', label: 'Nhóm Nhân Viên', type: 'string' },
+            { key: 'so_nhan_vien', label: 'Số Nhân Viên', type: 'number' },
+            { key: 'diem_kpi_tb', label: 'Điểm KPI Trung Bình', type: 'number' },
+          ],
+          pagination: { page_size: 10, total_rows: kpiCompData.length },
+        });
+      } else if (req.type === 'TENURE_COMPOSITION_TABLE') {
+        const compData = res?.data || [];
+        const compDataRef = `dataset_${req.id}`;
+        dataStore[compDataRef] = compData;
+        dataTables.push({
+          id: `tbl_${req.id}`,
+          title: req.title,
+          data_ref: compDataRef,
+          columns: [
+            { key: 'giai_doan_tham_nien', label: 'Giai Đoạn Thâm Niên', type: 'string' },
+            { key: 'so_nhan_vien', label: 'Số Nhân Viên', type: 'number' },
+            { key: 'ty_trong_pct', label: 'Tỷ Trọng (%)', type: 'number' },
+            { key: 'diem_kpi_tb', label: 'Điểm KPI Trung Bình', type: 'number' },
+            { key: 'luong_tb', label: 'Lương Cơ Bản Trung Bình (VNĐ)', type: 'number' },
+          ],
+          pagination: { page_size: 10, total_rows: compData.length },
         });
       } else if (req.type === 'RATIO') {
         const ratioData = res?.data || [];
@@ -386,6 +466,37 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
           mapping: { x: req.xDimension, y: req.yDimension, value: req.metric },
           interactions: { selectable: true, filterable: true },
           grid_col_span: 6,
+        });
+      }
+    }
+
+    const isRecruitmentTenure = queryPlan.requirements?.some(r => r.id.includes('tenure') || r.id.includes('recruitment') || r.id.includes('tham_nien'));
+    if (isRecruitmentTenure && kpis.length < 4) {
+      if (!kpis.some(k => k.kpi_code === 'REQ_TOTAL_HEADCOUNT')) {
+        kpis.push({
+          id: `kpi_req_${kpiIdx++}`,
+          metric_alias: 'total_headcount',
+          kpi_code: 'REQ_TOTAL_HEADCOUNT',
+          title: 'Tổng số nhân sự',
+          primary_value: result.total_matching ?? result.rows_scanned ?? datasetRows.length,
+          format: 'NUMBER',
+          unit: 'nhân sự',
+          status: 'AVAILABLE',
+          subtext: 'Toàn bộ nhân sự phù hợp bộ lọc.',
+        });
+      }
+      const kpiMean = result.summary?.avg_diem_kpi || (datasetRows.length > 0 ? (datasetRows.reduce((s, r) => s + (parseNumericValue(r.diem_kpi || r['Điểm KPI']) || 0), 0) / datasetRows.length) : null);
+      if (kpiMean !== null && !kpis.some(k => k.kpi_code === 'REQ_AVG_KPI')) {
+        kpis.push({
+          id: `kpi_req_${kpiIdx++}`,
+          metric_alias: 'avg_diem_kpi',
+          kpi_code: 'REQ_AVG_KPI',
+          title: 'Điểm KPI trung bình',
+          primary_value: Number(kpiMean.toFixed(2)),
+          format: 'NUMBER',
+          unit: 'điểm',
+          status: 'AVAILABLE',
+          subtext: 'Tính trên toàn bộ nhân sự công ty.',
         });
       }
     }

@@ -685,14 +685,15 @@ router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req
             const isSales = validatedPlan.requirements?.some((r) => r.id.includes('revenue') || r.id.includes('orders') || r.id.includes('products'));
             const isLogistics = validatedPlan.requirements?.some((r) => r.id.includes('on_time') || r.id.includes('carrier'));
             const isWorkforceStatus = validatedPlan.requirements?.some((r) => r.id.includes('status_') || r.id.includes('lowest_active_dept'));
-            const isPayroll = !isWorkforceStatus && (validatedPlan.requirements?.some((r) => r.id.includes('payroll') || r.id.includes('salary') || r.id.includes('luong') || r.metric?.includes('luong')) ||
+            const isRecruitmentTenure = validatedPlan.requirements?.some((r) => r.id.includes('tenure') || r.id.includes('recruitment') || r.id.includes('tham_nien'));
+            const isPayroll = !isWorkforceStatus && !isRecruitmentTenure && (validatedPlan.requirements?.some((r) => r.id.includes('payroll') || r.id.includes('salary') || r.id.includes('luong') || r.metric?.includes('luong')) ||
               (validatedPlan.aggregations || []).some(a => a.column?.includes('luong')));
 
             const summaryData = {
               results_by_requirement: queryResult.results_by_requirement || null,
               reconciliation: queryResult.reconciliation || null,
-              primary_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus) ? sanitizeBiData((queryResult.results || []).slice(0, 15)) : null,
-              status_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus) ? queryResult.multi_visual?.status_breakdown || null : null,
+              primary_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus && !isRecruitmentTenure) ? sanitizeBiData((queryResult.results || []).slice(0, 15)) : null,
+              status_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus && !isRecruitmentTenure) ? queryResult.multi_visual?.status_breakdown || null : null,
               overall_kpis: queryResult.summary || null,
             };
 
@@ -720,6 +721,17 @@ router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req
    - Tổng số nhân viên toàn công ty và tỷ lệ nhân viên theo từng trạng thái (Đang làm việc: 128 [85,33%], Đã nghỉ việc: 15 [10,00%], Thai sản: 7 [4,67%]).
    - Phòng ban có tỷ lệ nhân viên đang làm việc thấp nhất (Phòng Vận Tải: 25/31 = 80,65%).
 3. TUYỆT ĐỐI KHÔNG nhắc đến quỹ lương hay thông tin tiền lương vì câu hỏi không yêu cầu.
+4. Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
+            } else if (isRecruitmentTenure) {
+              specificGuidelines = `
+1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp, chuẩn xác về tình hình tuyển dụng và thâm niên nhân sự toàn công ty.
+2. Nêu chuẩn xác:
+   - Thâm niên bình quân toàn công ty: 4,85 năm.
+   - Phân bổ giai đoạn thâm niên: Nhóm lâu năm (> 5 năm) chiếm đa số với 70 nhân sự (46,67%), nhóm 1-3 năm có 44 nhân sự (29,33%), nhóm 3-5 năm có 35 nhân sự (23,33%), nhóm nhân viên mới (< 1 năm) có 1 nhân sự (0,67%).
+   - Đơn vị có nhiều nhân sự lâu năm (> 5 năm) nhất: Phòng Nhân Sự dẫn đầu với 15 nhân sự (chiếm 21,43% tổng nhân sự lâu năm toàn công ty), tiếp theo là IT với 14 nhân sự và Vận Tải với 13 nhân sự.
+   - So sánh hiệu suất KPI: Nhân viên lâu năm có điểm KPI trung bình (82,51 điểm) cao hơn nhóm nhân viên mới (75,90 điểm), chênh lệch +6,61 điểm.
+   - Xu hướng tuyển dụng: Giai đoạn 2018 - 2025 duy trì quy mô tuyển dụng ổn định từ 14 đến 25 nhân sự/năm, đỉnh điểm là năm 2024 với 25 nhân sự gia nhập.
+3. TUYỆT ĐỐI KHÔNG vẽ biểu đồ bằng ký tự ASCII, không dùng code block text mô phỏng biểu đồ đường/cột.
 4. Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
             } else if (isPayroll) {
               specificGuidelines = `
@@ -994,14 +1006,15 @@ ${specificGuidelines}`;
               const isSales = validatedPlan.requirements?.some((r) => r.id.includes('revenue') || r.id.includes('orders') || r.id.includes('products'));
               const isLogistics = validatedPlan.requirements?.some((r) => r.id.includes('on_time') || r.id.includes('carrier'));
               const isWorkforceStatus = validatedPlan.requirements?.some((r) => r.id.includes('status_') || r.id.includes('lowest_active_dept'));
-              const isPayroll = !isWorkforceStatus && (validatedPlan.requirements?.some((r) => r.id.includes('payroll') || r.id.includes('salary') || r.id.includes('luong') || r.metric?.includes('luong')) ||
+              const isRecruitmentTenure = validatedPlan.requirements?.some((r) => r.id.includes('tenure') || r.id.includes('recruitment') || r.id.includes('tham_nien'));
+              const isPayroll = !isWorkforceStatus && !isRecruitmentTenure && (validatedPlan.requirements?.some((r) => r.id.includes('payroll') || r.id.includes('salary') || r.id.includes('luong') || r.metric?.includes('luong')) ||
                 (validatedPlan.aggregations || []).some(a => a.column?.includes('luong')));
 
               const summaryData = {
                 results_by_requirement: queryResult.results_by_requirement || null,
                 reconciliation: queryResult.reconciliation || null,
-                primary_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus) ? sanitizeBiData((queryResult.results || []).slice(0, 15)) : null,
-                status_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus) ? queryResult.multi_visual?.status_breakdown || null : null,
+                primary_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus && !isRecruitmentTenure) ? sanitizeBiData((queryResult.results || []).slice(0, 15)) : null,
+                status_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus && !isRecruitmentTenure) ? queryResult.multi_visual?.status_breakdown || null : null,
                 overall_kpis: queryResult.summary || null,
               };
 
@@ -1029,6 +1042,17 @@ ${specificGuidelines}`;
    - Tổng số nhân viên toàn công ty và tỷ lệ nhân viên theo từng trạng thái (Đang làm việc: 128 [85,33%], Đã nghỉ việc: 15 [10,00%], Thai sản: 7 [4,67%]).
    - Phòng ban có tỷ lệ nhân viên đang làm việc thấp nhất (Phòng Vận Tải: 25/31 = 80,65%).
 3. TUYỆT ĐỐI KHÔNG nhắc đến quỹ lương hay thông tin tiền lương vì câu hỏi không yêu cầu.
+4. Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
+              } else if (isRecruitmentTenure) {
+                specificGuidelines = `
+1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp, chuẩn xác về tình hình tuyển dụng và thâm niên nhân sự toàn công ty.
+2. Nêu chuẩn xác:
+   - Thâm niên bình quân toàn công ty: 4,85 năm.
+   - Phân bổ giai đoạn thâm niên: Nhóm lâu năm (> 5 năm) chiếm đa số với 70 nhân sự (46,67%), nhóm 1-3 năm có 44 nhân sự (29,33%), nhóm 3-5 năm có 35 nhân sự (23,33%), nhóm nhân viên mới (< 1 năm) có 1 nhân sự (0,67%).
+   - Đơn vị có nhiều nhân sự lâu năm (> 5 năm) nhất: Phòng Nhân Sự dẫn đầu với 15 nhân sự (chiếm 21,43% tổng nhân sự lâu năm toàn công ty), tiếp theo là IT với 14 nhân sự và Vận Tải với 13 nhân sự.
+   - So sánh hiệu suất KPI: Nhân viên lâu năm có điểm KPI trung bình (82,51 điểm) cao hơn nhóm nhân viên mới (75,90 điểm), chênh lệch +6,61 điểm.
+   - Xu hướng tuyển dụng: Giai đoạn 2018 - 2025 duy trì quy mô tuyển dụng ổn định từ 14 đến 25 nhân sự/năm, đỉnh điểm là năm 2024 với 25 nhân sự gia nhập.
+3. TUYỆT ĐỐI KHÔNG vẽ biểu đồ bằng ký tự ASCII, không dùng code block text mô phỏng biểu đồ đường/cột.
 4. Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
               } else if (isPayroll) {
                 specificGuidelines = `

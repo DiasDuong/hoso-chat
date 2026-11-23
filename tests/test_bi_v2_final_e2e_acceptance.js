@@ -468,6 +468,57 @@ Sử dụng KPI Cards, Bar Chart, Pie Chart và bảng xếp hạng.`;
   check('TASK-5', 'GENERIC-MIXED-COMPOSITE', 'Câu hỏi viết tắt tiếng Anh + tiếng Việt nhận diện COMPOSITE', planMixed.intent === 'COMPOSITE');
   check('TASK-5', 'GENERIC-MIXED-REQS', `Câu hỏi hỗn hợp bóc tách được ${planMixed.requirements.length} yêu cầu`, planMixed.requirements.length >= 3);
 
+  // Test 5E: Recruitment & Tenure Domain (Benchmark Conversation 2e84fd1c-1883-4b85-ae28-9762baf62f4f)
+  const promptTenure = `Hãy tạo báo cáo BI về tình hình tuyển dụng và thâm niên nhân viên.
+
+Yêu cầu:
+- Số lượng nhân viên theo năm vào làm.
+- Số lượng nhân viên theo từng giai đoạn thâm niên.
+- Thâm niên trung bình.
+- Phòng ban có nhiều nhân viên lâu năm nhất.
+- So sánh KPI giữa nhóm nhân viên mới và lâu năm.
+- Phân tích cơ cấu nhân sự theo thời gian làm việc.
+Sử dụng Line Chart, Bar Chart và bảng thống kê.`;
+  const planTenure = planAnalyticalQuery(promptTenure, uploadedDataset.profile);
+  check('TASK-5', 'TENURE-COMPOSITE-INTENT', 'Domain Tuyển dụng & Thâm niên nhận diện intent COMPOSITE', planTenure.intent === 'COMPOSITE');
+  check('TASK-5', 'TENURE-ALL-6-REQS', `Bóc tách đủ 6 yêu cầu nghiệp vụ thâm niên (thực tế: ${planTenure.requirements?.length})`, planTenure.requirements?.length === 6);
+
+  let tenureDataset = null;
+  const tenureDatasetPath = path.resolve(__dirname, '../auth-service/storage/bi_datasets', `${fileId}.dataset.json`);
+  if (fs.existsSync(tenureDatasetPath)) {
+    tenureDataset = JSON.parse(fs.readFileSync(tenureDatasetPath, 'utf8'));
+  } else {
+    const { datasetJsonPath } = await processAndProfileDataset({
+      file_id: 'tenure_suite_file',
+      original_filename: 'BAO_CAO_DEMO_SOLIEU.xlsx',
+      file_extension: '.xlsx',
+      uploaded_by: authUser.user_id,
+      company_id: 'ALL',
+    }, excelBuffer);
+    tenureDataset = JSON.parse(fs.readFileSync(datasetJsonPath, 'utf8'));
+  }
+  tenureDataset.uploaded_by = authUser.user_id;
+  tenureDataset.company_id = 'ALL';
+
+  const valTenure = validateQueryPlan(planTenure, tenureDataset, authUser);
+  check('TASK-5', 'TENURE-CONTRACT-COMPLETE', 'Hợp đồng v2.0: metric_coverage.isComplete = true', valTenure.metric_coverage.isComplete === true);
+  check('TASK-5', 'TENURE-CONTRACT-6-RESOLVED', 'Hợp đồng v2.0: 6/6 yêu cầu được phân giải (resolved_requirements = 6)', valTenure.metric_coverage.resolved_requirements === 6);
+
+  const execTenure = executeAnalyticalQuery(tenureDataset, valTenure);
+  const avgTenureVal = execTenure.results_by_requirement['req_avg_tenure']?.value;
+  check('TASK-5', 'TENURE-AVG-VALUE', `Thâm niên trung bình chính xác = 4.85 năm (Thực tế: ${avgTenureVal})`, avgTenureVal === 4.85);
+
+  const seniorDeptVal = execTenure.results_by_requirement['req_senior_department']?.value;
+  check('TASK-5', 'TENURE-SENIOR-DEPT', `Phòng ban nhiều NV lâu năm nhất = 15 nhân sự (Thực tế: ${seniorDeptVal})`, seniorDeptVal === 15);
+
+  const tenureDistList = execTenure.results_by_requirement['req_tenure_distribution']?.data || [];
+  const tenureDistTotal = tenureDistList.reduce((s, b) => s + b.so_nhan_vien, 0);
+  check('TASK-5', 'TENURE-DIST-TOTAL-150', `Tổng số nhân viên phân bổ thâm niên (4 khoảng) = đúng 150 nhân viên (Thực tế: ${tenureDistTotal})`, tenureDistTotal === 150);
+
+  const hiresByYearList = execTenure.results_by_requirement['req_recruitment_by_year']?.data || [];
+  const hiresTotal = hiresByYearList.reduce((s, y) => s + y.so_nhan_vien, 0);
+  check('TASK-5', 'TENURE-HIRES-TOTAL-150', `Tổng số nhân viên tuyển dụng theo năm (8 năm) = đúng 150 nhân viên (Thực tế: ${hiresTotal})`, hiresTotal === 150);
+
   // ============================================================================
   // TASK 6: DATA QUALITY, BOUNDARIES, SCALE & PROFILING
   // ============================================================================
