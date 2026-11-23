@@ -748,11 +748,28 @@ function formatAnalyticalResultMarkdown(queryPlan, queryResult, dataset, explana
           lines.push(`| ${colKeys.map(k => escapeMarkdown(String(row[k] ?? '—'))).join(' | ')} |`);
         }
         lines.push('');
+      } else if (req.type === 'PIVOT') {
+        lines.push(`### 📋 ${req.title}`);
+        lines.push('');
+        const colKeys = res.columns || (res.data[0] ? Object.keys(res.data[0]) : []);
+        const headers = colKeys.map(k => getFriendlyColumnLabel(k));
+        lines.push(`| ${headers.join(' | ')} |`);
+        lines.push(`| ${headers.map(() => ':---:').join(' | ')} |`);
+        for (const row of res.data.slice(0, 15)) {
+          lines.push(`| ${colKeys.map(k => escapeMarkdown(String(typeof row[k] === 'number' ? row[k].toLocaleString('vi-VN') : (row[k] ?? '—')))).join(' | ')} |`);
+        }
+        lines.push('');
+      } else if (req.type === 'CORRELATION') {
+        lines.push(`### 📊 ${req.title}`);
+        lines.push('');
+        lines.push(`- **Hệ số tương quan (Pearson r):** **${res.value}**`);
+        lines.push(`- **Mô tả:** ${res.subtext || `Phân tích tương quan giữa ${res.column_x} và ${res.column_y}`}`);
+        lines.push('');
       }
     }
 
     // Missing requirements reporting (if any)
-    const missingReqs = queryPlan.requirements.filter((r) => r.status === 'DATA_UNAVAILABLE' || resByReq[r.id]?.status === 'DATA_UNAVAILABLE');
+    const missingReqs = queryPlan.requirements.filter((r) => r.status === 'DATA_UNAVAILABLE' || r.status === 'UNAVAILABLE_DATA' || resByReq[r.id]?.status === 'DATA_UNAVAILABLE' || resByReq[r.id]?.status === 'UNAVAILABLE_DATA');
     if (missingReqs.length > 0) {
       lines.push('### ⚠️ Chỉ Tiêu Chưa Thể Tính Toán (Thiếu Dữ Liệu)');
       for (const m of missingReqs) {

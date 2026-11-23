@@ -1092,11 +1092,13 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
   if (Array.isArray(querySpec.requirements) && querySpec.requirements.length > 0) {
     resultsByRequirement = {};
     for (const req of querySpec.requirements) {
-      if (req.status === 'DATA_UNAVAILABLE') {
+      if (req.status === 'DATA_UNAVAILABLE' || req.status === 'UNAVAILABLE_DATA') {
         resultsByRequirement[req.id] = {
           id: req.id,
+          requirement_id: req.requirement_id || req.id,
           title: req.title,
-          status: 'DATA_UNAVAILABLE',
+          type: req.type || 'METRIC',
+          status: 'UNAVAILABLE_DATA',
           reason: req.reason || 'Dữ liệu không khả dụng trong bộ dữ liệu này.',
         };
         continue;
@@ -1246,6 +1248,20 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
             else if (func === 'AVG') metricVal = Number((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2));
             else if (func === 'MIN') metricVal = Math.min(...nums);
             else if (func === 'MAX') metricVal = Math.max(...nums);
+            else if (func === 'MEDIAN') {
+              const sorted = [...nums].sort((a, b) => a - b);
+              const mid = Math.floor(sorted.length / 2);
+              metricVal = sorted.length % 2 !== 0 ? sorted[mid] : Number(((sorted[mid - 1] + sorted[mid]) / 2).toFixed(2));
+            } else if (func === 'PERCENTILE' || func.startsWith('P')) {
+              const p = req.percentile || 90;
+              const sorted = [...nums].sort((a, b) => a - b);
+              const idx = Math.min(sorted.length - 1, Math.max(0, Math.floor((p / 100) * sorted.length)));
+              metricVal = sorted[idx];
+            } else if (func === 'STDDEV') {
+              const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
+              const variance = nums.reduce((acc, v) => acc + Math.pow(v - avg, 2), 0) / (nums.length > 1 ? nums.length - 1 : 1);
+              metricVal = Number(Math.sqrt(variance).toFixed(2));
+            }
           }
         }
 
@@ -1939,6 +1955,69 @@ function executeAnalyticalQuery(dataset, querySpec = {}) {
           title: req.title,
           type: 'TABLE',
           data: tableRows,
+          status: 'AVAILABLE',
+        };
+      } else if (req.type === 'CORRELATION') {
+        const colX = req.column_x || req.column;
+        const colY = req.column_y || req.target_measure || req.secondary_column;
+        const pairs = targetRows
+          .map((r) => ({ x: parseNumericValue(r[colX]), y: parseNumericValue(r[colY]) }))
+          .filter((p) => p.x !== null && p.y !== null);
+        let rVal = 0;
+        if (pairs.length > 1) {
+          const meanX = pairs.reduce((a, p) => a + p.x, 0) / pairs.length;
+          const meanY = pairs.reduce((a, p) => a + p.y, 0) / pairs.length;
+          const num = pairs.reduce((acc, p) => acc + (p.x - meanX) * (p.y - meanY), 0);
+          const denX = Math.sqrt(pairs.reduce((acc, p) => acc + Math.pow(p.x - meanX, 2), 0));
+          const denY = Math.sqrt(pairs.reduce((acc, p) => acc + Math.pow(p.y - meanY, 2), 0));
+          rVal = (denX > 0 && denY > 0) ? Number((num / (denX * denY)).toFixed(4)) : 0;
+        }
+        resultsByRequirement[req.id] = {
+          id: req.id,
+          requirement_id: req.requirement_id || req.id,
+          title: req.title,
+          type: 'CORRELATION',
+          value: rVal,
+          column_x: colX,
+          column_y: colY,
+          sample_size: pairs.length,
+          status: 'AVAILABLE',
+          subtext: `Hệ số tương quan Pearson r = ${rVal} (trên ${pairs.length} mẫu dữ liệu)`,
+        };
+      } else if (req.type === 'PIVOT') {
+        const rowDim = req.row_dimension || req.dimension || 'phong_ban';
+        const colDim = req.col_dimension || req.secondary_dimension || 'chuc_vu';
+        const measureCol = req.column || req.metric || 'value';
+        const func = String(req.func || 'SUM').toUpperCase();
+
+        const rowValues = Array.from(new Set(targetRows.map((r) => String(r[rowDim] || 'Khác').trim()))).sort();
+        const colValues = Array.from(new Set(targetRows.map((r) => String(r[colDim] || 'Khác').trim()))).sort();
+
+        const pivotData = rowValues.map((rVal) => {
+          const rowObj = { [rowDim]: rVal };
+          for (const cVal of colValues) {
+            const cellRows = targetRows.filter((r) => String(r[rowDim] || 'Khác').trim() === rVal && String(r[colDim] || 'Khác').trim() === cVal);
+            let val = 0;
+            if (func === 'COUNT') {
+              val = cellRows.length;
+            } else {
+              const nums = cellRows.map((r) => parseNumericValue(r[measureCol])).filter((n) => n !== null);
+              val = nums.length > 0 ? (func === 'AVG' ? Number((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2)) : Number(nums.reduce((a, b) => a + b, 0).toFixed(2))) : 0;
+            }
+            rowObj[cVal] = val;
+          }
+          return rowObj;
+        });
+
+        resultsByRequirement[req.id] = {
+          id: req.id,
+          requirement_id: req.requirement_id || req.id,
+          title: req.title,
+          type: 'PIVOT',
+          row_dimension: rowDim,
+          col_dimension: colDim,
+          data: pivotData,
+          columns: [rowDim, ...colValues],
           status: 'AVAILABLE',
         };
       }

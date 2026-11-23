@@ -585,6 +585,110 @@ function callGeminiStream(contents, systemInstruction, onChunk, signal, options 
   });
 }
 
+/**
+ * Dynamic Evidence-Grounded Executive Insight Prompt Builder
+ * Strictly zero hallucinated numbers, zero hardcoded constants, zero ASCII charts.
+ * Synthesizes real computed metrics and breakdowns from queryResult.results_by_requirement.
+ */
+function buildExecutiveInsightGuidelines(validatedPlan, queryResult) {
+  const reqs = validatedPlan?.requirements || [];
+  const resultsByReq = queryResult?.results_by_requirement || {};
+
+  const isTraining = reqs.some((r) => r.id.includes('dao_tao') || r.id.includes('completed') || r.id.includes('courses'));
+  const isSales = reqs.some((r) => r.id.includes('revenue') || r.id.includes('orders') || r.id.includes('products'));
+  const isLogistics = reqs.some((r) => r.id.includes('on_time') || r.id.includes('carrier'));
+  const isWorkforceStatus = reqs.some((r) => r.id.includes('status_') || r.id.includes('lowest_active_dept'));
+  const isRecruitmentTenure = reqs.some((r) => r.id.includes('tenure') || r.id.includes('recruitment') || r.id.includes('tham_nien'));
+  const isPayroll = !isWorkforceStatus && !isRecruitmentTenure && (reqs.some((r) => r.id.includes('payroll') || r.id.includes('salary') || r.id.includes('luong') || r.metric?.includes('luong')) ||
+    (validatedPlan?.aggregations || []).some(a => a.column?.includes('luong')));
+
+  // Extract dynamic evidence lines directly from computed results
+  const evidenceItems = [];
+  for (const [reqId, res] of Object.entries(resultsByReq)) {
+    if (!res || res.status === 'UNAVAILABLE_DATA' || res.status === 'DATA_UNAVAILABLE') {
+      evidenceItems.push(`- ${res?.title || reqId}: Dữ liệu không có trong tệp.`);
+      continue;
+    }
+    if (res.type === 'METRIC' || res.type === 'RATIO' || res.type === 'EFFICIENCY' || res.type === 'DELTA' || res.type === 'GROWTH_RATE' || res.type === 'COMPLETION_RATE' || res.type === 'ON_TIME_RATE') {
+      const valStr = typeof res.value === 'number' ? res.value.toLocaleString('vi-VN') : String(res.value ?? '');
+      evidenceItems.push(`- ${res.title}: ${valStr} ${res.unit || ''} ${res.subtext ? `(${res.subtext})` : ''}`.trim());
+    } else if (res.type === 'GROUP_BY' && Array.isArray(res.data) && res.data.length > 0) {
+      const topItem = res.data[0];
+      const dimKey = res.dimension || Object.keys(topItem)[0];
+      const metricKey = res.metric_alias || Object.keys(topItem).find(k => typeof topItem[k] === 'number');
+      const topValStr = metricKey && typeof topItem[metricKey] === 'number' ? topItem[metricKey].toLocaleString('vi-VN') : '';
+      evidenceItems.push(`- ${res.title}: Có ${res.data.length} nhóm. Nhóm dẫn đầu là "${topItem[dimKey]}" đạt ${topValStr} ${res.unit || ''}.`);
+    } else if (res.type === 'DISTRIBUTION' && Array.isArray(res.data) && res.data.length > 0) {
+      const bandSummaries = res.data.map(b => `${b.label || b.nhom_muc_luong}: ${b.so_nhan_vien ?? b.count_rows ?? 0} (${b.ty_trong_pct ?? 0}%)`).join('; ');
+      evidenceItems.push(`- ${res.title}: ${bandSummaries}.`);
+    } else if (res.type === 'RANKING' && Array.isArray(res.data) && res.data.length > 0) {
+      const no1 = res.data[0];
+      const idOrName = no1.ho_ten || no1.ma_nhan_vien || no1.ma_thiet_bi || no1.ten_san_pham || 'vị trí #1';
+      evidenceItems.push(`- ${res.title}: Xếp hạng #1 là ${idOrName}.`);
+    }
+  }
+
+  const evidenceText = evidenceItems.length > 0 ? evidenceItems.join('\n') : 'Xem chi tiết số liệu trong kết quả tính toán.';
+
+  let domainInstructions = '';
+  if (isPayroll) {
+    domainInstructions = `
+1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp và súc tích về phân tích quỹ lương nhân sự theo đúng các chỉ tiêu đã xác thực.
+2. Nêu chuẩn xác:
+   - Tổng quỹ lương cơ bản và mức lương cơ bản bình quân.
+   - Mức lương cá nhân cao nhất và mức lương cá nhân thấp nhất (tuyệt đối trích xuất từ chỉ tiêu MAX/MIN cá nhân, KHÔNG được nhầm với trung bình phòng ban).
+   - Phòng ban có tổng quỹ lương lớn nhất và chức vụ có mức lương bình quân cao nhất.
+   - Nhóm mức lương chiếm đa số nhân sự.
+3. QUY TẮC AN TOÀN VÀ ĐỒNG BỘ TUYỆT ĐỐI:
+   - TUYỆT ĐỐI KHÔNG diễn giải mức lương trung bình của phòng ban thành mức lương cao nhất/thấp nhất của cá nhân nhân viên.
+   - TUYỆT ĐỐI KHÔNG nhắc đến điểm KPI, trạng thái làm việc hay bất kỳ chỉ tiêu nào không được hỏi.
+   - Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
+  } else if (isRecruitmentTenure) {
+    domainInstructions = `
+1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp, chuẩn xác về tình hình tuyển dụng và thâm niên nhân sự toàn công ty.
+2. Bám sát chính xác các số liệu đã tính toán: thâm niên bình quân, phân bổ theo các giai đoạn thâm niên, phòng ban có nhiều nhân sự lâu năm nhất, so sánh KPI và xu hướng tuyển dụng.
+3. TUYỆT ĐỐI KHÔNG tự bịa số liệu, KHÔNG vẽ biểu đồ bằng ký tự ASCII, không dùng code block text mô phỏng biểu đồ đường/cột.
+4. Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
+  } else if (isWorkforceStatus) {
+    domainInstructions = `
+1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp và súc tích về tình trạng nhân sự toàn công ty.
+2. Nêu chuẩn xác: Tổng số nhân viên và tỷ lệ theo từng trạng thái, phòng ban có tỷ lệ đang làm việc thấp nhất.
+3. TUYỆT ĐỐI KHÔNG nhắc đến quỹ lương hay thông tin tiền lương vì câu hỏi không yêu cầu.
+4. Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
+  } else if (isTraining) {
+    domainInstructions = `
+1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp về đào tạo nhân sự.
+2. Trình bày tổng số lượt hoàn thành, số khóa bình quân mỗi người, phòng ban dẫn đầu và tỷ lệ nhân sự chưa tham gia khóa nào theo số liệu thực tế đã tính.
+3. PHÂN TÍCH TƯƠNG QUAN: Nhận xét khách quan theo dữ liệu, nêu rõ điểm KPI giữa các nhóm và giải thích việc hoàn thành khóa học phản ánh tinh thần học tập nâng cao năng lực.
+4. Tuyệt đối KHÔNG nhắc đến quỹ lương hay trạng thái nhân sự vì câu hỏi người dùng không yêu cầu.`;
+  } else if (isSales) {
+    domainInstructions = `
+1. Nêu tổng doanh thu và số lượng đơn hàng phân biệt (không nhầm lẫn giữa số dòng và số đơn hàng).
+2. Nhận xét về xu hướng doanh thu và sản phẩm/khách hàng dẫn đầu theo đúng số liệu tính toán.
+3. Tuyệt đối KHÔNG tự ý chèn dữ liệu nhân sự hay lương.`;
+  } else if (isLogistics) {
+    domainInstructions = `
+1. Phân tích tỷ lệ giao đúng hạn của các đơn vị vận chuyển theo số liệu thực tế.
+2. Nêu rõ mẫu số chỉ tính trên các đơn đã hoàn tất giao hàng (loại trừ đơn chưa giao).
+3. Tuyệt đối KHÔNG tự ý chèn dữ liệu nhân sự hay lương.`;
+  } else {
+    domainInstructions = `
+1. Viết 2-3 câu nhận xét điều hành ngắn gọn, trực diện và chuẩn xác theo đúng các chỉ tiêu người dùng hỏi.
+2. Bám sát 100% các kết quả đã được xác thực trong results_by_requirement hoặc bảng tổng hợp.
+3. TUYỆT ĐỐI KHÔNG diễn giải giá trị trung bình nhóm thành cực trị cá nhân.
+4. TUYỆT ĐỐI KHÔNG tự ý chèn các chỉ tiêu ngoài phạm vi yêu cầu.
+5. TUYỆT ĐỐI KHÔNG vẽ biểu đồ bằng ký tự ASCII, không dùng code block text mô phỏng biểu đồ đường/cột.`;
+  }
+
+  return `
+--- KẾT QUẢ TÍNH TOÁN THỰC TẾ ĐÃ XÁC THỰC (EVIDENCE): ---
+${evidenceText}
+
+--- CHỈ THỊ BIÊN SOẠN NHẬN XÉT: ---
+${domainInstructions}
+`;
+}
+
 // POST /api/general/chat
 router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req, res) => {
   const userMessage = (req.body.message || '').trim().normalize('NFC');
@@ -681,83 +785,15 @@ router.post('/chat', generalAiUploadMiddleware, generalAiRateLimiter, async (req
           // Optional AI Insight from Gemini
           let aiInsight = '';
           try {
-            const isTraining = validatedPlan.requirements?.some((r) => r.id.includes('dao_tao') || r.id.includes('completed') || r.id.includes('courses'));
-            const isSales = validatedPlan.requirements?.some((r) => r.id.includes('revenue') || r.id.includes('orders') || r.id.includes('products'));
-            const isLogistics = validatedPlan.requirements?.some((r) => r.id.includes('on_time') || r.id.includes('carrier'));
-            const isWorkforceStatus = validatedPlan.requirements?.some((r) => r.id.includes('status_') || r.id.includes('lowest_active_dept'));
-            const isRecruitmentTenure = validatedPlan.requirements?.some((r) => r.id.includes('tenure') || r.id.includes('recruitment') || r.id.includes('tham_nien'));
-            const isPayroll = !isWorkforceStatus && !isRecruitmentTenure && (validatedPlan.requirements?.some((r) => r.id.includes('payroll') || r.id.includes('salary') || r.id.includes('luong') || r.metric?.includes('luong')) ||
-              (validatedPlan.aggregations || []).some(a => a.column?.includes('luong')));
-
-            const summaryData = {
-              results_by_requirement: queryResult.results_by_requirement || null,
-              reconciliation: queryResult.reconciliation || null,
-              primary_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus && !isRecruitmentTenure) ? sanitizeBiData((queryResult.results || []).slice(0, 15)) : null,
-              status_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus && !isRecruitmentTenure) ? queryResult.multi_visual?.status_breakdown || null : null,
-              overall_kpis: queryResult.summary || null,
-            };
-
-            let specificGuidelines = '';
-            if (isTraining) {
-              specificGuidelines = `
-1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp về đào tạo nhân sự.
-2. Trình bày tổng số lượt hoàn thành (414 lượt, bình quân 2,76 khóa/người), phòng ban dẫn đầu (Phòng Nhân Sự 92 lượt, Vận Tải 87 lượt), và tỷ lệ 21 nhân sự (14%) có 0 khóa đào tạo.
-3. PHÂN TÍCH TƯƠNG QUAN ĐÀO TẠO VÀ HIỆU SUẤT: Nêu rõ nhóm 0 khóa có điểm KPI trung bình cao (85,58 điểm) trong khi nhóm 5 khóa đạt 80,31 điểm; giải thích rằng kết quả KPI phụ thuộc vào năng lực thực chiến, kinh nghiệm và đặc thù vị trí, việc tham gia nhiều khóa học không đồng nghĩa cơ học với KPI cao hơn.
-4. Tuyệt đối KHÔNG nhắc đến quỹ lương hay trạng thái nhân sự vì câu hỏi người dùng không yêu cầu.`;
-            } else if (isSales) {
-              specificGuidelines = `
-1. Nêu tổng doanh thu và số lượng đơn hàng phân biệt (không nhầm lẫn giữa số dòng và số đơn hàng).
-2. Nhận xét về xu hướng doanh thu theo các tháng và sản phẩm dẫn đầu.
-3. Tuyệt đối KHÔNG tự ý chèn dữ liệu nhân sự hay lương.`;
-            } else if (isLogistics) {
-              specificGuidelines = `
-1. Phân tích tỷ lệ giao đúng hạn của các đơn vị vận chuyển.
-2. Nêu rõ mẫu số chỉ tính trên các đơn đã hoàn tất giao hàng (loại trừ đơn chưa giao).
-3. Tuyệt đối KHÔNG tự ý chèn dữ liệu nhân sự hay lương.`;
-            } else if (isWorkforceStatus) {
-              specificGuidelines = `
-1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp và súc tích về tình trạng nhân sự toàn công ty.
-2. Nêu chuẩn xác:
-   - Tổng số nhân viên toàn công ty và tỷ lệ nhân viên theo từng trạng thái (Đang làm việc: 128 [85,33%], Đã nghỉ việc: 15 [10,00%], Thai sản: 7 [4,67%]).
-   - Phòng ban có tỷ lệ nhân viên đang làm việc thấp nhất (Phòng Vận Tải: 25/31 = 80,65%).
-3. TUYỆT ĐỐI KHÔNG nhắc đến quỹ lương hay thông tin tiền lương vì câu hỏi không yêu cầu.
-4. Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
-            } else if (isRecruitmentTenure) {
-              specificGuidelines = `
-1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp, chuẩn xác về tình hình tuyển dụng và thâm niên nhân sự toàn công ty.
-2. Nêu chuẩn xác:
-   - Thâm niên bình quân toàn công ty: 4,85 năm.
-   - Phân bổ giai đoạn thâm niên: Nhóm lâu năm (> 5 năm) chiếm đa số với 70 nhân sự (46,67%), nhóm 1-3 năm có 44 nhân sự (29,33%), nhóm 3-5 năm có 35 nhân sự (23,33%), nhóm nhân viên mới (< 1 năm) có 1 nhân sự (0,67%).
-   - Đơn vị có nhiều nhân sự lâu năm (> 5 năm) nhất: Phòng Nhân Sự dẫn đầu với 15 nhân sự (chiếm 21,43% tổng nhân sự lâu năm toàn công ty), tiếp theo là IT với 14 nhân sự và Vận Tải với 13 nhân sự.
-   - So sánh hiệu suất KPI: Nhân viên lâu năm có điểm KPI trung bình (82,51 điểm) cao hơn nhóm nhân viên mới (75,90 điểm), chênh lệch +6,61 điểm.
-   - Xu hướng tuyển dụng: Giai đoạn 2018 - 2025 duy trì quy mô tuyển dụng ổn định từ 14 đến 25 nhân sự/năm, đỉnh điểm là năm 2024 với 25 nhân sự gia nhập.
-3. TUYỆT ĐỐI KHÔNG vẽ biểu đồ bằng ký tự ASCII, không dùng code block text mô phỏng biểu đồ đường/cột.
-4. Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
-            } else if (isPayroll) {
-              specificGuidelines = `
-1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp và súc tích về phân tích quỹ lương nhân sự theo đúng các chỉ tiêu đã xác thực.
-2. Nêu chuẩn xác:
-   - Tổng quỹ lương cơ bản và mức lương cơ bản bình quân.
-   - Mức lương cá nhân cao nhất và mức lương cá nhân thấp nhất (tuyệt đối trích xuất từ chỉ tiêu MAX/MIN cá nhân, KHÔNG được nhầm với trung bình phòng ban).
-   - Phòng ban có tổng quỹ lương lớn nhất và chức vụ có mức lương bình quân cao nhất.
-   - Nhóm mức lương chiếm đa số nhân sự.
-3. QUY TẮC AN TOÀN VÀ ĐỒNG BỘ TUYỆT ĐỐI:
-   - TUYỆT ĐỐI KHÔNG diễn giải mức lương trung bình của phòng ban thành mức lương cao nhất/thấp nhất của cá nhân nhân viên.
-   - TUYỆT ĐỐI KHÔNG nhắc đến điểm KPI, trạng thái làm việc hay bất kỳ chỉ tiêu nào không được hỏi.
-   - Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
-            } else {
-              specificGuidelines = `
-1. Viết 2-3 câu nhận xét điều hành ngắn gọn, trực diện và chuẩn xác theo đúng các chỉ tiêu người dùng hỏi.
-2. Bám sát 100% các kết quả đã được xác thực trong results_by_requirement hoặc bảng tổng hợp.
-3. TUYỆT ĐỐI KHÔNG diễn giải giá trị trung bình nhóm thành cực trị cá nhân.
-4. TUYỆT ĐỐI KHÔNG tự ý chèn các chỉ tiêu ngoài phạm vi yêu cầu.
-5. TUYỆT ĐỐI KHÔNG vẽ biểu đồ bằng ký tự ASCII, không dùng code block text mô phỏng biểu đồ đường/cột.`;
-            }
-
+            const specificGuidelines = buildExecutiveInsightGuidelines(validatedPlan, queryResult);
             const insightPrompt = `Dưới đây là kết quả phân tích số liệu thực tế từ tệp bảng tính ${metadata.original_filename}:
 Câu hỏi người dùng: "${userMessage}"
 Tóm tắt số liệu đã xác thực từ hệ thống:
-${JSON.stringify(summaryData, null, 2)}
+${JSON.stringify({
+  results_by_requirement: queryResult.results_by_requirement || null,
+  reconciliation: queryResult.reconciliation || null,
+  overall_kpis: queryResult.summary || null,
+}, null, 2)}
 Yêu cầu nhận xét điều hành:
 ${specificGuidelines}`;
             const aiRes = await callGeminiSafe([{ role: 'user', parts: [{ text: insightPrompt }] }], 'Bạn là chuyên gia phân tích dữ liệu điều hành BI SOTRANS.');
@@ -1002,89 +1038,18 @@ ${specificGuidelines}`;
 
             let aiInsight = '';
             try {
-              const isTraining = validatedPlan.requirements?.some((r) => r.id.includes('dao_tao') || r.id.includes('completed') || r.id.includes('courses'));
-              const isSales = validatedPlan.requirements?.some((r) => r.id.includes('revenue') || r.id.includes('orders') || r.id.includes('products'));
-              const isLogistics = validatedPlan.requirements?.some((r) => r.id.includes('on_time') || r.id.includes('carrier'));
-              const isWorkforceStatus = validatedPlan.requirements?.some((r) => r.id.includes('status_') || r.id.includes('lowest_active_dept'));
-              const isRecruitmentTenure = validatedPlan.requirements?.some((r) => r.id.includes('tenure') || r.id.includes('recruitment') || r.id.includes('tham_nien'));
-              const isPayroll = !isWorkforceStatus && !isRecruitmentTenure && (validatedPlan.requirements?.some((r) => r.id.includes('payroll') || r.id.includes('salary') || r.id.includes('luong') || r.metric?.includes('luong')) ||
-                (validatedPlan.aggregations || []).some(a => a.column?.includes('luong')));
-
-              const summaryData = {
-                results_by_requirement: queryResult.results_by_requirement || null,
-                reconciliation: queryResult.reconciliation || null,
-                primary_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus && !isRecruitmentTenure) ? sanitizeBiData((queryResult.results || []).slice(0, 15)) : null,
-                status_breakdown: (!isTraining && !isSales && !isLogistics && !isPayroll && !isWorkforceStatus && !isRecruitmentTenure) ? queryResult.multi_visual?.status_breakdown || null : null,
-                overall_kpis: queryResult.summary || null,
-              };
-
-              let specificGuidelines = '';
-              if (isTraining) {
-                specificGuidelines = `
-1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp về đào tạo nhân sự.
-2. Trình bày tổng số lượt hoàn thành (414 lượt, bình quân 2,76 khóa/người), phòng ban dẫn đầu (Phòng Nhân Sự 92 lượt, Vận Tải 87 lượt), và tỷ lệ 21 nhân sự (14%) có 0 khóa đào tạo.
-3. PHÂN TÍCH TƯƠNG QUAN ĐÀO TẠO VÀ HIỆU SUẤT: Nêu rõ nhóm 0 khóa có điểm KPI trung bình cao (85,58 điểm) trong khi nhóm 5 khóa đạt 80,31 điểm; giải thích rằng kết quả KPI phụ thuộc vào năng lực thực chiến, kinh nghiệm và đặc thù vị trí, việc tham gia nhiều khóa học không đồng nghĩa cơ học với KPI cao hơn.
-4. Tuyệt đối KHÔNG nhắc đến quỹ lương hay trạng thái nhân sự vì câu hỏi người dùng không yêu cầu.`;
-              } else if (isSales) {
-                specificGuidelines = `
-1. Nêu tổng doanh thu và số lượng đơn hàng phân biệt (không nhầm lẫn giữa số dòng và số đơn hàng).
-2. Nhận xét về xu hướng doanh thu theo các tháng và sản phẩm dẫn đầu.
-3. Tuyệt đối KHÔNG tự ý chèn dữ liệu nhân sự hay lương.`;
-              } else if (isLogistics) {
-                specificGuidelines = `
-1. Phân tích tỷ lệ giao đúng hạn của các đơn vị vận chuyển.
-2. Nêu rõ mẫu số chỉ tính trên các đơn đã hoàn tất giao hàng (loại trừ đơn chưa giao).
-3. Tuyệt đối KHÔNG tự ý chèn dữ liệu nhân sự hay lương.`;
-              } else if (isWorkforceStatus) {
-                specificGuidelines = `
-1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp và súc tích về tình trạng nhân sự toàn công ty.
-2. Nêu chuẩn xác:
-   - Tổng số nhân viên toàn công ty và tỷ lệ nhân viên theo từng trạng thái (Đang làm việc: 128 [85,33%], Đã nghỉ việc: 15 [10,00%], Thai sản: 7 [4,67%]).
-   - Phòng ban có tỷ lệ nhân viên đang làm việc thấp nhất (Phòng Vận Tải: 25/31 = 80,65%).
-3. TUYỆT ĐỐI KHÔNG nhắc đến quỹ lương hay thông tin tiền lương vì câu hỏi không yêu cầu.
-4. Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
-              } else if (isRecruitmentTenure) {
-                specificGuidelines = `
-1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp, chuẩn xác về tình hình tuyển dụng và thâm niên nhân sự toàn công ty.
-2. Nêu chuẩn xác:
-   - Thâm niên bình quân toàn công ty: 4,85 năm.
-   - Phân bổ giai đoạn thâm niên: Nhóm lâu năm (> 5 năm) chiếm đa số với 70 nhân sự (46,67%), nhóm 1-3 năm có 44 nhân sự (29,33%), nhóm 3-5 năm có 35 nhân sự (23,33%), nhóm nhân viên mới (< 1 năm) có 1 nhân sự (0,67%).
-   - Đơn vị có nhiều nhân sự lâu năm (> 5 năm) nhất: Phòng Nhân Sự dẫn đầu với 15 nhân sự (chiếm 21,43% tổng nhân sự lâu năm toàn công ty), tiếp theo là IT với 14 nhân sự và Vận Tải với 13 nhân sự.
-   - So sánh hiệu suất KPI: Nhân viên lâu năm có điểm KPI trung bình (82,51 điểm) cao hơn nhóm nhân viên mới (75,90 điểm), chênh lệch +6,61 điểm.
-   - Xu hướng tuyển dụng: Giai đoạn 2018 - 2025 duy trì quy mô tuyển dụng ổn định từ 14 đến 25 nhân sự/năm, đỉnh điểm là năm 2024 với 25 nhân sự gia nhập.
-3. TUYỆT ĐỐI KHÔNG vẽ biểu đồ bằng ký tự ASCII, không dùng code block text mô phỏng biểu đồ đường/cột.
-4. Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
-              } else if (isPayroll) {
-                specificGuidelines = `
-1. Viết 2-3 câu nhận xét điều hành chuyên nghiệp và súc tích về phân tích quỹ lương nhân sự theo đúng các chỉ tiêu đã xác thực.
-2. Nêu chuẩn xác:
-   - Tổng quỹ lương cơ bản và mức lương cơ bản bình quân.
-   - Mức lương cá nhân cao nhất và mức lương cá nhân thấp nhất (tuyệt đối trích xuất từ chỉ tiêu MAX/MIN cá nhân, KHÔNG được nhầm với trung bình phòng ban).
-   - Phòng ban có tổng quỹ lương lớn nhất và chức vụ có mức lương bình quân cao nhất.
-   - Nhóm mức lương chiếm đa số nhân sự.
-3. QUY TẮC AN TOÀN VÀ ĐỒNG BỘ TUYỆT ĐỐI:
-   - TUYỆT ĐỐI KHÔNG diễn giải mức lương trung bình của phòng ban thành mức lương cao nhất/thấp nhất của cá nhân nhân viên.
-   - TUYỆT ĐỐI KHÔNG nhắc đến điểm KPI, trạng thái làm việc hay bất kỳ chỉ tiêu nào không được hỏi.
-   - Bám sát 100% số liệu đã được xác thực từ hệ thống.`;
-              } else {
-                specificGuidelines = `
-1. Viết 2-3 câu nhận xét điều hành ngắn gọn, trực diện và chuẩn xác theo đúng các chỉ tiêu người dùng hỏi.
-2. Bám sát 100% các kết quả đã được xác thực trong results_by_requirement hoặc bảng tổng hợp.
-3. TUYỆT ĐỐI KHÔNG diễn giải giá trị trung bình nhóm thành cực trị cá nhân.
-4. TUYỆT ĐỐI KHÔNG tự ý chèn các chỉ tiêu ngoài phạm vi yêu cầu.
-5. TUYỆT ĐỐI KHÔNG vẽ biểu đồ bằng ký tự ASCII, không dùng code block text mô phỏng biểu đồ đường/cột.`;
-              }
-
+              const specificGuidelines = buildExecutiveInsightGuidelines(validatedPlan, queryResult);
               const insightPrompt = `Dưới đây là kết quả phân tích số liệu thực tế từ tệp bảng tính ${activeDataset.original_filename}:
 Câu hỏi người dùng: "${userMessage}"
 Tóm tắt số liệu đã xác thực từ hệ thống:
-${JSON.stringify(summaryData, null, 2)}
+${JSON.stringify({
+  results_by_requirement: queryResult.results_by_requirement || null,
+  reconciliation: queryResult.reconciliation || null,
+  overall_kpis: queryResult.summary || null,
+}, null, 2)}
 Yêu cầu nhận xét điều hành:
 ${specificGuidelines}`;
-              const aiRes = await callGeminiSafe(
-                [{ role: 'user', parts: [{ text: insightPrompt }] }],
-                'Bạn là chuyên gia phân tích dữ liệu điều hành BI SOTRANS.'
-              );
+              const aiRes = await callGeminiSafe([{ role: 'user', parts: [{ text: insightPrompt }] }], 'Bạn là chuyên gia phân tích dữ liệu điều hành BI SOTRANS.');
               if (aiRes && aiRes.text && !aiRes.isFallback) {
                 aiInsight = aiRes.text.trim();
               }

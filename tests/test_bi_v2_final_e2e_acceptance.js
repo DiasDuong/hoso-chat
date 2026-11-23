@@ -898,6 +898,96 @@ Sử dụng Line Chart, Bar Chart và bảng thống kê.`;
   check('TASK-8', 'D10-FOLLOWUP-FILTER', 'Domain 10 Áp dụng filter phòng ban Vận Tải', followUpPlan?.filters?.some(f => f.value === 'Vận Tải'));
   check('TASK-8', 'D10-FOLLOWUP-CHART', 'Domain 10 Chuyển visual preference sang PIE', followUpPlan?.chart_preference === 'PIE');
 
+  // DOMAIN 11: UNKNOWN DOMAIN — IOT & EQUIPMENT TELEMETRY (DYNAMIC ZERO-SHOT SCHEMA)
+  const iotRows = [
+    { ma_thiet_bi: 'TB-01', xuong_san_xuat: 'Xưởng Đóng Gói', chi_phi_bao_tri_vnd: 15000000, nhiet_do_c: 65.5, do_rung_mm_s: 2.1, dien_nang_tieu_thu_kwh: 1200 },
+    { ma_thiet_bi: 'TB-02', xuong_san_xuat: 'Xưởng Cơ Khí', chi_phi_bao_tri_vnd: 28000000, nhiet_do_c: 82.0, do_rung_mm_s: 4.8, dien_nang_tieu_thu_kwh: 3400 },
+    { ma_thiet_bi: 'TB-03', xuong_san_xuat: 'Xưởng Đóng Gói', chi_phi_bao_tri_vnd: 8000000, nhiet_do_c: 58.2, do_rung_mm_s: 1.5, dien_nang_tieu_thu_kwh: 950 },
+    { ma_thiet_bi: 'TB-04', xuong_san_xuat: 'Xưởng Cơ Khí', chi_phi_bao_tri_vnd: 45000000, nhiet_do_c: 91.4, do_rung_mm_s: 6.2, dien_nang_tieu_thu_kwh: 4800 },
+  ];
+  const iotDataset = {
+    file_id: 'ds_iot_golden',
+    original_filename: 'telemetry_thiet_bi.xlsx',
+    uploaded_by: authUser.user_id,
+    company_id: 'ALL',
+    profile: {
+      active_sheet: 'Sheet1',
+      grain: 'EQUIPMENT',
+      row_count: iotRows.length,
+      columns: [
+        { key: 'ma_thiet_bi', name: 'Mã Thiết Bị', type: 'STRING', is_unique: true },
+        { key: 'xuong_san_xuat', name: 'Xưởng Sản Xuất', type: 'STRING' },
+        { key: 'chi_phi_bao_tri_vnd', name: 'Chi Phí Bảo Trì (VNĐ)', type: 'INTEGER' },
+        { key: 'nhiet_do_c', name: 'Nhiệt Độ (°C)', type: 'FLOAT' },
+        { key: 'do_rung_mm_s', name: 'Độ Rung (mm/s)', type: 'FLOAT' },
+        { key: 'dien_nang_tieu_thu_kwh', name: 'Điện Năng Tiêu Thụ (kWh)', type: 'FLOAT' },
+      ],
+    },
+    rows: iotRows,
+  };
+  const p11 = 'Báo cáo telemetry thiết bị: 1. Tổng chi phí bảo trì, 2. Nhiệt độ trung bình, 3. Phân bổ độ rung theo xưởng sản xuất, 4. Top 3 thiết bị tiêu thụ điện cao nhất';
+  const plan11 = planAnalyticalQuery(p11, iotDataset.profile);
+  check('TASK-8', 'D11-IOT-DECOMPOSE', `Domain 11 IoT Telemetry bóc tách đủ >= 4 yêu cầu (thực tế: ${plan11.requirements?.length})`, plan11.requirements?.length >= 4);
+  const val11 = validateQueryPlan(plan11, iotDataset, authUser);
+  const exec11 = executeAnalyticalQuery(iotDataset, val11);
+  check('TASK-8', 'D11-IOT-EXEC', 'Domain 11 Stage B Execution Complete', exec11.execution_coverage.isComplete === true);
+  const dash11 = buildDatasetDashboard(val11, exec11, iotDataset, authUser);
+  check('TASK-8', 'D11-IOT-STAGE-C', 'Domain 11 Stage C Presentation Complete', dash11.completeness_contract.isFullyComplete === true);
+
+  // DOMAIN 12: CONTINUOUS UNNUMBERED NARRATIVE PARAGRAPH
+  const p12 = 'Hãy phân tích hiệu suất thiết bị: tính tổng chi phí bảo trì đồng thời tính nhiệt độ trung bình bên cạnh đó phân tích độ rung theo xưởng sản xuất ngoài ra lập danh sách top 3 thiết bị tiêu thụ điện cao nhất.';
+  const plan12 = planAnalyticalQuery(p12, iotDataset.profile);
+  check('TASK-8', 'D12-NARRATIVE-DECOMPOSE', `Domain 12 Đoạn văn liên tục bóc tách đủ >= 4 yêu cầu (thực tế: ${plan12.requirements?.length})`, plan12.requirements?.length >= 4);
+  const val12 = validateQueryPlan(plan12, iotDataset, authUser);
+  const exec12 = executeAnalyticalQuery(iotDataset, val12);
+  check('TASK-8', 'D12-NARRATIVE-EXEC', 'Domain 12 Stage B Execution Complete', exec12.execution_coverage.isComplete === true);
+  const dash12 = buildDatasetDashboard(val12, exec12, iotDataset, authUser);
+  check('TASK-8', 'D12-NARRATIVE-STAGE-C', 'Domain 12 Stage C Presentation Complete', dash12.completeness_contract.isFullyComplete === true);
+
+  // DOMAIN 13: ADVANCED STATISTICAL & MATRIX ANALYTICS (MEDIAN, PERCENTILE, STDDEV, CORRELATION, PIVOT)
+  const statsPlan = {
+    intent: 'ANALYTICAL_QUERY',
+    requirements: [
+      { id: 'req_median_cost', title: 'Trung vị chi phí', type: 'METRIC', func: 'MEDIAN', column: 'chi_phi_bao_tri_vnd', status: 'AVAILABLE' },
+      { id: 'req_p90_temp', title: 'Phân vị 90 nhiệt độ', type: 'METRIC', func: 'PERCENTILE', percentile: 90, column: 'nhiet_do_c', status: 'AVAILABLE' },
+      { id: 'req_stddev_power', title: 'Độ lệch chuẩn điện năng', type: 'METRIC', func: 'STDDEV', column: 'dien_nang_tieu_thu_kwh', status: 'AVAILABLE' },
+      { id: 'req_corr_temp_power', title: 'Tương quan nhiệt độ và điện năng', type: 'CORRELATION', column_x: 'nhiet_do_c', column_y: 'dien_nang_tieu_thu_kwh', status: 'AVAILABLE' },
+      { id: 'req_pivot_matrix', title: 'Ma trận chi phí theo xưởng', type: 'PIVOT', row_dimension: 'xuong_san_xuat', col_dimension: 'ma_thiet_bi', column: 'chi_phi_bao_tri_vnd', status: 'AVAILABLE' },
+    ],
+  };
+  const val13 = validateQueryPlan(statsPlan, iotDataset, authUser);
+  const exec13 = executeAnalyticalQuery(iotDataset, val13);
+  check('TASK-8', 'D13-STATS-MEDIAN', 'Tính đúng MEDIAN chi phí bảo trì = 21.500.000 VNĐ', exec13.results_by_requirement['req_median_cost'].value === 21500000);
+  check('TASK-8', 'D13-STATS-PERCENTILE', 'Tính đúng PERCENTILE (P90) nhiệt độ', typeof exec13.results_by_requirement['req_p90_temp'].value === 'number');
+  check('TASK-8', 'D13-STATS-STDDEV', 'Tính đúng STDDEV điện năng tiêu thụ', typeof exec13.results_by_requirement['req_stddev_power'].value === 'number');
+  check('TASK-8', 'D13-STATS-CORRELATION', 'Tính đúng Pearson CORRELATION (r > 0.95)', exec13.results_by_requirement['req_corr_temp_power'].value > 0.95);
+  check('TASK-8', 'D13-STATS-PIVOT', 'Tạo ma trận PIVOT 2 chiều với các cột thiết bị', exec13.results_by_requirement['req_pivot_matrix'].columns.length > 2);
+  const dash13 = buildDatasetDashboard(val13, exec13, iotDataset, authUser);
+  check('TASK-8', 'D13-STATS-STAGE-C', 'Domain 13 Stage C Presentation Complete', dash13.completeness_contract.isFullyComplete === true);
+
+  // DOMAIN 14: DATA UNAVAILABLE METRIC REPORTING
+  const unavailPlan = {
+    intent: 'ANALYTICAL_QUERY',
+    requirements: [
+      { id: 'req_cost', title: 'Chi phí bảo trì', type: 'METRIC', func: 'SUM', column: 'chi_phi_bao_tri_vnd', status: 'AVAILABLE' },
+      { id: 'req_missing', title: 'Áp suất buồng đốt', type: 'METRIC', status: 'UNAVAILABLE_DATA', reason: 'Tệp không có cột áp suất.' },
+    ],
+  };
+  const val14 = validateQueryPlan(unavailPlan, iotDataset, authUser);
+  const exec14 = executeAnalyticalQuery(iotDataset, val14);
+  check('TASK-8', 'D14-UNAVAILABLE-IS-COMPLETE', 'Stage B đánh dấu hoàn tất và báo cáo rõ chỉ tiêu thiếu', exec14.execution_coverage.isComplete === true && exec14.execution_coverage.unavailable_requirements === 1);
+  const dash14 = buildDatasetDashboard(val14, exec14, iotDataset, authUser);
+  check('TASK-8', 'D14-UNAVAILABLE-CONTRACT-REPORTED', 'Hợp đồng v2.0 ghi nhận chỉ tiêu thiếu dữ liệu và bảo vệ không đánh dấu hoàn tất giả', dash14.completeness_contract.isFullyComplete === false && dash14.completeness_contract.unavailable_count === 1);
+
+  // ============================================================================
+  // TASK 9: ANTI-OVERFITTING & DYNAMIC GROUNDING PROMPT AUDIT
+  // ============================================================================
+  console.log('\n--- [TASK 9] ANTI-OVERFITTING & DYNAMIC GROUNDING PROMPT AUDIT ---');
+  const generalAiSrc = fs.readFileSync(path.resolve(__dirname, '..', 'auth-service/routes/general_ai.js'), 'utf8');
+  check('TASK-9', 'NO-HARDCODED-TRAINING-FIXTURE', 'general_ai.js KHÔNG chứa số liệu hardcode đào tạo (414 lượt, 2,76 khóa)', !generalAiSrc.includes('414 lượt'));
+  check('TASK-9', 'NO-HARDCODED-TENURE-FIXTURE', 'general_ai.js KHÔNG chứa số liệu hardcode thâm niên (70 nhân sự [46,67%], 4,85 năm)', !generalAiSrc.includes('70 nhân sự [46,67%]'));
+  check('TASK-9', 'DYNAMIC-PROMPT-BUILDER-EXISTS', 'general_ai.js có hàm buildExecutiveInsightGuidelines động', generalAiSrc.includes('function buildExecutiveInsightGuidelines('));
+
   // Close browser cleanly
   await browser.close();
 

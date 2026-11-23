@@ -1175,9 +1175,13 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
     !hasWordOrPhrase(promptNorm, 'phan tich quy luong') &&
     !hasWordOrPhrase(promptNorm, 'bang xep hang');
 
+  const isKpiMetricAsked =
+    (hasWordOrPhrase(promptNorm, 'diem kpi') || hasWordOrPhrase(promptNorm, 'kpi tb') || hasWordOrPhrase(promptNorm, 'hieu suat kpi') ||
+      (hasWordOrPhrase(promptNorm, 'kpi') && !hasWordOrPhrase(promptNorm, 'kpi card') && !hasWordOrPhrase(promptNorm, 'kpi cards') && !hasWordOrPhrase(promptNorm, 'the kpi')));
+
   const isMultiDimensionalOrCrossDomain =
     hasWordOrPhrase(promptNorm, 'da chieu') ||
-    (hasWordOrPhrase(promptNorm, 'kpi') && hasWordOrPhrase(promptNorm, 'quy luong')) ||
+    (isKpiMetricAsked && hasWordOrPhrase(promptNorm, 'quy luong')) ||
     (hasWordOrPhrase(promptNorm, 'theo') && (promptNorm.includes(' va chuc vu') || promptNorm.includes(' va phong ban') || promptNorm.includes(' va vi tri')));
 
   if (!isMultiDimensionalOrCrossDomain && !isMultiBreakdownStatusDept && !isDeptComparisonMultiMetric && isPayrollAsked && (isCompositeStructure || hasWordOrPhrase(promptNorm, 'phan tich') || hasWordOrPhrase(promptNorm, 'quy luong') || hasWordOrPhrase(promptNorm, 'nhom muc luong') || hasWordOrPhrase(promptNorm, 'nhom luong') || hasWordOrPhrase(promptNorm, 'phan loai'))) {
@@ -1502,14 +1506,30 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
     }
   }
 
+  // 6. Continuous Narrative Paragraph Segmenter (splitting by transition connectives)
+  if (extractedClauses.length < 2) {
+    const transitionRegex = /(?:,\s*|\.\s+|\s+)(?:đồng thời|dong thoi|song song đó|song song do|bên cạnh đó|ben canh do|ngoài ra|ngoai ra|kèm theo|kem theo|cùng với đó|cung voi do|tiếp theo|tiep theo|sau đó|sau do)\s+/gi;
+    if (transitionRegex.test(promptRaw)) {
+      const parts = promptRaw
+        .split(/(?:,\s*|\.\s+|\s+)(?:đồng thời|dong thoi|song song đó|song song do|bên cạnh đó|ben canh do|ngoài ra|ngoai ra|kèm theo|kem theo|cùng với đó|cung voi do|tiếp theo|tiep theo|sau đó|sau do)\s+/i)
+        .map((p) => p.trim().replace(/^[-*•+\d.)\s]+/, '').replace(/^[.,;]+|[.,;]+$/g, ''))
+        .filter((p) => p.length > 5 && !/^(hãy|vui lòng|tạo|xây dựng)\s+báo cáo/i.test(p));
+      if (parts.length >= 2) {
+        extractedClauses = parts;
+      }
+    }
+  }
+
   if (extractedClauses.length >= 1) {
     const genericReqs = [];
     let reqIndex = 1;
 
     for (const clauseRaw of extractedClauses) {
-      const clauseNorm = normalizeText(clauseRaw);
+      // Strip trailing UI directives glued to the clause (e.g. "Top 10...\nSử dụng KPI Cards, Bar Chart...")
+      const cleanedClauseRaw = clauseRaw.replace(/\r?\n\s*(?:Sử dụng|Hiển thị|Trình bày|Dùng|Format|Dạng|Bao gồm)\b[\s\S]*$/i, '').trim();
+      const clauseNorm = normalizeText(cleanedClauseRaw);
 
-      // Skip UI-only directives like "8. Hiển thị KPI Cards, Bar Chart..."
+      // Skip pure UI-only directives like "8. Hiển thị KPI Cards, Bar Chart..."
       if (
         hasWordOrPhrase(clauseNorm, 'hien thi kpi cards') ||
         hasWordOrPhrase(clauseNorm, 'hien thi bieu do') ||
@@ -1529,8 +1549,8 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
       for (const col of colProfile.measures.concat(colProfile.quantities)) {
         const k = normalizeText(col.key);
         const n = normalizeText(col.name);
-        const cleanK = k.replace(/_(vnd|usd|count|total|sum|avg)$/g, '');
-        const cleanN = n.replace(/\b(vnd|dong|usd|diem|ngay|gio|nguoi|don vi)\b/g, '').trim();
+        const cleanK = k.replace(/_(vnd|usd|count|total|sum|avg|c|mm_s|kwh|bar|lit|phut)$/g, '');
+        const cleanN = n.replace(/\b(vnd|dong|usd|diem|ngay|gio|nguoi|don vi|°c|c|mm\/s|kwh|bar|lit|phut)\b/g, '').trim();
         if (
           hasWordOrPhrase(clauseNorm, k) ||
           hasWordOrPhrase(clauseNorm, n) ||
@@ -1539,6 +1559,24 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
         ) {
           measureCol = col;
           break;
+        }
+      }
+
+      // Token overlap matching for unknown/IoT domain measures
+      if (!measureCol) {
+        const clauseTokens = clauseNorm.split(/[\s_]+/).filter((t) => t.length > 2 && !['bao', 'cao', 'tinh', 'tong', 'trung', 'binh', 'nhat', 'theo', 'cac'].includes(t));
+        let bestScore = 0;
+        let bestCol = null;
+        for (const col of colProfile.measures.concat(colProfile.quantities)) {
+          const colTokens = normalizeText(`${col.key} ${col.name}`).split(/[\s_]+/).filter((t) => t.length > 2);
+          const overlap = clauseTokens.filter((t) => colTokens.includes(t)).length;
+          if (overlap > bestScore) {
+            bestScore = overlap;
+            bestCol = col;
+          }
+        }
+        if (bestScore >= 1) {
+          measureCol = bestCol;
         }
       }
       const isCountClause = !measureCol && (
@@ -1560,8 +1598,18 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
       const matchedDims = colProfile.dimensions.filter((col) => {
         const k = normalizeText(col.key);
         const n = normalizeText(col.name);
-        return hasWordOrPhrase(clauseNorm, k) || hasWordOrPhrase(clauseNorm, n);
+        const cleanK = k.replace(/_(ma|ten|id|code|key)$/g, '');
+        return hasWordOrPhrase(clauseNorm, k) || hasWordOrPhrase(clauseNorm, n) || (cleanK.length > 2 && hasWordOrPhrase(clauseNorm, cleanK));
       });
+      if (matchedDims.length === 0) {
+        const clauseTokens = clauseNorm.split(/[\s_]+/).filter((t) => t.length > 2 && !['bao', 'cao', 'tinh', 'tong', 'trung', 'binh', 'nhat', 'theo', 'cac'].includes(t));
+        for (const col of colProfile.dimensions) {
+          const colTokens = normalizeText(`${col.key} ${col.name}`).split(/[\s_]+/).filter((t) => t.length > 2);
+          if (clauseTokens.some((t) => colTokens.includes(t))) {
+            matchedDims.push(col);
+          }
+        }
+      }
       const dimCol = matchedDims[0] || null;
 
       // Match temporal / date column
@@ -1579,7 +1627,7 @@ function decomposeCompositeRequirements(promptNorm, promptRaw, datasetProfile, c
         genericReqs.push({
           id: `req_generic_top_${reqIndex}`,
           requirement_id: reqIdStr,
-          original_user_request: clauseRaw,
+          original_user_request: cleanedClauseRaw,
           title: `Top ${limitVal} theo ${measureCol ? measureCol.name : 'chỉ số'}`,
           type: 'RANKING',
           limit: limitVal,

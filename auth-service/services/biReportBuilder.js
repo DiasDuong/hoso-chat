@@ -116,8 +116,8 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
     for (const req of queryPlan.requirements) {
       const res = result.results_by_requirement[req.id];
       if (req.type === 'METRIC') {
-        const val = res ? res.value : null;
-        const isUnavailable = req.status === 'DATA_UNAVAILABLE' || res?.status === 'DATA_UNAVAILABLE' || val === null;
+        const val = res && res.value !== undefined ? res.value : null;
+        const isUnavailable = req.status === 'DATA_UNAVAILABLE' || req.status === 'UNAVAILABLE_DATA' || res?.status === 'DATA_UNAVAILABLE' || res?.status === 'UNAVAILABLE_DATA' || val === null;
         kpis.push({
           id: `kpi_req_${kpiIdx++}`,
           metric_alias: req.id,
@@ -492,9 +492,9 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
           ],
           pagination: { page_size: 10, total_rows: growthData.length },
         });
-      } else if (req.type === 'COMPLETION_RATE' || req.type === 'ON_TIME_RATE' || req.type === 'EFFICIENCY' || req.type === 'DELTA') {
+      } else if (req.type === 'COMPLETION_RATE' || req.type === 'ON_TIME_RATE' || req.type === 'EFFICIENCY' || req.type === 'DELTA' || req.type === 'CORRELATION') {
         const val = res?.value !== undefined ? res.value : null;
-        const isUnavailable = req.status === 'DATA_UNAVAILABLE' || res?.status === 'DATA_UNAVAILABLE' || val === null;
+        const isUnavailable = req.status === 'DATA_UNAVAILABLE' || req.status === 'UNAVAILABLE_DATA' || res?.status === 'DATA_UNAVAILABLE' || res?.status === 'UNAVAILABLE_DATA' || val === null;
         kpis.push({
           id: `kpi_req_${kpiIdx++}`,
           metric_alias: req.id,
@@ -506,11 +506,11 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
           status: isUnavailable ? 'DATA_UNAVAILABLE' : 'AVAILABLE',
           subtext: isUnavailable ? (req.reason || res?.reason || 'Chưa đủ dữ liệu.') : (res?.subtext || req.subtext || 'Tính trên toàn bộ tập dữ liệu.'),
         });
-      } else if (req.type === 'TABLE') {
+      } else if (req.type === 'TABLE' || req.type === 'PIVOT') {
         const tblData = res?.data || [];
         const tblRef = `dataset_${req.id}`;
         dataStore[tblRef] = tblData;
-        const colKeys = tblData[0] ? Object.keys(tblData[0]).slice(0, 8) : ['id'];
+        const colKeys = res?.columns || (tblData[0] ? Object.keys(tblData[0]).slice(0, 10) : ['id']);
         dataTables.push({
           id: `tbl_${req.id}`,
           title: req.title,
@@ -616,10 +616,15 @@ function buildDatasetDashboard(queryPlan, result, dataset, userContext = null) {
       missing_presentation: missingPresentation,
     };
     payload.presentation_coverage = presentationCoverage;
+    const unavailableCount = Array.isArray(queryPlan.requirements)
+      ? queryPlan.requirements.filter((r) => r.status === 'UNAVAILABLE_DATA' || r.status === 'DATA_UNAVAILABLE').length
+      : 0;
+
     payload.completeness_contract = {
       stage_a_planning: queryPlan.metric_coverage || null,
       stage_b_execution: result.execution_coverage || null,
       stage_c_presentation: presentationCoverage,
+      unavailable_count: unavailableCount,
       isFullyComplete: (queryPlan.metric_coverage?.isComplete !== false) &&
                        (result.execution_coverage?.isComplete !== false) &&
                        presentationCoverage.isComplete,
